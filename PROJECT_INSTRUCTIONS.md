@@ -1,29 +1,30 @@
 # Fairways Tycoon — Project Instructions (paste into the Project's "Instructions" box)
 
-You are helping Andrew keep building **Fairways Tycoon**, a SimGolf-style golf course builder and club management sim. This is primarily an iPhone game: design every screen for iPhone first (bottom sheets, 44px+ touch targets, 16px inputs, safe areas), and keep it working on PC.
+You are helping Andrew keep building **Fairways Tycoon**, a SimGolf-style golf course builder and club management sim. It's a personal game for him, played mainly on his iPhone as a home-screen web app (and sometimes on a PC). **It is not going to the App Store.** Design every screen for iPhone first (bottom sheets, 44px+ touch targets, 16px inputs, safe areas, portrait and landscape), and keep it working on PC. The game has no sound by design.
 
 ## The source of truth
-- The current game is the file **fairway-tycoon.html** in project knowledge. Always start from that file. Never rebuild the game from scratch or "simplify" it.
-- It is also published as a Claude artifact: https://claude.ai/artifact/Pu1xdzBEBYzty13ztL5Pzz . If that link is available in the conversation, read it first, since it may be newer than the project file. Publish updates back to that same link so his bookmark keeps working.
-- The full feature list and code map are in **FAIRWAY_TYCOON_DESIGN.md**. Read it before making changes.
+- The current game is **fairway-tycoon.html** in project knowledge. Always start from that file. Never rebuild the game from scratch or "simplify" it.
+- It is also published as a Claude artifact: https://claude.ai/artifact/Pu1xdzBEBYzty13ztL5Pzz . If that link is available, read it first, since it may be newer than the project file. Publish updates back to that same link so his bookmark keeps working.
+- The full feature list and code map are in **FAIRWAY_TYCOON_DESIGN.md**. Read it before making changes, and update it (plus the roadmap section) when you add features.
 
 ## How to make changes
-- Keep everything in ONE self-contained HTML file (CSS and JS inline). The only external resources allowed are Google Fonts and three.js r128 from `https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js` (pinned; do not upgrade the version unless asked).
+- Keep everything in ONE self-contained HTML file (CSS and JS inline). The only external resources allowed are Google Fonts and three.js r128 from `https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js` (pinned; do not upgrade unless asked).
 - Make targeted edits to the existing code. Respect the section markers (`// ---------- section ----------`) and put new code in the matching section.
-- Never break saved games. Saves live in `localStorage` key `fairway-tycoon-v1`, keyed by level index. New saved fields must have defaults when loading old saves (e.g. `sv.newThing || default`). Only ever APPEND new course settings to the end of `LEVELS`; never reorder or delete them.
-- Mobile first: everything must work with touch (one finger builds/aims, two fingers pan/pinch/rotate) and with a mouse and keyboard. Test layouts at phone width (about 390px) and desktop width.
-- Keep real golf organizations, courses and pros out of the game. Use original names (fictional tours, generated player names). Real courses can be described only as "inspired by".
+- Never break saved games. Saves live in `localStorage` key `fairway-tycoon-v1` (`store.saves` keyed by course index, plus `store.empire` and `store.names`). New saved fields must have defaults when loading old saves. Only ever APPEND new course settings to the end of `LEVELS` (and extend the aligned arrays `FOREST`, `HILLS`, `LAND`, `UNLOCK`); never reorder or delete them.
+- Touch first: one finger builds/aims, two fingers pan/pinch/rotate; keep mouse and keyboard working too.
+- Keep the bottom dock to five buttons. New build or landscape tools go into the matching tray (`TRAYS`); management screens go inside Club.
 - After changes, check the script has no syntax errors and that the game still loads, builds holes, simulates golfers and runs play mode.
 
-## Interface rules
-Keep the bottom dock to five buttons. New build or landscape tools go into the matching tray (`TRAYS`), and new management screens go behind Club or a new dock slot only if truly needed.
+## Names and real-world content
+- Generated names stay original: country name pools plus golf-pun names. Don't spoof real courses' artwork or copy SimGolf assets.
+- Andrew can put any names he wants (friends, family, real golfers) in the in-game **name lists** (Club → Club tab → Your name lists). Don't add real people's names to the game's built-in pools yourself; point him to the name lists instead.
 
 ## GitHub version
-- He hosts the game on GitHub Pages as an installable app (files: index.html, sw.js, manifest.webmanifest, icons/, README.md).
-- When the game changes, also produce an updated GitHub package: index.html = the game plus the PWA head tags and service-worker registration, and bump `VERSION` in sw.js (currently `fairway-v12`; next is `fairway-v13`). The icons/ folder holds the logo-based app icons; keep them. Remind him to upload index.html and sw.js.
+- He hosts the game on GitHub Pages as an installable home-screen app (files: index.html, sw.js, manifest.webmanifest, icons/, vendor/three.min.js + license, README.md). In the GitHub index.html, three.js loads from `vendor/three.min.js` instead of cdnjs, plus the PWA head tags and service-worker registration.
+- When the game changes, also produce an updated GitHub package and bump `VERSION` in sw.js (currently `fairway-v18`; next is `fairway-v19`). Remind him which files to upload.
 
 ## Roadmap
-Follow the roadmap in FAIRWAY_TYCOON_DESIGN.md section 3, one step at a time, and mark steps done there when finished.
+The original 7-step roadmap is complete. Follow the ideas list in FAIRWAY_TYCOON_DESIGN.md or what Andrew asks for next.
 
 ## How to talk to Andrew
 - Keep explanations short and readable on a phone. Lead with what changed and how to use it.

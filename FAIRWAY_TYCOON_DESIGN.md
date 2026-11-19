@@ -1,6 +1,6 @@
 # Fairways Tycoon — Design & Code Guide
 
-A SimGolf-style golf game: design courses, run a golf club, host tournaments and play your own holes. Single HTML file, three.js 3D rendering, installable from GitHub Pages. **Primary platform: iPhone** (bottom-sheet menus under 600px wide, 44px+ touch targets, 16px inputs so iOS doesn't zoom); also works on PC.
+A SimGolf-style golf game: design courses, run a golf club, host tournaments and play your own holes. Single HTML file, three.js 3D rendering, installable from GitHub Pages as a home-screen app. Personal project, **not going to the App Store**. **Primary platform: iPhone** (bottom-sheet menus under 600px wide, 44px+ touch targets, 16px inputs so iOS doesn't zoom); also works on PC.
 
 ---
 
@@ -8,6 +8,15 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
+
+### Polish & platform (step 7)
+- **No sound by design.**
+- **Landscape** (`@media (orientation: landscape) and (max-height: 520px)`): the map fills the left side; hint, tray (wrapping, scrollable) and a two-column dock sit in a 228px right panel; HUD pills sit over the map; side safe areas respected.
+- **Animations:** golfer swing (club pivot at the hands: backswing → downswing → follow-through during the 0.5s address and the start of ball flight), ball flight trails (overlay), smooth zoom buttons (`smoothZoom`), sheets slide up, trays slide in when opened. All respect reduced motion.
+- **Performance:** 1024 shadow map on phones; when paused and idle for 1.5s the scene draws at ~15fps (`lastInteract`, `idleN`).
+- **iPhone hardening:** no page pinch-zoom (`gesturestart`), no rubber-band scroll, no long-press callout, persistent storage requested.
+- **Backup / restore** (empire screen): copy the whole save store as a code; paste a code to restore.
+- **GitHub package:** three.js is bundled locally (`vendor/three.min.js`, MIT license included) and cached by the service worker so the home-screen app works offline. The Claude artifact still loads three.js from cdnjs.
 
 ### Controls layout (bottom dock)
 The bottom of the screen is a five-button dock: 🏗️ **Build**, 🌳 **Landscape**, 🏌️ **Play**, 🏆 **Club** (red badge = waiting invitations), 📋 **Golfers** (scorecards). Build and Landscape open a tray above the dock (`TRAYS`, `openTray`, `closeTray`, `S.tray`):
@@ -32,7 +41,7 @@ All 9 settings are unlocked; each has an optional challenge (holes, star rating,
 | 8 | Lakeshore Dunes | Great Lakes dunes (Whistling Straits-like) | Lake along top, pot bunkers, fescue |
 
 ### Building
-- **Hole tool:** tap tee spot, then pin spot (100–700 yds). Auto-builds tee box + green. Par: ≤250 yds = 3, ≤470 = 4, else 5. Cost $200 + green tiles.
+- **Hole tool:** tap tee spot, then pin spot (100–700 yds). Builds the tee box and a single green tile at the pin; the player paints the rest of the green (holes with a green under 5 tiles get a "Green is small" note and less design score). Par: ≤250 yds = 3, ≤470 = 4, else 5. Cost $200 + green tiles.
 - **Paint tools:** Fairway $30, Green $60, Bunker $25, Cart path $15, Trees $20, Flowers $35, Pond $60, Clear $10 (water→$40, rock→$80). Brush 1×1 or 3×3. Clearing a tee or pin removes that hole.
 - **Move tool** for one-finger panning.
 - **Elevation:** Raise / Lower tools ($40 per tile per level, levels 0–8, one level = 0.22 tiles ≈ 5.5 yds; `E` Int8Array, `ELH`, `EMAX`, `elevAt`). Water and the clubhouse stay flat; painting water flattens a tile. New courses get natural hills per setting (`HILLS`, aligned with `LEVELS`; `genElev`). Rendering adds elevation into the blended terrain heights. Holes show "plays as" yardage (`info.plays`, `info.drop`); par uses plays yardage; elevated tees (2+ levels down to the green) add design score. Shots: AI golfers compensate for target elevation, carry is shortened uphill / lengthened downhill based on the landing spot; play mode applies the same physics and the hint shows plays-as distance.
@@ -63,6 +72,38 @@ Placed by tapping (footprint centered on the tap; needs clear ground away from w
 | Restaurant 🍽️ | 2×2, one | $9,000 / $90 | After the round, chance to eat ($15–45), +5 mood (counts toward the course rating) |
 Golfers walk to "need" facilities between holes (`planDetour`, `g.detour`, `useFacility`), arrival extras happen at the first tee (`arriveExtras`), the restaurant in `finishRound`. Golfers have a `spend` trait (0–1) and track `spent` (shown on their card). Attribute boosts are `g.bonus`, added by `A()`. Visitors no longer ride carts unless they rent one; members still ride free.
 
+### Golf empire (start screen = empire screen)
+The 9 course settings are **properties**. `store.empire.owned` (in the main save store) lists owned indexes; Meadow Run is owned free, and any setting with a save is owned (old players keep everything). Each property keeps fully independent saves: money, staff, members, facilities, rating, loan.
+- **Empire screen** (`showLevels`): stats (rank, properties owned, empire value, cash on hand), "Your properties" (club name, day, holes, stars, cash, value, loan; Continue / Build here / Start over), "Land for sale" sorted by unlock value.
+- **Buying land:** price = land cost (`LAND`) + the setting's build budget (`LEVELS[i].cash`), paid from any started property's cash (pick in the card). A property goes on sale once empire value ≥ `UNLOCK[i]` ($15k Pine Barrens/… up to $70k Cliffside). The buyer's books record "Land purchases".
+- **Values:** `propertyValue()` = land (min $10k) + $1,500/hole + 60% of facility cost + stars × holes × $700 + $400/member + $800/prestige; saved as `value` and `stars` with each save. Empire value = Σ (value + cash − loan). Ranks: Course Owner, Club Group (2), Golf Company (3+, $120k), Golf Resorts Group (5+, $300k), Golf Empire (7+, $600k).
+- **Loans** (Club → Club tab): borrow $10k/$25k/$50k up to 50% of property value; repay 115% over 60 days in daily payments (`S.loan = {balance, daily}`, `loanDay()`), or pay off early.
+- **Send money** between started properties (Club tab), recorded as "Sent to other courses".
+- **Bankruptcy** now only loses that one property (unless it's your only one).
+- **Unlocks:** facilities need course stars (Putting Green 1★, Pro Shop 1.5★, Cart Barn 2★, Driving Range 2.5★, Restaurant 3★; tray shows 🔒); Superintendent needs 4 holes. Bigger tour invitations already scale with holes, stars and prestige.
+
+### Course rating breakdown (tap ★ in the HUD, or Goals → Rating breakdown)
+`courseRatings()` scores nine categories 0–10; stars = weighted sum / 2 (`RATING_W`) + up to +0.3 for distinct facility types:
+Hole design 25% (avg hole quality) · Challenge 10% (actual strokes over par per hole from played holes, best around +0.8; labeled Easy/Fair/Tough/Brutal) · Beauty 10% (scenery near tees/greens, elevated tees, flower beds) · Variety 10% (par mix, doglegs, elevation changes, length spread) · Fairness 10% (hole warnings: missing fairway, crossing holes, pin off green, too short/long) · Green quality 10% (green size + greens condition) · Condition 10% (`condScore`) · Pace of play 5% (sim seconds per hole from the last 25 rounds, `S.paceLog`, shown as hours for 18) · Golfer happiness 10% (recent satisfaction). The sheet shows bars and tips for the two weakest categories. Stored on `S.course.r`.
+
+### Your rounds (Play): golfer view + swing meter
+Camera sits behind the ball (FOV 52°, `playCamStep`, `camPos`/`camLook`), looking down the aim line; 🗺️ Hole view toggles back to the overhead map (pan by dragging). Aim with ◀ ▶ (hold) or by dragging sideways; auto-aims at the pin or the dogleg corner. Clubs (`CLUBS`): Driver, 3 Wood, 5/7/9 Iron, Wedge, Sand Wedge, Putter, auto-picked for the distance (‹ › to change). Three-tap swing (`swingTap`, `stepMeter`, `hitP`): tap Swing → power bar fills (past the white line = overswing, up to 110%) → tap to set power → marker runs back → tap on the green sweet spot for accuracy (early = push right, late = pull left; sweet spot width grows with Driving accuracy/Chipping/Putting). Keyboard: Space swing, ←/→ aim, ↑/↓ club. Lie, elevation, roll, penalties and coins work as before; golfer swing pose follows the meter.
+
+### Record book (Club → Honors)
+`S.records = { rounds:{[holeCount]: {toPar,total,name,kind,country,day}}, holes:[{best,par,name,kind,day}], aces:[] }`. Course record per layout size, best score on each hole (resets if that hole's par changes, shifts when a hole is removed), hole-in-one list; toasts for new course records and aces. Updated from AI golfers, event players and your pro's rounds.
+
+### Names
+**Your name lists** (Club → Club tab): two text boxes, one name per line, stored empire-wide in `store.names = { pros:[], members:[] }`. New tour pros (`proPlayer`) and new members (`newMember`) take unused names from these first (`poolPick`); pros can carry a country code ("Name, ESP" or "Name (ESP)", `parseNameLine`). Otherwise `randName(code, fun=.35)` makes names: 35% original golf puns (`FUN_FULL`, `FUN_FIRST` × `FUN_LAST`: Chip Shotwell, Sandy Trapp, Rusty Irons, Bo Gee, Holly Inone…), the rest country/regular names. The built-in pools don't include real people; Andrew adds whoever he wants through the lists.
+
+### Golfer traits
+Skill attributes (`ATTRS`, coin-upgradable): Driving, Driving accuracy (tee/long shots), **Iron play** (`ir`, approach shots at the pin from 60+ yds), Chipping, Sand, Recovery, Putting, **Course management** (`cm`: better target choices with less randomness, more respect for water, better elevation adjustment). Personality traits (not skills): **Patience** (`patience`, bad holes hurt mood more for impatient golfers; holes taking 14+ sim seconds annoy them: "This is taking forever.") and **Spending** (`spend`). Shown as "Patient, big spender" on golfer cards and member profiles. Old members/pro get `ir` = old accuracy and a `cm` value.
+
+### Staff & maintenance (🏆 Club → Staff tab)
+**Course condition** (`S.cond`: turf, greens, bunkers, equipment, 5–100%) changes once a day in `maintDay()`. Crew capacity vs. workload (`maintCalc()`): each Groundskeeper handles ~60 fairway/tee tiles; each Greenskeeper ~25 green tiles and ~20 bunker tiles (groundskeepers help a little); a Superintendent makes the crew 30% more effective; worn equipment (decays daily, Repair button, cost grows with wear) cuts effectiveness up to 40%. Daily change ≈ +8×coverage − 5 for turf (greens +9×coverage − 6, bunkers +6×coverage − 4), plus watering (Low −2 / Normal 0 / High +1.5), fertilizer (+1.5 turf, +1 greens) and minus golfer traffic. Desert courses lose 2 turf a day unless watering is High.
+**Effects:** course stars + clamp((condition − 70)/60, −0.8, +0.3) where condition = turf 40% + greens 40% + bunkers 20% (`condScore`); golfer mood (condition − 65)/12 per hole plus complaints ("These greens are bumpy.", "The fairways need a mow.", "Nobody raked these bunkers."); putting success × (0.82 + 0.18 × greens%); grass color dries toward straw-brown below ~72%.
+**Roles** (`ROLES`, daily wage): Superintendent $90 (max 1), Groundskeeper $35, Greenskeeper $40, Pro Shop Clerk $30 (needs Pro Shop, +40% shop sales), Chef $35 (needs a food facility, +35% food & drink), Cart Attendant $25 (needs Cart Barn, +15% rental chance), Marshal $30 (golfers walk 12% faster, pick up at par+3). New courses start with a groundskeeper and a greenskeeper; old saves get the same starter crew.
+**Daily bills:** salaries, water (per fairway/tee/green tile by watering level), fertilizer, electricity ($15 + $8 per facility), repairs; all in Finances. The end-of-day message shows the condition % and warnings.
+
 ### Economy
 Money pays for everything you build. It comes in from green fees (each public round), food & drink, pro shop sales, range fees, cart rentals, weekly member dues (every 7 days), hosting events (tour invitations pay a hosting fee plus ticket sales; club events collect entry fees) and your club pro's prize money. Lesson fees from your pro's member lessons also come in. It goes out to building and daily upkeep. Every transaction is booked by category (`book(cat, amt)`) into `S.books` (this week) and `S.lastBooks` (last week, rolled every 7 days); the Club tab shows a Finances table. Tapping the money in the HUD opens it.
 
@@ -77,6 +118,7 @@ Money pays for everything you build. It comes in from green fees (each public ro
 Outside tournaments arrive as random invitations (`S.offers`, max 3; ~40% chance each day once you have a hole; each expires after 6–14 days). Each lists course requirements with ✓/✗ and "(X now)" progress, and can only be accepted when every requirement is met. Tiers (`TIERS`): County amateur (3–4 holes, 2★, plus water/bunkers/par 3), Collegiate (6 holes, 2.5★, par 5, bunkers on 3 holes), Legends Senior Tour (6 holes, 3★, cart paths on every hole; pro can enter), Atlantic Pro Tour with fictional sponsors (6–9 holes, 3.5★, water on 2 holes, par 5, 2,000 yards; pro can enter, $20k purse), United Links major (9 holes, 4★, prestige 5, water on 3, two par 3s, two par 5s, 3,200 yards; $60k purse). Bigger tiers become more likely as holes, stars and prestige grow. Requirement checks: `REQ` (holes, stars, members, prestige, par3, par5, water, sand, carts, yards).
 
 ### Club management (🏆 Club button)
+- **Staff tab:** course condition bars, crew coverage, watering/fertilizer/repairs, daily costs, staff list (let go), hire cards.
 - **Club tab:** club pro card, Pro lessons (pick member + attribute, 3 per day), Finances table, club name, Club Championship trophy name, stats, reigning champion, what each golfer type thinks.
 - **Members tab:** member cards (shirt-color badge with flag, personality, handicap, match record, mood). Tap to open the **member profile sheet**: name, nationality (14 flag chips + None), personality, six attributes upgraded with coins (Driving, Accuracy, Chipping, Sand, Recovery, Putting; handicap derives from their average), shirt and pants colors (avatar preview), and record (rounds, best round to par, match W-L-H, titles, head-to-head vs each member). Weekly dues (collected every 7 days) vs "fair dues". Members apply when rating/dues are good; unhappy members quit; members play free rounds on their own schedule.
 - **Golfer types (personalities):** Weekend Golfer (wants wide fairways, hates water), Grinder (loves hazards/tough holes, bored by easy ones), Senior (shorter, rides carts, hates long walks), Social Golfer (loves scenery, cares less about score), Big Hitter (+15% distance, less accurate, loves par 5s). Applies to public visitors (weighted mix), members and guests; drives satisfaction and thought bubbles. Club tab shows "What golfers think" mood per type.
@@ -104,7 +146,7 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 
 | Section marker | What's in it |
 |---|---|
-| (top) | Constants: grid `COLS=18, ROWS=26`, `YD=25` yards per tile, `DAY=40`, `MAXG=30`, tile types `T`, `TOOLS`, `UPKEEP`, `ALL_TOOLS`, `NATIVE_STYLE`, `LIEVAL`, `LEVELS`, name pools, `COUNTRIES`, `EVENTS`, `SHIRTS`, helpers (`clamp`, `lerp`, `gauss`, `fmt`, `rng`, `hash`, `pick`) |
+| (top) | Constants: grid `COLS=34, ROWS=46` (was 18×26; `migrateSave` moves old saves into the new map, offset so the old clubhouse lines up with the new one at `CHX, CHY`; feature counts scale by `AF`, camera fit by `MK`), `YD=25` yards per tile, `DAY=40`, `MAXG=30`, tile types `T`, `TOOLS`, `UPKEEP`, `ALL_TOOLS`, `NATIVE_STYLE`, `LIEVAL`, `LEVELS`, name pools, `COUNTRIES`, `EVENTS`, `SHIRTS`, helpers (`clamp`, `lerp`, `gauss`, `fmt`, `rng`, `hash`, `pick`) |
 | `state` | Grid `G` (Uint8Array), state object `S`, save/load (`saveGame`, `store`), `tile()`, `at()`, cart access map `NEAR` / `hasCart()` |
 | `map generation` | `genMap(L)` seeded terrain per setting (coast, creek, trees, flowers, ponds, waste, sand, rocks, clubhouse) |
 | `hole analysis` | `holeInfo(h)` (yards, par, quality, notes, cart), `recompute()` (course stars) |
@@ -127,7 +169,7 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 - **Event player:** `{ name, skill, pow, acc, put, type?, country?, mid?, team?, guest?, card[], started, done, sat }`
 - **Offer:** `{ id, tier, name, org, blurb, field, skill, type?, prestige, purse, pro, base, gate, reqs:[[key,n]], expires }`
 - **Club pro:** `{ name, country, at:{dr,ac,ch,sd,rc,pt}, skill, shirt, pants, skin, starts, wins, top10, earnings, log[] }`
-- **Save (per level index):** `grid, elev, bridges, facilities, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft`
+- **Save (per level index):** `records, grid, elev, bridges, facilities, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft, staff, staffId, cond, water, fert, loan, stars, value`; empire-wide: `store.empire.owned`
 
 ---
 
@@ -135,10 +177,10 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 1. ✅ Construction upgrade: undo/redo, hills and elevation.
 2. ✅ Better holes: dogleg holes (bend point), fringe collar on greens, bridges, hole signs.
 3. ✅ Facilities: pro shop, snack bar, drink stand, restaurant, driving range, putting green, cart barn, restrooms, benches; revenue from shop, food and drink, range and cart rentals; fix hunger/thirst/energy.
-4. Staff and maintenance: superintendent, groundskeepers, shop/restaurant staff, cart attendants; salaries; course condition (mowing, watering, greens, bunkers); water and electricity costs.
-5. Ratings breakdown (difficulty, beauty, variety, fairness, green quality, condition, pace of play, satisfaction) and deeper golfer traits (iron accuracy, short game, course management, patience, spending).
-6. Golf empire: buy additional properties with independent books, loans, progression unlocks.
-7. Polish: sound, animations, landscape layout, App Store wrapper (Capacitor) when ready.
+4. ✅ Staff and maintenance: superintendent, groundskeepers, greenskeepers, clerks, chefs, cart attendants, marshals; salaries; course condition (turf, greens, bunkers, equipment) with watering, fertilizer and repairs; water and electricity costs.
+5. ✅ Ratings breakdown (design, challenge, beauty, variety, fairness, green quality, condition, pace of play, happiness) and deeper golfer traits (iron play, course management, patience, spending).
+6. ✅ Golf empire: buy additional properties with independent books, loans, money transfers, progression unlocks.
+7. ✅ Polish: animations, landscape layout, performance, backups, offline package (no sound by design; not going to the App Store).
 
 ## 4. Ideas not built yet
 - Amenities: snack carts, refreshment stands (fix hunger/thirst), benches (energy), restrooms, driving range, pro shop, decorative buildings (windmill, lighthouse, gazebo, fountain)
