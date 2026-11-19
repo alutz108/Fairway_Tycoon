@@ -1,4 +1,4 @@
-# Fairway Tycoon
+# Fairways Tycoon
 
 Design golf courses, run your club, host tournaments and play your own holes.
 Works in any modern browser on phones, tablets and computers, and can be installed as an app.
