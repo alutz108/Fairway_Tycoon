@@ -71,7 +71,20 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
   transition:opacity .2s;pointer-events:none}
 #toast.show{opacity:1}
 #hint{margin:6px 14px 4px;font-size:.84rem;color:var(--muted);min-height:1.2em;line-height:1.35}
-#tools{display:flex;gap:6px;overflow-x:auto;padding:4px 10px 10px;scrollbar-width:none}
+#tools{display:flex;flex-direction:column;gap:6px;padding:4px 10px 10px}
+.tray{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.tray::-webkit-scrollbar{display:none}
+.tool.done{background:var(--brand);color:#fff}
+.tool.done .pr{color:rgba(255,255,255,.75)}
+.undoBox{position:absolute;left:10px;bottom:10px;display:flex;gap:6px}
+.undoBox button{width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);color:#17301f;font-size:1.3rem;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.undoBox button:disabled{opacity:.45}
+.dock{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.dock.three{grid-template-columns:repeat(3,1fr)}
+.dockbtn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--panel);color:var(--ink);border:2px solid transparent;border-radius:14px;padding:6px 2px;min-height:56px;font-weight:600;font-size:.74rem;box-shadow:0 0 0 1px var(--line)}
+.dockbtn .di{font-size:1.35rem;line-height:1.1}
+.dockbtn.on{border-color:var(--brand);background:var(--chip)}
+.badge{position:absolute;top:3px;right:6px;min-width:18px;height:18px;border-radius:9px;background:var(--flag);color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
 #tools::-webkit-scrollbar{display:none}
 .tool{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--panel);border:2px solid transparent;
   border-radius:12px;padding:7px 8px 6px;min-width:62px;box-shadow:0 0 0 1px var(--line)}
@@ -184,7 +197,9 @@ td.neg{color:var(--flag)}
 .hud .lvl,.hud .day,.hud .group,.hud #money,.hud #stars,.hud #coins{background:rgba(14,34,22,.8);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 3px 12px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1)}
 .hud .lvl{border-radius:14px;padding:6px 12px;flex:0 1 auto;max-width:60%}
 .hud #money{margin-left:auto}
-.hud .day{flex:0 1 220px}
+.hud .day{flex:1 1 0;min-width:0;max-width:240px}
+.hud #dayLbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud .group button{padding:6px 9px}
 .hud .row > .group:first-of-type{margin-left:auto}
 .hud #lvlName{color:#fff}
 .hud #goalMini{color:#b9ec8f}
@@ -235,7 +250,7 @@ td.neg{color:var(--flag)}
       <div class="group" id="speed" aria-label="Game speed"><button data-s="0" aria-label="Pause">❚❚</button><button data-s="1" aria-label="Play">▶</button><button data-s="4" aria-label="Fast">▶▶</button></div>
     </div>
   </header>
-  <main id="stage"><canvas id="gl" aria-hidden="true"></canvas><canvas id="map" aria-label="Golf course map"></canvas><div class="zoom"><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="rotL" aria-label="Rotate left">⟲</button><button id="rotR" aria-label="Rotate right">⟳</button><button id="zFit" class="fit" aria-label="Show whole course">Fit</button></div><button id="eventChip" class="hidden"></button><div id="toast" role="status" aria-live="polite"></div></main>
+  <main id="stage"><canvas id="gl" aria-hidden="true"></canvas><canvas id="map" aria-label="Golf course map"></canvas><div class="zoom"><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="rotL" aria-label="Rotate left">⟲</button><button id="rotR" aria-label="Rotate right">⟳</button><button id="zFit" class="fit" aria-label="Show whole course">Fit</button></div><div class="undoBox hidden" id="undoBox"><button id="undoBtn" aria-label="Undo, refunds the cost">↶</button><button id="redoBtn" aria-label="Redo">↷</button></div><button id="eventChip" class="hidden"></button><div id="toast" role="status" aria-live="polite"></div></main>
   <p id="hint"></p>
   <nav id="tools" aria-label="Build tools"></nav>
 </div>
@@ -249,7 +264,7 @@ td.neg{color:var(--flag)}
 <div id="help" class="overlay hidden"><div class="card">
   <h2 id="helpTitle">How to build</h2>
   <ol class="steps">
-    <li>Pick <b>Hole</b>, tap where the tee goes, then tap where the pin goes. A green is built around the pin.</li>
+    <li>Tap <b>🏗️ Build</b>, pick <b>Hole</b>, tap where the tee goes, then tap where the pin goes. A green is built around the pin.</li>
     <li>Paint <b>fairway</b> between them so golfers have somewhere good to land.</li>
     <li>Put bunkers, trees and ponds near the landing areas. Golfers love a hole with some danger.</li>
     <li>Press <b>▶</b> to open. Golfers pay the green fee, play your holes and tell you what they think.</li>
@@ -1977,49 +1992,51 @@ function updateHint(){
   if (S.tool === 'dogleg') h = 'Tap near a hole to bend it there, $100. Line the corner with trees or bunkers. Tap a bend again to straighten the hole.';
   else if (S.tool === 'hole') h = S.pendingTee ? 'Now tap where the pin goes, 100 to 700 yards away. Tap the tee again to cancel.' : 'Tap where the tee box goes. Holes cost $200 plus the green.';
   else if (TOOLS[S.tool].elev) h = `Drag to ${S.tool === 'raise' ? 'raise' : 'lower'} the land one level, ${fmt(TOOLS[S.tool].cost)} a tile. Use the large brush for smooth hills. Water stays flat.`;
+  else if (S.tool === 'move' && !S.tray) h = 'Drag to look around, pinch to zoom. Tap a golfer for their card, or open 🏗️ Build to design.';
   else if (S.tool === 'move') h = 'Drag to move around. Pinch, scroll or use + and − to zoom.';
   else if (S.tool === 'clear') h = 'Drag to clear back to rough. Clearing a tee or pin removes that hole.';
   else h = `Drag to paint ${TOOLS[S.tool].name.toLowerCase()}, ${fmt(TOOLS[S.tool].cost)} a tile.`;
-  if (!S.holes.length && S.tool !== 'hole' && S.tool !== 'move') h = 'Start with the Hole tool to place your first tee and pin.';
+  if (!S.holes.length && S.tool !== 'hole' && S.tool !== 'move') h = 'Start in 🏗️ Build with the Hole tool to place your first tee and pin.';
   else if (S.holes.length && S.speed === 0 && S.day === 1 && S.dayT === 0) h += ' Press ▶ when you’re ready to open.';
   $('hint').textContent = h;
 }
+const TRAYS = {
+  build: { icon:'🏗️', name:'Build', tools:['hole','dogleg','fairway','green','sand','path','bridge'] },
+  land:  { icon:'🌳', name:'Landscape', tools:['trees','flowers','water','raise','lower','clear'] }
+};
+function openTray(id){
+  if (S.tray === id) return closeTray();
+  S.tray = id; if (!TRAYS[id].tools.includes(S.tool)) S.tool = TRAYS[id].tools[0];
+  if (S.tool !== 'hole') S.pendingTee = null; buildTools(); updateHint();
+}
+$('undoBtn').addEventListener('click', () => { undo(); updateUndo(); });
+$('redoBtn').addEventListener('click', () => { redo(); updateUndo(); });
+function closeTray(){ S.tray = null; S.tool = 'move'; S.pendingTee = null; buildTools(); updateHint(); }
 function buildTools(){
   const nav = $('tools'); nav.innerHTML = '';
   if (S.mode === 'play') {
-    const mk = (ic, nm, pr, fn) => { const b = document.createElement('button'); b.className = 'tool'; b.innerHTML = `<span class="ic">${ic}</span><span class="nm">${nm}</span><span class="pr">${pr}</span>`; b.addEventListener('click', fn); nav.appendChild(b); };
-    mk('📋', 'Scorecard', 'So far', showCard);
-    mk('↺', 'Restart', 'From hole 1', startRound);
-    mk('✕', 'Quit round', 'Back to build', endRound);
+    const dock = document.createElement('div'); dock.className = 'dock three'; nav.appendChild(dock);
+    const mk = (ic, nm, fn) => { const b = document.createElement('button'); b.className = 'dockbtn'; b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>`; b.addEventListener('click', fn); dock.appendChild(b); };
+    mk('📋', 'Scorecard', showCard); mk('↺', 'Restart', startRound); mk('✕', 'Quit round', endRound);
     return;
   }
-  for (const [id, ic, nm, fn] of [['undoBtn','↶','Undo',undo],['redoBtn','↷','Redo',redo]]) {
-    const b = document.createElement('button'); b.className = 'tool'; b.id = id;
-    b.innerHTML = `<span class="ic">${ic}</span><span class="nm">${nm}</span><span class="pr">${id === 'undoBtn' ? 'Refunds cost' : 'Do it again'}</span>`;
-    b.addEventListener('click', () => { fn(); updateUndo(); }); nav.appendChild(b);
+  if (S.tray && TRAYS[S.tray]) {
+    const T0 = TRAYS[S.tray], tray = document.createElement('div'); tray.className = 'tray'; nav.appendChild(tray);
+    const add = (cls, html, fn, id) => { const b = document.createElement('button'); b.className = cls; if (id) b.id = id; b.innerHTML = html; b.addEventListener('click', fn); tray.appendChild(b); return b; };
+    add('tool done', '<span class="ic">✓</span><span class="nm">Done</span><span class="pr">Close</span>', closeTray);
+    for (const id of T0.tools) { const t = TOOLS[id];
+      add('tool' + (S.tool === id ? ' on' : ''), `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${fmt(t.cost)}</span>`,
+        () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; buildTools(); updateHint(); }); }
+    if (!['hole','dogleg'].includes(S.tool)) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
   }
-  for (const id of ['move', ...ALL_TOOLS]) {
-    const t = TOOLS[id], b = document.createElement('button'); b.className = 'tool' + (S.tool === id ? ' on' : '');
-    b.innerHTML = `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${id === 'move' ? 'Pan' : fmt(t.cost)}</span>`;
-    b.addEventListener('click', () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; buildTools(); updateHint(); });
-    nav.appendChild(b);
-  }
-  const br = document.createElement('button'); br.className = 'tool';
-  br.innerHTML = `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`;
-  br.addEventListener('click', () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
-  nav.appendChild(br);
-  const pl = document.createElement('button'); pl.className = 'tool';
-  pl.innerHTML = '<span class="ic">🏌️</span><span class="nm">Play round</span><span class="pr">Your course</span>';
-  pl.addEventListener('click', startRound);
-  nav.appendChild(pl);
-  const cl = document.createElement('button'); cl.className = 'tool';
-  cl.innerHTML = '<span class="ic">🏆</span><span class="nm">Club</span><span class="pr" id="clubPr">Members, events</span>';
-  cl.addEventListener('click', () => openClub());
-  nav.appendChild(cl);
-  const scb = document.createElement('button'); scb.className = 'tool';
-  scb.innerHTML = '<span class="ic">📋</span><span class="nm">Scorecards</span><span class="pr">Who’s playing</span>';
-  scb.addEventListener('click', () => openScores());
-  nav.appendChild(scb);
+  const dock = document.createElement('div'); dock.className = 'dock'; nav.appendChild(dock);
+  const mk = (ic, nm, fn, on, extra) => { const b = document.createElement('button'); b.className = 'dockbtn' + (on ? ' on' : ''); b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>${extra || ''}`; b.addEventListener('click', fn); dock.appendChild(b); };
+  mk(TRAYS.build.icon, TRAYS.build.name, () => openTray('build'), S.tray === 'build');
+  mk(TRAYS.land.icon, TRAYS.land.name, () => openTray('land'), S.tray === 'land');
+  mk('🏌️', 'Play', startRound);
+  mk('🏆', 'Club', () => openClub(), false, `<span class="badge hidden" id="clubPr"></span>`);
+  mk('📋', 'Golfers', () => openScores());
+  $('undoBox').classList.toggle('hidden', !S.tray); updateUndo(); updateHUD();
 }
 function updateSpeed(){ document.querySelectorAll('#speed button').forEach(b => b.classList.toggle('on', +b.dataset.s === S.speed)); }
 document.querySelectorAll('#speed button').forEach(b => b.addEventListener('click', () => {
@@ -2035,7 +2052,7 @@ $('feeUp').addEventListener('click', () => { S.fee = Math.min(200, S.fee + 5); u
 function updateUndo(){ const u = $('undoBtn'), r = $('redoBtn'); if (u) u.disabled = !hist.length; if (r) r.disabled = !future.length; }
 function updateHUD(){
   updateUndo();
-  const cp = $('clubPr'); if (cp) cp.textContent = S.offers.length ? `📨 ${S.offers.length} invite${S.offers.length === 1 ? '' : 's'}` : 'Members, events';
+  const cp = $('clubPr'); if (cp) { cp.textContent = S.offers.length; cp.classList.toggle('hidden', !S.offers.length); }
   const m = $('money'); m.textContent = fmt(S.money); m.classList.toggle('neg', S.money < 0);
   $('stars').innerHTML = `<b>★</b> ${S.course.stars.toFixed(1)}`;
   $('coins').textContent = `🪙 ${S.coins}`;
@@ -2113,7 +2130,7 @@ function startLevel(i, cont){
     delete store.saves[i]; saveStore();
   }
   S.mode = 'build'; P.fl = null; P.drag = null; hist = []; future = []; curAct = null; S.event = null; S.setup = null; S.matches = []; S.matchSetup = null; S.follow = null; $('prof').classList.add('hidden'); scView = null; $('sc').classList.add('hidden'); $('round').classList.add('hidden'); $('club').classList.add('hidden'); $('evDone').classList.add('hidden');
-  S.golfers = []; S.dayT = 0; S.spawnT = 2; S.speed = 0; S.pendingTee = null; S.tool = 'hole'; S.dayFees = 0; S.dayGolfers = 0;
+  S.golfers = []; S.dayT = 0; S.spawnT = 2; S.speed = 0; S.pendingTee = null; S.tool = 'move'; S.tray = null; S.dayFees = 0; S.dayGolfers = 0;
   S.active = true; recompute(); buildTools(); cam.ready = false; layout(); terrainDirty = true; updateSpeed(); updateHUD(); updateHint();
   planMembers();
   $('levels').classList.add('hidden');
