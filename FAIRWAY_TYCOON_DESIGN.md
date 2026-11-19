@@ -61,8 +61,9 @@ List of everyone on the course; individual hole-by-hole cards (birdies red, boge
 ### Play mode (🏌️ Play round)
 You play as your club pro: max distance from Driving, error from Accuracy / Chipping (near the green) / Putting, lie penalties from Sand and Recovery. Earns coins (see above). Slingshot aiming (pull back and release), power and carry shown, landing circle, putting in feet on greens, penalties, scorecard and results.
 
-### Graphics & camera
-three.js r128: rolling vertex-colored terrain with smooth type blending, sunken bunkers and water, raised greens/tees/rocks, diorama soil skirt, sun shadows, dusk lighting shift, instanced low-poly trees per setting (round, pine, cypress, palm, longleaf, cactus), azalea bushes, boulders, 3D clubhouse, waving flags, 3D golfers with walking legs and carts, balls in real arcs. 2D overlay canvas for route lines, aim guide, badges, thought bubbles and name tags.
+### Graphics & camera (SimGolf-inspired look, original art)
+three.js r128 with a near-isometric camera (FOV 14°, pitch 0.84, starts zoomed in; Fit shows the whole course). Terrain: 4 vertices per tile (`SUB=4`), crisp type blending, bold mowing patterns (diagonal fairway stripes, wide rough bands, checkered greens), dark dirt beds under trees, deep blue water, sunken bunkers, raised greens/tees/rocks. The course sits inside a **countryside ring** (`buildRing`, `RING=14` tiles): forest on land sides (2-tile clearing at the edge so trees never hide the course), open water on coastal sides; rebuilt only when the setting changes. Trees: per-setting forest mixes (`FOREST`, aligned with `LEVELS` order; append-only) of round, pine (3-tier), willow, blossom, autumn, cypress, palm, longleaf and cactus; 2–3 trees per tile. Grand clubhouse (main hall, tower, two wings, porch with columns, awnings, chimneys, planters, flagpole). Sun shadows, dusk shift, 3D golfers/carts, waving flags. 2D overlay for route lines, aim guide, badges, thought bubbles, name tags.
+**Floating HUD** over the map (glass pills: club/goals, money, stars, coins, day, fee, speed). **Golfer info card** (tap a golfer): avatar, type, quote based on mood, likes, mood bars (Fun, Energy, Hunger, Thirst), hole-by-hole strip, recent thoughts. Golfers get hungrier/thirstier/tired each hole (`energy`, `hunger`, `thirst`), which lowers mood when high — ready for refreshment amenities. Every visitor has a generated name.
 Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q,E to rotate, arrows pan, +/− zoom, ⟲ ⟳ and Fit buttons.
 
 ---
@@ -99,7 +100,7 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 ---
 
 ## 3. Ideas not built yet
-- Amenities: snack carts, benches, restrooms, driving range, pro shop
+- Amenities: snack carts, refreshment stands (fix hunger/thirst), benches (energy), restrooms, driving range, pro shop, decorative buildings (windmill, lighthouse, gazebo, fountain)
 - Staff (greenskeepers, marshals) and course condition
 - Multi-round tournaments with a cut, weather and wind
 - Elevation tools (raise/lower land), island greens
