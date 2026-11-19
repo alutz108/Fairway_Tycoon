@@ -9,6 +9,13 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Controls layout (bottom dock)
+The bottom of the screen is a five-button dock: 🏗️ **Build**, 🌳 **Landscape**, 🏌️ **Play**, 🏆 **Club** (red badge = waiting invitations), 📋 **Golfers** (scorecards). Build and Landscape open a tray above the dock (`TRAYS`, `openTray`, `closeTray`, `S.tray`):
+- Build tray: Hole, Dogleg, Fairway, Green, Bunker, Cart path, Bridge.
+- Landscape tray: Trees, Flowers, Pond, Raise, Lower, Clear.
+- Each tray starts with a ✓ Done button and ends with the Brush toggle (paint tools only). Undo/Redo float on the map (bottom-left) while a tray is open.
+With no tray open the game is in **look mode** (`S.tool = 'move'`): one finger pans, taps open golfer cards. New courses start in look mode. In play mode the dock shows Scorecard, Restart and Quit round.
+
 ### Course settings (start screen)
 All 9 settings are unlocked; each has an optional challenge (holes, star rating, green-fee earnings) and its own save, club name, members and trophy history. Each card shows a mini map preview.
 

@@ -15,9 +15,12 @@ You are helping Andrew keep building **Fairways Tycoon**, a SimGolf-style golf c
 - Keep real golf organizations, courses and pros out of the game. Use original names (fictional tours, generated player names). Real courses can be described only as "inspired by".
 - After changes, check the script has no syntax errors and that the game still loads, builds holes, simulates golfers and runs play mode.
 
+## Interface rules
+Keep the bottom dock to five buttons. New build or landscape tools go into the matching tray (`TRAYS`), and new management screens go behind Club or a new dock slot only if truly needed.
+
 ## GitHub version
 - He hosts the game on GitHub Pages as an installable app (files: index.html, sw.js, manifest.webmanifest, icons/, README.md).
-- When the game changes, also produce an updated GitHub package: index.html = the game plus the PWA head tags and service-worker registration, and bump `VERSION` in sw.js (currently `fairway-v10`; next is `fairway-v11`). The icons/ folder holds the logo-based app icons; keep them. Remind him to upload index.html and sw.js.
+- When the game changes, also produce an updated GitHub package: index.html = the game plus the PWA head tags and service-worker registration, and bump `VERSION` in sw.js (currently `fairway-v11`; next is `fairway-v12`). The icons/ folder holds the logo-based app icons; keep them. Remind him to upload index.html and sw.js.
 
 ## Roadmap
 Follow the roadmap in FAIRWAY_TYCOON_DESIGN.md section 3, one step at a time, and mark steps done there when finished.
