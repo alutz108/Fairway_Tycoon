@@ -17,7 +17,10 @@ You are helping Andrew keep building **Fairways Tycoon**, a SimGolf-style golf c
 
 ## GitHub version
 - He hosts the game on GitHub Pages as an installable app (files: index.html, sw.js, manifest.webmanifest, icons/, README.md).
-- When the game changes, also produce an updated GitHub package: index.html = the game plus the PWA head tags and service-worker registration, and bump `VERSION` in sw.js (currently `fairway-v8`; next is `fairway-v9`). The icons/ folder holds the logo-based app icons; keep them. Remind him to upload index.html and sw.js.
+- When the game changes, also produce an updated GitHub package: index.html = the game plus the PWA head tags and service-worker registration, and bump `VERSION` in sw.js (currently `fairway-v9`; next is `fairway-v10`). The icons/ folder holds the logo-based app icons; keep them. Remind him to upload index.html and sw.js.
+
+## Roadmap
+Follow the roadmap in FAIRWAY_TYCOON_DESIGN.md section 3, one step at a time, and mark steps done there when finished.
 
 ## How to talk to Andrew
 - Keep explanations short and readable on a phone. Lead with what changed and how to use it.

@@ -28,6 +28,8 @@ All 9 settings are unlocked; each has an optional challenge (holes, star rating,
 - **Hole tool:** tap tee spot, then pin spot (100–700 yds). Auto-builds tee box + green. Par: ≤250 yds = 3, ≤470 = 4, else 5. Cost $200 + green tiles.
 - **Paint tools:** Fairway $30, Green $60, Bunker $25, Cart path $15, Trees $20, Flowers $35, Pond $60, Clear $10 (water→$40, rock→$80). Brush 1×1 or 3×3. Clearing a tee or pin removes that hole.
 - **Move tool** for one-finger panning.
+- **Elevation:** Raise / Lower tools ($40 per tile per level, levels 0–8, one level = 0.22 tiles ≈ 5.5 yds; `E` Int8Array, `ELH`, `EMAX`, `elevAt`). Water and the clubhouse stay flat; painting water flattens a tile. New courses get natural hills per setting (`HILLS`, aligned with `LEVELS`; `genElev`). Rendering adds elevation into the blended terrain heights. Holes show "plays as" yardage (`info.plays`, `info.drop`); par uses plays yardage; elevated tees (2+ levels down to the green) add design score. Shots: AI golfers compensate for target elevation, carry is shortened uphill / lengthened downhill based on the landing spot; play mode applies the same physics and the hint shows plays-as distance.
+- **Undo / Redo** (first two buttons in the tool bar): snapshot-based history of grid, elevation and holes (`checkpoint`, `undo`, `redo`, 40 steps). One checkpoint per paint stroke or hole. Undo refunds what that action cost; redo charges it again. Cleared when you switch courses; locked during events.
 - Hole design score (0–10) from fairway coverage, nearby hazards, green quality, scenery, tee box, length, and crossing other holes. Course star rating = average design + par variety + golfer satisfaction.
 
 ### Simulation
@@ -98,11 +100,20 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 - **Event player:** `{ name, skill, pow, acc, put, type?, country?, mid?, team?, guest?, card[], started, done, sat }`
 - **Offer:** `{ id, tier, name, org, blurb, field, skill, type?, prestige, purse, pro, base, gate, reqs:[[key,n]], expires }`
 - **Club pro:** `{ name, country, at:{dr,ac,ch,sd,rc,pt}, skill, shirt, pants, skin, starts, wins, top10, earnings, log[] }`
-- **Save (per level index):** `grid, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft`
+- **Save (per level index):** `grid, elev, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft`
 
 ---
 
-## 3. Ideas not built yet
+## 3. Roadmap (from the full game spec)
+1. ✅ Construction upgrade: undo/redo, hills and elevation.
+2. Better holes: dogleg holes (bend point), fringe collar on greens, bridges, hole signs.
+3. Facilities: pro shop, snack bar/restaurant, driving range, putting green, cart barn, restrooms, benches; revenue from shop, food and drink, range and cart rentals; fix hunger/thirst/energy.
+4. Staff and maintenance: superintendent, groundskeepers, shop/restaurant staff, cart attendants; salaries; course condition (mowing, watering, greens, bunkers); water and electricity costs.
+5. Ratings breakdown (difficulty, beauty, variety, fairness, green quality, condition, pace of play, satisfaction) and deeper golfer traits (iron accuracy, short game, course management, patience, spending).
+6. Golf empire: buy additional properties with independent books, loans, progression unlocks.
+7. Polish: sound, animations, landscape layout, App Store wrapper (Capacitor) when ready.
+
+## 4. Ideas not built yet
 - Amenities: snack carts, refreshment stands (fix hunger/thirst), benches (energy), restrooms, driving range, pro shop, decorative buildings (windmill, lighthouse, gazebo, fountain)
 - Staff (greenskeepers, marshals) and course condition
 - Multi-round tournaments with a cut, weather and wind
