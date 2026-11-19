@@ -1,10 +1,13 @@
-# Fairway Tycoon — Design & Code Guide
+# Fairways Tycoon — Design & Code Guide
 
 A SimGolf-style golf game: design courses, run a golf club, host tournaments and play your own holes. Single HTML file, three.js 3D rendering, installable from GitHub Pages. **Primary platform: iPhone** (bottom-sheet menus under 600px wide, 44px+ touch targets, 16px inputs so iOS doesn't zoom); also works on PC.
 
 ---
 
 ## 1. Feature list (current)
+
+### Branding
+Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
 ### Course settings (start screen)
 All 9 settings are unlocked; each has an optional challenge (holes, star rating, green-fee earnings) and its own save, club name, members and trophy history. Each card shows a mini map preview.
