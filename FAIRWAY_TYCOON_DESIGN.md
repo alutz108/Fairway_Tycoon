@@ -11,7 +11,7 @@ Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fai
 
 ### Controls layout (bottom dock)
 The bottom of the screen is a five-button dock: 🏗️ **Build**, 🌳 **Landscape**, 🏌️ **Play**, 🏆 **Club** (red badge = waiting invitations), 📋 **Golfers** (scorecards). Build and Landscape open a tray above the dock (`TRAYS`, `openTray`, `closeTray`, `S.tray`):
-- Build tray: Hole, Dogleg, Fairway, Green, Bunker, Cart path, Bridge.
+- Build tray: Hole, Dogleg, Fairway, Green, Bunker, Cart path, Bridge, and Facilities › (opens the facilities tray, which has ‹ Build to go back).
 - Landscape tray: Trees, Flowers, Pond, Raise, Lower, Clear.
 - Each tray starts with a ✓ Done button and ends with the Brush toggle (paint tools only). Undo/Redo float on the map (bottom-left) while a tray is open.
 With no tray open the game is in **look mode** (`S.tool = 'move'`): one finger pans, taps open golfer cards. New courses start in look mode. In play mode the dock shows Scorecard, Restart and Quit round.
@@ -48,8 +48,23 @@ All 9 settings are unlocked; each has an optional challenge (holes, star rating,
 - Public golfers arrive based on stars, holes, green fee vs fair price and prestige. They pay the green fee and play every hole with shot AI (club distance by skill and lie, target picking, errors, roll, water/OB penalties, putting model), then rate the experience. Thought bubbles ("Birdie!", "Splash…", "Where's the fairway?").
 - Lies: tee/fairway best; rough, bunker, trees, native area, flowers worse; water = penalty drop; rocks/clubhouse/off-map = out of bounds.
 
+### Facilities (Build tray → 🏛️ Facilities ›)
+Placed by tapping (footprint centered on the tap; needs clear ground away from water, tees, greens, rocks and buildings). Footprint tiles become `T.HOUSE` (out of bounds) with a facility pad color, and are flattened to the average elevation. `S.facilities = [{type,x,y}]`, footprint index map `FO`. Clear on a facility sells it for half. Daily upkeep is added to course upkeep. Each distinct facility type adds +0.08 stars (max +0.5).
+| Facility | Size | Cost / day | Effect |
+|---|---|---|---|
+| Snack Bar 🌭 | 1×1 | $1,500 / $20 | Hungry or thirsty golfers within 4.5 tiles of the green or next tee walk over, buy food ($6–16), hunger/thirst reset, +3 mood |
+| Drink Stand 🥤 | 1×1 | $800 / $10 | Thirsty golfers buy a drink ($4–7), thirst reset, +2 mood |
+| Bench 🪑 | 1×1 | $150 / $1 | Tired golfers (energy < 75) rest: +25 energy |
+| Restroom 🚻 | 1×1 | $1,000 / $12 | Once per round, +3 mood |
+| Pro Shop 🛍️ | 2×2, one | $6,000 / $60 | On arrival, chance by spending trait to buy ($10–60) |
+| Putting Green ⛳ | 2×2, one | $3,000 / $30 | 50% practice: +0.04 putting, +0.02 chipping for the round |
+| Driving Range 🎯 | 2×5, one | $8,000 / $50 | Chance to pay $8 to warm up: +0.02 driving, +0.03 accuracy |
+| Cart Barn 🚗 | 2×2, one | $5,000 / $40 | Visitors rent carts ($15; seniors 85%) when cart paths exist; renters ride like members |
+| Restaurant 🍽️ | 2×2, one | $9,000 / $90 | After the round, chance to eat ($15–45), +5 mood (counts toward the course rating) |
+Golfers walk to "need" facilities between holes (`planDetour`, `g.detour`, `useFacility`), arrival extras happen at the first tee (`arriveExtras`), the restaurant in `finishRound`. Golfers have a `spend` trait (0–1) and track `spent` (shown on their card). Attribute boosts are `g.bonus`, added by `A()`. Visitors no longer ride carts unless they rent one; members still ride free.
+
 ### Economy
-Money pays for everything you build. It comes in from green fees (each public round), weekly member dues (every 7 days), hosting events (tour invitations pay a hosting fee plus ticket sales; club events collect entry fees) and your club pro's prize money. Lesson fees from your pro's member lessons also come in. It goes out to building and daily upkeep. Every transaction is booked by category (`book(cat, amt)`) into `S.books` (this week) and `S.lastBooks` (last week, rolled every 7 days); the Club tab shows a Finances table. Tapping the money in the HUD opens it.
+Money pays for everything you build. It comes in from green fees (each public round), food & drink, pro shop sales, range fees, cart rentals, weekly member dues (every 7 days), hosting events (tour invitations pay a hosting fee plus ticket sales; club events collect entry fees) and your club pro's prize money. Lesson fees from your pro's member lessons also come in. It goes out to building and daily upkeep. Every transaction is booked by category (`book(cat, amt)`) into `S.books` (this week) and `S.lastBooks` (last week, rolled every 7 days); the Club tab shows a Finances table. Tapping the money in the HUD opens it.
 
 ### Club pro (you) and the coin system
 `S.pro`: name, nationality, shirt/pants and six attributes. **Play round mode is your pro playing** (uses the pro's attributes and outfit).
@@ -78,6 +93,7 @@ List of everyone on the course; individual hole-by-hole cards (birdies red, boge
 You play as your club pro: max distance from Driving, error from Accuracy / Chipping (near the green) / Putting, lie penalties from Sand and Recovery. Earns coins (see above). Slingshot aiming (pull back and release), power and carry shown, landing circle, putting in feet on greens, penalties, scorecard and results.
 
 ### Graphics & camera (SimGolf-inspired look, original art)
+**Crisp square tiles:** every tile is one terrain type with hard edges and per-tile mowing patterns (`rebuildTerrain` builds non-indexed geometry, `SUB=4` sub-cells per tile for smooth heights, normals from the height grid). While a Build/Landscape/Facilities tray is open, a white tile grid (`gridLines`) and a tile cursor (`S.cursor`; shows brush or facility footprint) appear.
 three.js r128 with a near-isometric camera (FOV 14°, pitch 0.84, starts zoomed in; Fit shows the whole course). Terrain: 4 vertices per tile (`SUB=4`), crisp type blending, bold mowing patterns (diagonal fairway stripes, wide rough bands, checkered greens), dark dirt beds under trees, deep blue water, sunken bunkers, raised greens/tees/rocks. The course sits inside a **countryside ring** (`buildRing`, `RING=14` tiles): forest on land sides (2-tile clearing at the edge so trees never hide the course), open water on coastal sides; rebuilt only when the setting changes. Trees: per-setting forest mixes (`FOREST`, aligned with `LEVELS` order; append-only) of round, pine (3-tier), willow, blossom, autumn, cypress, palm, longleaf and cactus; 2–3 trees per tile. Grand clubhouse (main hall, tower, two wings, porch with columns, awnings, chimneys, planters, flagpole). Sun shadows, dusk shift, 3D golfers/carts, waving flags. 2D overlay for route lines, aim guide, badges, thought bubbles, name tags.
 **Floating HUD** over the map (glass pills: club/goals, money, stars, coins, day, fee, speed). **Golfer info card** (tap a golfer): avatar, type, quote based on mood, likes, mood bars (Fun, Energy, Hunger, Thirst), hole-by-hole strip, recent thoughts. Golfers get hungrier/thirstier/tired each hole (`energy`, `hunger`, `thirst`), which lowers mood when high — ready for refreshment amenities. Every visitor has a generated name.
 Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q,E to rotate, arrows pan, +/− zoom, ⟲ ⟳ and Fit buttons.
@@ -111,14 +127,14 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 - **Event player:** `{ name, skill, pow, acc, put, type?, country?, mid?, team?, guest?, card[], started, done, sat }`
 - **Offer:** `{ id, tier, name, org, blurb, field, skill, type?, prestige, purse, pro, base, gate, reqs:[[key,n]], expires }`
 - **Club pro:** `{ name, country, at:{dr,ac,ch,sd,rc,pt}, skill, shirt, pants, skin, starts, wins, top10, earnings, log[] }`
-- **Save (per level index):** `grid, elev, bridges, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft`
+- **Save (per level index):** `grid, elev, bridges, facilities, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft`
 
 ---
 
 ## 3. Roadmap (from the full game spec)
 1. ✅ Construction upgrade: undo/redo, hills and elevation.
 2. ✅ Better holes: dogleg holes (bend point), fringe collar on greens, bridges, hole signs.
-3. Facilities: pro shop, snack bar/restaurant, driving range, putting green, cart barn, restrooms, benches; revenue from shop, food and drink, range and cart rentals; fix hunger/thirst/energy.
+3. ✅ Facilities: pro shop, snack bar, drink stand, restaurant, driving range, putting green, cart barn, restrooms, benches; revenue from shop, food and drink, range and cart rentals; fix hunger/thirst/energy.
 4. Staff and maintenance: superintendent, groundskeepers, shop/restaurant staff, cart attendants; salaries; course condition (mowing, watering, greens, bunkers); water and electricity costs.
 5. Ratings breakdown (difficulty, beauty, variety, fairness, green quality, condition, pace of play, satisfaction) and deeper golfer traits (iron accuracy, short game, course management, patience, spending).
 6. Golf empire: buy additional properties with independent books, loans, progression unlocks.
