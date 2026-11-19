@@ -1,5 +1,5 @@
 // Bump VERSION every time you upload a new index.html so phones pick up the update.
-const VERSION = 'fairway-v11';
+const VERSION = 'fairway-v12';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png'];
 const THREE_JS = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 

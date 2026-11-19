@@ -346,6 +346,7 @@ const TOOLS = {
   water:   { name:'Pond',    cost:60,  paint:T.WATER, sw:'#3f86c8' },
   dogleg:  { name:'Dogleg',  cost:100, icon:'↪️' },
   bridge:  { name:'Bridge',  cost:80,  icon:'🌉' },
+  ...Object.fromEntries(Object.entries({ snack:'🌭', drinks:'🥤', bench:'🪑', restroom:'🚻', proshop:'🛍️', range:'🎯', putting:'⛳', carts:'🚗', restaurant:'🍽️' }).map(([k]) => ['f_' + k, { fac:k }])),
   raise:   { name:'Raise',   cost:40,  elev:1,  icon:'⛰️' },
   lower:   { name:'Lower',   cost:40,  elev:-1, icon:'🔻' },
   clear:   { name:'Clear',   cost:10,  paint:T.ROUGH, sw:'#5d9a45' }
@@ -444,7 +445,7 @@ function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let 
 const hash = (x,y) => { let h = x*374761393 + y*668265263; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 // ---------- state ----------
-let G = new Uint8Array(COLS*ROWS), E = new Int8Array(COLS*ROWS), BR = new Uint8Array(COLS*ROWS), FR = new Uint8Array(COLS*ROWS);
+let G = new Uint8Array(COLS*ROWS), E = new Int8Array(COLS*ROWS), BR = new Uint8Array(COLS*ROWS), FR = new Uint8Array(COLS*ROWS), FO = new Int16Array(COLS*ROWS).fill(-1);
 const ELH = .22, EMAX = 8; // one elevation level = 0.22 tiles = about 5.5 yards
 const elevAt = (x, y) => { const xx = Math.floor(x), yy = Math.floor(y); return xx < 0 || yy < 0 || xx >= COLS || yy >= ROWS || G[yy*COLS+xx] === T.WATER ? 0 : E[yy*COLS+xx]; };
 const HILLS = [3, 2, 2, 4, 2, 3, 0, 3, 4];
@@ -458,7 +459,7 @@ function genElev(L, g){
   return e;
 }
 const S = { active:false, level:0, money:0, earned:0, day:1, dayT:0, fee:30, speed:0, holes:[], golfers:[], recent:[],
-  spawnT:2, mode:'build', clubName:'', trophy:'', members:[], mid:0, matches:[], matchSetup:null, matchLog:[], matchId:0, typeSat:{}, pro:null, offers:[], offerId:0, books:{}, lastBooks:{}, coins:0, lessonsLeft:3, lessonSetup:null, dues:50, prestige:0, eventLast:{}, history:[], event:null, setup:null, memberQueue:[], tool:'hole', brush:1, pendingTee:null, won:false, dayFees:0, dayGolfers:0, course:{ stars:0, avgQ:0 } };
+  spawnT:2, mode:'build', clubName:'', trophy:'', members:[], mid:0, matches:[], matchSetup:null, matchLog:[], matchId:0, typeSat:{}, pro:null, facilities:[], tray:null, cursor:null, hasPath:false, offers:[], offerId:0, books:{}, lastBooks:{}, coins:0, lessonsLeft:3, lessonSetup:null, dues:50, prestige:0, eventLast:{}, history:[], event:null, setup:null, memberQueue:[], tool:'hole', brush:1, pendingTee:null, won:false, dayFees:0, dayGolfers:0, course:{ stars:0, avgQ:0 } };
 let terrainDirty = true, gid = 0, NEAR = new Uint8Array(COLS*ROWS);
 function hasCart(x, y){ const xx = Math.floor(x), yy = Math.floor(y); return xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS && NEAR[yy*COLS+xx] === 1; }
 
@@ -467,7 +468,7 @@ function loadStore(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if 
 let store = loadStore();
 function saveStore(){ try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} }
 function saveGame(){
-  store.saves[S.level] = { grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
+  store.saves[S.level] = { grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
     members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft };
   saveStore();
@@ -570,7 +571,8 @@ function holeInfo(h){
 }
 function recompute(){
   NEAR = new Uint8Array(COLS*ROWS);
-  FR = new Uint8Array(COLS*ROWS);
+  FR = new Uint8Array(COLS*ROWS); FO = new Int16Array(COLS*ROWS).fill(-1); S.hasPath = G.includes(T.PATH);
+  S.facilities.forEach((f, fi) => { const F = FACS[f.type]; for (let dy=0; dy<F.h; dy++) for (let dx=0; dx<F.w; dx++) { const xx = f.x+dx, yy = f.y+dy; if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) FO[yy*COLS+xx] = fi; } });
   for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) { const t = G[y*COLS+x]; if (t !== T.ROUGH && t !== T.FAIR) continue;
     for (let dy=-1; dy<=1 && !FR[y*COLS+x]; dy++) for (let dx=-1; dx<=1; dx++) if (tile(x+dx, y+dy) === T.GREEN) { FR[y*COLS+x] = 1; break; } }
   for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) if (G[y*COLS+x] === T.PATH || (BR[y*COLS+x] && G[y*COLS+x] === T.WATER))
@@ -581,7 +583,7 @@ function recompute(){
   const pars = new Set(S.holes.map(h => h.info.par)).size;
   const variety = pars >= 2 ? (pars-1)/2 : 0;
   const sat = S.recent.length ? S.recent.reduce((a,b) => a+b, 0)/S.recent.length : 50;
-  const stars = clamp(avgQ*.42 + variety*.8 + clamp((sat-50)/120, -.5, .5), 0, 5);
+  const stars = clamp(avgQ*.42 + variety*.8 + clamp((sat-50)/120, -.5, .5) + Math.min(.5, new Set(S.facilities.map(f => f.type)).size*.08), 0, 5);
   S.course = { stars, avgQ };
 }
 
@@ -612,20 +614,20 @@ const GEO = {
   box: new TH.BoxGeometry(1, 1, 1), pyr: (() => { const g = new TH.ConeGeometry(1, 1, 4); g.rotateY(Math.PI/4); return g; })()
 };
 
-// --- terrain ---
+// --- terrain (crisp square tiles) ---
 const SUB = 4, VW = COLS*SUB + 1, VH = ROWS*SUB + 1;
-let HGT = new Float32Array(VW*VH);
-const tPos = new Float32Array(VW*VH*3), tCol = new Float32Array(VW*VH*3);
+let HGT = new Float32Array(VW*VH); const NRM = new Float32Array(VW*VH*3);
+const NVT = COLS*ROWS*SUB*SUB*6;
+const tPos = new Float32Array(NVT*3), tCol = new Float32Array(NVT*3), tNrm = new Float32Array(NVT*3);
 const terrainGeo = new TH.BufferGeometry();
-{ const idx = []; for (let j=0; j<VH-1; j++) for (let i=0; i<VW-1; i++) { const a = j*VW+i, b = a+1, c = a+VW, d = c+1; idx.push(a,c,b, b,c,d); }
-  terrainGeo.setIndex(idx); terrainGeo.setAttribute('position', new TH.BufferAttribute(tPos, 3)); terrainGeo.setAttribute('color', new TH.BufferAttribute(tCol, 3)); }
+terrainGeo.setAttribute('position', new TH.BufferAttribute(tPos, 3)); terrainGeo.setAttribute('color', new TH.BufferAttribute(tCol, 3)); terrainGeo.setAttribute('normal', new TH.BufferAttribute(tNrm, 3));
 const terrain = new TH.Mesh(terrainGeo, new TH.MeshLambertMaterial({ vertexColors:true }));
 terrain.receiveShadow = true; scene.add(terrain);
+const gridGeo = new TH.BufferGeometry();
+const gridLines = new TH.LineSegments(gridGeo, new TH.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:.28 })); gridLines.visible = false; scene.add(gridLines);
 const RING = 14;
 const water = new TH.Mesh(new TH.PlaneGeometry(COLS + RING*2, ROWS + RING*2), new TH.MeshLambertMaterial({ color:0x1d5fa8, transparent:true, opacity:.92 }));
 water.rotation.x = -Math.PI/2; water.position.y = -.1; water.receiveShadow = true; scene.add(water);
-const skirtGeo = new TH.BufferGeometry();
-const skirt = new TH.Mesh(skirtGeo, new TH.MeshLambertMaterial({ vertexColors:true, side:TH.DoubleSide })); skirt.visible = false; scene.add(skirt);
 const TH_H = { [T.ROUGH]:.04, [T.FAIR]:.02, [T.GREEN]:.06, [T.TEE]:.11, [T.SAND]:-.06, [T.WATER]:-.42, [T.TREES]:.05, [T.HOUSE]:.02, [T.FLOWERS]:.08, [T.ROCK]:.32, [T.NATIVE]:.09, [T.PATH]:.03 };
 function heightAt(x, y){
   const vx = clamp(x*SUB, 0, VW-1.001), vy = clamp(y*SUB, 0, VH-1.001), i = Math.floor(vx), j = Math.floor(vy), fx = vx-i, fy = vy-j;
@@ -633,39 +635,60 @@ function heightAt(x, y){
   return lerp(lerp(h(i,j), h(i+1,j), fx), lerp(h(i,j+1), h(i+1,j+1), fx), fy);
 }
 function rebuildTerrain(){
-  const LV = LEVELS[S.level], NS = nativeOf(), c = new TH.Color();
+  const LV = LEVELS[S.level], NS = nativeOf();
   const grass = LV.lush ? '#3f8530' : '#4c8a33';
   const TC = { [T.ROUGH]:grass, [T.FAIR]:'#86ca46', [T.GREEN]:'#a3e05a', [T.TEE]:'#93d452', [T.SAND]:'#f3e9cf', [T.WATER]:'#2c5878',
     [T.TREES]: LV.desert ? NS.fill : '#5a4330', [T.HOUSE]:'#cbc3b0', [T.FLOWERS]:'#6b4a33', [T.ROCK]:'#8d877d', [T.NATIVE]:NS.fill, [T.PATH]:'#c9bfa8' };
   const TCC = {}; for (const k in TC) TCC[k] = new TH.Color(TC[k]);
-  const FRINGE_C = new TH.Color('#96d257');
+  const FRINGE_C = new TH.Color('#96d257'), PAD = { range:new TH.Color('#80c24c'), putting:new TH.Color('#a3e05a') }, PAD_C = new TH.Color('#d6ccb8');
+  // heights: blended so slopes stay smooth
   const R = .74;
   for (let j=0; j<VH; j++) for (let i=0; i<VW; i++) {
-    const vx = i/SUB, vy = j/SUB; let wsum = 0, hs = 0, r = 0, gg = 0, b = 0, gw = 0;
+    const vx = i/SUB, vy = j/SUB; let wsum = 0, hs = 0, gw = 0;
     for (let ty=Math.floor(vy-1); ty<=Math.floor(vy+1); ty++) for (let tx=Math.floor(vx-1); tx<=Math.floor(vx+1); tx++) {
       const d = Math.hypot(tx+.5-vx, ty+.5-vy); if (d >= R) continue;
-      const t = tile(clamp(tx,0,COLS-1), clamp(ty,0,ROWS-1)), w = (1 - d/R)**3, col = (t === T.ROUGH || t === T.FAIR) && FR[clamp(ty,0,ROWS-1)*COLS + clamp(tx,0,COLS-1)] ? FRINGE_C : TCC[t] || TCC[T.ROUGH];
-      const ev = t === T.WATER || t === T.HOUSE ? 0 : E[clamp(ty,0,ROWS-1)*COLS + clamp(tx,0,COLS-1)]*ELH;
-      wsum += w; hs += w*((TH_H[t] ?? .04) + ev); r += w*col.r; gg += w*col.g; b += w*col.b; if (t === T.GREEN || t === T.TEE) gw += w;
+      const cx = clamp(tx,0,COLS-1), cy = clamp(ty,0,ROWS-1), t = tile(cx, cy), w = (1 - d/R)**3;
+      const ev = t === T.WATER ? 0 : E[cy*COLS + cx]*ELH;
+      wsum += w; hs += w*((TH_H[t] ?? .04) + ev); if (t === T.GREEN || t === T.TEE || t === T.HOUSE) gw += w;
     }
-    const k = j*VW+i, inv = 1/(wsum || 1);
-    const und = .085*(1 + Math.sin(vx*.5 + LV.seed)*Math.cos(vy*.4 + LV.seed*.7)) * (1 - .7*gw*inv);
-    HGT[k] = hs*inv + und;
-    let shade = .95 + .08*hash(i, j);
-    const ct = tile(Math.min(COLS-1, Math.floor(vx)), Math.min(ROWS-1, Math.floor(vy)));
-    const band = (a) => ((a % 2) + 2) % 2;
-    if (ct === T.FAIR || ct === T.TEE) shade *= band(Math.floor(vx - vy)) ? 1.1 : .9;
-    else if (ct === T.GREEN) shade *= band(Math.floor(vx*2) + Math.floor(vy*2)) ? 1.05 : .97;
-    else if (ct === T.ROUGH) shade *= band(Math.floor((vx + vy)/2)) ? 1.06 : .94;
-    tPos[k*3] = W2(vx); tPos[k*3+1] = HGT[k]; tPos[k*3+2] = Z2(vy);
-    tCol[k*3] = r*inv*shade; tCol[k*3+1] = gg*inv*shade; tCol[k*3+2] = b*inv*shade;
+    const inv = 1/(wsum || 1);
+    HGT[j*VW+i] = hs*inv + .085*(1 + Math.sin(vx*.5 + LV.seed)*Math.cos(vy*.4 + LV.seed*.7)) * (1 - .8*gw*inv);
   }
-  terrainGeo.attributes.position.needsUpdate = true; terrainGeo.attributes.color.needsUpdate = true; terrainGeo.computeVertexNormals(); terrainGeo.computeBoundingSphere();
-  // diorama skirt
-  const edges = []; for (let i=0; i<VW; i++) edges.push([i,0]); for (let j=0; j<VH; j++) edges.push([VW-1,j]); for (let i=VW-1; i>=0; i--) edges.push([i,VH-1]); for (let j=VH-1; j>=0; j--) edges.push([0,j]);
-  const sp = [], sc = [], si = [], top = new TH.Color('#7a5536'), bot = new TH.Color('#4e3522');
-  edges.forEach(([i,j], n) => { const h = Math.max(HGT[j*VW+i], -.1); sp.push(W2(i/SUB), h, Z2(j/SUB), W2(i/SUB), -1.1, Z2(j/SUB)); sc.push(top.r, top.g, top.b, bot.r, bot.g, bot.b); if (n) { const a = (n-1)*2; si.push(a, a+1, a+2, a+1, a+3, a+2); } });
-  skirtGeo.setAttribute('position', new TH.Float32BufferAttribute(sp, 3)); skirtGeo.setAttribute('color', new TH.Float32BufferAttribute(sc, 3)); skirtGeo.setIndex(si); skirtGeo.computeVertexNormals();
+  for (let j=0; j<VH; j++) for (let i=0; i<VW; i++) {
+    const il = Math.max(i-1,0), ir = Math.min(i+1,VW-1), ju = Math.max(j-1,0), jd = Math.min(j+1,VH-1);
+    const sx = (HGT[j*VW+ir] - HGT[j*VW+il]) / ((ir-il)/SUB), sz = (HGT[jd*VW+i] - HGT[ju*VW+i]) / ((jd-ju)/SUB), l = Math.hypot(sx, 1, sz), k = (j*VW+i)*3;
+    NRM[k] = -sx/l; NRM[k+1] = 1/l; NRM[k+2] = -sz/l;
+  }
+  // colors: one terrain type per square tile, hard edges, mowing patterns
+  const band = a => ((a % 2) + 2) % 2;
+  let v = 0;
+  const put = (i, j, r, g, b) => { const k = j*VW+i, o = v*3; tPos[o] = W2(i/SUB); tPos[o+1] = HGT[k]; tPos[o+2] = Z2(j/SUB); tNrm[o] = NRM[k*3]; tNrm[o+1] = NRM[k*3+1]; tNrm[o+2] = NRM[k*3+2]; tCol[o] = r; tCol[o+1] = g; tCol[o+2] = b; v++; };
+  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
+    const idx = y*COLS+x, t = G[idx], fo = FO[idx], fac = fo >= 0 && S.facilities[fo] ? S.facilities[fo].type : null;
+    const fringe = (t === T.ROUGH || t === T.FAIR) && FR[idx];
+    const base = fac ? (PAD[fac] || PAD_C) : fringe ? FRINGE_C : (TCC[t] || TCC[T.ROUGH]);
+    const n0 = .97 + .06*hash(x*7+1, y*13+3);
+    for (let b=0; b<SUB; b++) for (let a=0; a<SUB; a++) {
+      let sh = n0; const si = x*SUB+a, sj = y*SUB+b;
+      if (fac === 'putting' || (!fac && t === T.GREEN)) sh *= band((si >> 1) + (sj >> 1)) ? 1.04 : .97;
+      else if (fac === 'range') sh *= band(y) ? 1.06 : .95;
+      else if (fac) sh *= .98 + .03*hash(si, sj);
+      else if (fringe) sh *= 1;
+      else if (t === T.FAIR || t === T.TEE) sh *= band(x - y) ? 1.07 : .94;
+      else if (t === T.ROUGH) sh *= band(Math.floor((x + y)/2)) ? 1.04 : .96;
+      else if (t === T.SAND || t === T.NATIVE) sh *= .97 + .05*hash(si, sj);
+      if (a === 0 || b === 0) sh *= .965;
+      const r = base.r*sh, g = base.g*sh, bl = base.b*sh;
+      put(si, sj, r, g, bl); put(si, sj+1, r, g, bl); put(si+1, sj, r, g, bl);
+      put(si+1, sj, r, g, bl); put(si, sj+1, r, g, bl); put(si+1, sj+1, r, g, bl);
+    }
+  }
+  terrainGeo.attributes.position.needsUpdate = true; terrainGeo.attributes.color.needsUpdate = true; terrainGeo.attributes.normal.needsUpdate = true; terrainGeo.computeBoundingSphere();
+  // tile grid shown while building
+  const gp = [];
+  for (let x=0; x<=COLS; x++) { const i = x*SUB; for (let j=0; j<VH-1; j++) gp.push(W2(i/SUB), HGT[j*VW+i]+.015, Z2(j/SUB), W2(i/SUB), HGT[(j+1)*VW+i]+.015, Z2((j+1)/SUB)); }
+  for (let y=0; y<=ROWS; y++) { const j = y*SUB; for (let i=0; i<VW-1; i++) gp.push(W2(i/SUB), HGT[j*VW+i]+.015, Z2(j/SUB), W2((i+1)/SUB), HGT[j*VW+i+1]+.015, Z2(j/SUB)); }
+  gridGeo.setAttribute('position', new TH.Float32BufferAttribute(gp, 3)); gridGeo.computeBoundingSphere();
   buildProps(); if (ringFor !== S.level) buildRing();
 }
 
@@ -753,6 +776,7 @@ function buildProps(){
   add('cyl', '#f4f4ef', [1.05,.7,.95], [.015,1.4,.015]);
   const fl = new TH.Mesh(new TH.PlaneGeometry(.3,.18), new TH.MeshLambertMaterial({ color:0x1f5c35, side:TH.DoubleSide })); fl.position.set(1.2,1.3,.95); hg.add(fl);
   hg.position.set(W2(9), base, Z2(25)); propGroup.add(hg);
+  for (const f of S.facilities) propGroup.add(facModel(f));
   holeSig = '';
 }
 
@@ -951,6 +975,15 @@ function draw(now){
     ringWorld(t.x+.5, t.y+.5, .5); ctx.fillStyle = `rgba(255,255,255,${.3 + .3*pulse})`; ctx.fill();
     ringWorld(t.x+.5, t.y+.5, 4); ctx.setLineDash([5,5]); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.4; ctx.stroke(); ctx.setLineDash([]);
   }
+  gridLines.visible = S.mode === 'build' && !!S.tray;
+  if (S.mode === 'build' && S.tray && S.cursor && S.cursor.x >= 0 && S.cursor.y >= 0 && S.cursor.x < COLS && S.cursor.y < ROWS) {
+    const tl = TOOLS[S.tool], F = tl && tl.fac ? FACS[tl.fac] : null;
+    let x0 = S.cursor.x, y0 = S.cursor.y, w = 1, h2 = 1;
+    if (F) { w = F.w; h2 = F.h; x0 -= Math.floor((w-1)/2); y0 -= Math.floor((h2-1)/2); } else if (S.brush === 3 && !['hole','dogleg'].includes(S.tool)) { x0 -= 1; y0 -= 1; w = h2 = 3; }
+    ctx.beginPath(); const pts = [[x0,y0],[x0+w,y0],[x0+w,y0+h2],[x0,y0+h2]];
+    pts.forEach(([px2,py2], k) => { const q = proj(px2, py2, heightAt(clamp(px2,0,COLS-.01), clamp(py2,0,ROWS-.01)) + .03); if (k) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }); ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+  }
   if (S.mode === 'play') drawAim();
   const crowd = S.mode === 'play' ? [] : S.golfers;
   for (const g of crowd) if (g.id === S.follow) { ringWorld(g.x, g.y, .32); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2.5; ctx.stroke(); }
@@ -978,17 +1011,18 @@ function nextInterval(){
 function makeGolfer(o){
   const h = S.holes[0];
   const g = { id:++gid, x:DOOR.x, y:DOOR.y, bx:h.tee.x+.5, by:h.tee.y+.5, hole:0, strokes:0, state:'walk', toTee:true, leaving:false,
-    skill:.25 + Math.random()*.7, color:pick(SHIRTS), pants:pick(PANTS), skin:pick(SKIN), hat:pick(HATS), sat:55, energy:100, hunger:Math.random()*20, thirst:Math.random()*20, log:[], fl:null, thought:null, quiet:0, ...o };
+    skill:.25 + Math.random()*.7, color:pick(SHIRTS), pants:pick(PANTS), skin:pick(SKIN), hat:pick(HATS), spend:Math.random(), sat:55, energy:100, hunger:Math.random()*20, thirst:Math.random()*20, log:[], fl:null, thought:null, quiet:0, ...o };
   S.golfers.push(g); return g;
 }
 function spawn(){
   if (S.golfers.length >= MAXG || !S.holes.length || S.event) return;
-  makeGolfer({ ...visitor(), name: randName() });
+  arriveExtras(makeGolfer({ ...visitor(), name: randName() }));
   S.money += S.fee; book('fees', S.fee); S.earned += S.fee; S.dayFees += S.fee; S.dayGolfers++;
 }
 function say(g, text, force){ if (!text) return; if (!force && g.quiet > 0) return; g.thought = { text, t:2.4 }; g.quiet = 3; (g.log = g.log || []).push(text); if (g.log.length > 5) g.log.shift(); }
 function goHome(g){ g.leaving = true; g.state = 'walk'; g.fl = null; }
 function finishRound(g){
+  if (!g.ep && hasFac('restaurant') && Math.random() < .35 + .4*(g.spend ?? .5) + (g.hunger > 40 ? .2 : 0)) { earnFac('food', Math.round(15 + (g.spend ?? .5)*30), g); g.sat += 5; }
   const sat = clamp(g.sat, 0, 100);
   S.recent.push(sat); if (S.recent.length > 25) S.recent.shift();
   if (g.type && !g.ep) { const a = S.typeSat[g.type] = S.typeSat[g.type] || []; a.push(Math.round(sat)); if (a.length > 12) a.shift(); }
@@ -1004,11 +1038,12 @@ function stepGolfer(g, dt){
   g.quiet -= dt;
   if (!g.leaving && !S.holes[g.hole]) goHome(g);
   if (g.state === 'walk') {
-    const tx = g.leaving ? DOOR.x : g.bx - .3, ty = g.leaving ? DOOR.y : g.by + .14;
-    const riding = !!((g.mid || g.type === 'senior') && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
+    const dtr = !g.leaving && g.detour, tx = g.leaving ? DOOR.x : dtr ? dtr.x : g.bx - .3, ty = g.leaving ? DOOR.y : dtr ? dtr.y : g.by + .14;
+    const riding = !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
     const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 11 : 6)*dt;
     if (d <= step) { g.x = tx; g.y = ty;
       if (g.leaving) { g.done = true; finishRound(g); }
+      else if (dtr) { g.detour = null; useFacility(g, dtr.f); }
       else { g.state = 'address'; g.t = .35; g.toTee = false; }
     } else { g.x += dx/d*step; g.y += dy/d*step; }
   } else if (g.state === 'address') {
@@ -1026,7 +1061,8 @@ function swing(g){
   g.state = 'flight'; g.strokes++;
 }
 // Golfer attributes: dr driving, ac accuracy, ch chipping, sd sand, rc recovery, pt putting (0.1-1.1)
-function A(g, k){
+function A(g, k){ return A0(g, k) + (g.bonus && g.bonus[k] || 0); }
+function A0(g, k){
   const at = g.at; if (at && at[k] != null) return at[k];
   const s = g.skill ?? .5;
   return k === 'dr' ? (g.pow ?? s) : k === 'ac' ? (g.acc ?? s) : k === 'pt' ? (g.put ?? s) : k === 'ch' ? ((g.acc ?? s) + (g.put ?? s))/2 : s;
@@ -1115,14 +1151,14 @@ function holeOut(g){
   if (g.hole < S.holes.length) {
     const n = S.holes[g.hole];
     const far = Math.hypot(n.tee.x - prev.pin.x, n.tee.y - prev.pin.y) > 9, cart = hasCart(prev.pin.x+.5, prev.pin.y+.5) && hasCart(n.tee.x+.5, n.tee.y+.5);
-    if ((g.mid || g.type === 'senior') && !g.ep) { if (cart) g.sat += 1.5; else if (far) { g.sat -= 4; if (!text && Math.random() < .6) text = 'No cart path out here?'; } }
+    if ((g.mid || g.rented) && !g.ep) { if (cart) g.sat += 1.5; else if (far) { g.sat -= 4; if (!text && Math.random() < .6) text = 'No cart path out here?'; } }
     else if (far) { g.sat -= 3; if (!text && Math.random() < .6) text = 'Long walk to the next tee.'; }
-    g.bx = n.tee.x+.5; g.by = n.tee.y+.5; g.toTee = true; g.state = 'walk';
+    g.bx = n.tee.x+.5; g.by = n.tee.y+.5; g.toTee = true; g.state = 'walk'; planDetour(g, prev, n);
   } else { goHome(g); if (!text) text = g.sat > 60 ? 'What a round!' : g.sat < 40 ? 'Not coming back.' : null; }
   say(g, text, sc === 1 || diff <= -1);
 }
 function endDay(){
-  let up = 0; for (let i=0; i<G.length; i++) up += UPKEEP[G[i]] || 0; up = Math.round(up);
+  let up = 0; for (let i=0; i<G.length; i++) up += UPKEEP[G[i]] || 0; for (const f of S.facilities) up += FACS[f.type].upkeep; up = Math.round(up);
   S.money -= up; book('upkeep', -up);
   const news = clubDay();
   toast(`Day ${S.day}: ${S.dayGolfers} golfer${S.dayGolfers===1?'':'s'}, +${fmt(S.dayFees)} fees, −${fmt(up)} upkeep.` + (news ? ' ' + news : ''), 3400);
@@ -1138,7 +1174,7 @@ function sim(dt){
     S.spawnT -= dt; if (S.spawnT <= 0) { spawn(); S.spawnT = nextInterval(); }
     while (S.memberQueue.length && S.memberQueue[0].t <= S.dayT) {
       const q = S.memberQueue.shift(), m = S.members.find(m => m.id === q.mid);
-      if (m && !busy(m.id) && S.golfers.length < MAXG) makeGolfer(memberGolfer(m));
+      if (m && !busy(m.id) && S.golfers.length < MAXG) arriveExtras(makeGolfer(memberGolfer(m)));
     }
   }
   for (const g of S.golfers) stepGolfer(g, dt);
@@ -1163,6 +1199,100 @@ function checkGoals(){
     S.speed = 0; updateSpeed();
     $('done').classList.remove('hidden');
   }
+}
+
+// ---------- facilities ----------
+const FACS = {
+  snack:      { name:'Snack Bar',     icon:'🌭', w:1, h:1, cost:1500, upkeep:20, range:4.5, kind:'need', blurb:'Hungry or thirsty golfers walking nearby stop for food and drinks.' },
+  drinks:     { name:'Drink Stand',   icon:'🥤', w:1, h:1, cost:800,  upkeep:10, range:4.5, kind:'need', blurb:'Thirsty golfers stop for a cold drink.' },
+  bench:      { name:'Bench',         icon:'🪑', w:1, h:1, cost:150,  upkeep:1,  range:3.5, kind:'need', blurb:'Tired golfers sit for a minute and get their energy back.' },
+  restroom:   { name:'Restroom',      icon:'🚻', w:1, h:1, cost:1000, upkeep:12, range:4.5, kind:'need', blurb:'A pit stop that keeps golfers in a good mood.' },
+  proshop:    { name:'Pro Shop',      icon:'🛍️', w:2, h:2, cost:6000, upkeep:60, unique:true, kind:'arrive', blurb:'Golfers browse before their round. Big spenders buy more.' },
+  range:      { name:'Driving Range', icon:'🎯', w:2, h:5, cost:8000, upkeep:50, unique:true, kind:'arrive', blurb:'Golfers pay to warm up and play a little better.' },
+  putting:    { name:'Putting Green', icon:'⛳', w:2, h:2, cost:3000, upkeep:30, unique:true, kind:'arrive', blurb:'Free practice green. Golfers chip and putt a bit better.' },
+  carts:      { name:'Cart Barn',     icon:'🚗', w:2, h:2, cost:5000, upkeep:40, unique:true, kind:'arrive', blurb:'Rents carts to visitors, seniors especially. Needs cart paths.' },
+  restaurant: { name:'Restaurant',    icon:'🍽️', w:2, h:2, cost:9000, upkeep:90, unique:true, kind:'leave', blurb:'Golfers eat after their round and leave happier.' }
+};
+const facCenter = f => { const F = FACS[f.type]; return { x: f.x + F.w/2, y: f.y + F.h/2 }; };
+const hasFac = t => S.facilities.some(f => f.type === t);
+function earnFac(cat, amt, g){ S.money += amt; book(cat, amt); if (g) g.spent = (g.spent || 0) + amt; }
+function facTap(x, y){
+  if (S.event) return toast('The course is locked while an event is on');
+  const ft = TOOLS[S.tool].fac, F = FACS[ft];
+  if (F.unique && hasFac(ft)) return toast(`You already have a ${F.name}. Clear it to move it.`);
+  const x0 = x - Math.floor((F.w-1)/2), y0 = y - Math.floor((F.h-1)/2), tiles = [];
+  for (let dy=0; dy<F.h; dy++) for (let dx=0; dx<F.w; dx++) {
+    const tx = x0+dx, ty = y0+dy, t = tile(tx, ty);
+    if (t < 0) return toast(`The ${F.name} doesn’t fit there.`);
+    if (t === T.WATER || t === T.HOUSE || t === T.TEE || t === T.GREEN || t === T.ROCK) return toast(`The ${F.name} needs a clear ${F.w}×${F.h} spot away from water, tees, greens and buildings.`);
+    tiles.push([tx, ty]);
+  }
+  if (S.money < F.cost) return toast(`A ${F.name} costs ${fmt(F.cost)}. You have ${fmt(S.money)}.`);
+  checkpoint(); S.money -= F.cost; book('build', -F.cost); spend(F.cost);
+  const avg = Math.round(tiles.reduce((a,[tx,ty]) => a + E[ty*COLS+tx], 0)/tiles.length);
+  for (const [tx,ty] of tiles) { setTile(tx, ty, T.HOUSE); E[ty*COLS+tx] = avg; BR[ty*COLS+tx] = 0; }
+  S.facilities.push({ type:ft, x:x0, y:y0 });
+  terrainDirty = true; recompute(); toast(`${F.icon} ${F.name} built. ${F.blurb}`, 2600); updateHint();
+}
+function removeFacility(fi){
+  const f = S.facilities[fi], F = FACS[f.type], refund = Math.round(F.cost/2);
+  for (let dy=0; dy<F.h; dy++) for (let dx=0; dx<F.w; dx++) setTile(f.x+dx, f.y+dy, T.ROUGH);
+  S.facilities.splice(fi, 1); S.money += refund; book('build', refund); spend(-refund);
+  toast(`${F.name} removed. Sold for ${fmt(refund)}.`);
+}
+function arriveExtras(g){
+  if (!g || g.ep) return;
+  const sp = g.spend ?? .5;
+  if (hasFac('carts') && S.hasPath && !g.mid && Math.random() < (g.type === 'senior' ? .85 : .2 + .35*sp)) { g.rented = true; earnFac('carts', 15, g); }
+  if (hasFac('range') && Math.random() < .3 + .35*sp) { earnFac('range', 8, g); g.bonus = { ...(g.bonus || {}), dr:.02, ac:.03 }; g.sat += 2; }
+  if (hasFac('putting') && Math.random() < .5) { g.bonus = { ...(g.bonus || {}), pt:.04, ch:.02 }; g.sat += 1; }
+  if (hasFac('proshop') && Math.random() < .25 + .45*sp) { earnFac('shop', Math.round(10 + sp*50), g); g.sat += 2; if (Math.random() < .3) say(g, 'Picked up a new glove.'); }
+}
+function planDetour(g, prev, n){
+  if (g.ep || !S.facilities.length) return;
+  let best = null, bd = 1e9;
+  for (const f of S.facilities) {
+    const F = FACS[f.type]; if (F.kind !== 'need') continue;
+    const want = f.type === 'snack' ? (g.hunger > 35 || g.thirst > 35) : f.type === 'drinks' ? g.thirst > 35 : f.type === 'bench' ? g.energy < 75 : f.type === 'restroom' ? (!g.wc && Math.random() < .5) : false;
+    if (!want) continue;
+    const c = facCenter(f), d = Math.min(Math.hypot(c.x - prev.pin.x - .5, c.y - prev.pin.y - .5), Math.hypot(c.x - n.tee.x - .5, c.y - n.tee.y - .5));
+    if (d <= F.range && d < bd) { bd = d; best = f; }
+  }
+  if (best) { const c = facCenter(best); g.detour = { x:c.x + .1, y:c.y + FACS[best.type].h/2 + .3, f:best }; }
+}
+function useFacility(g, f){
+  const sp = g.spend ?? .5;
+  if (f.type === 'snack') { earnFac('food', Math.round(6 + sp*10), g); g.hunger = 5; g.thirst = Math.min(g.thirst, 10); g.sat += 3; say(g, 'Just what I needed.', true); }
+  else if (f.type === 'drinks') { earnFac('food', Math.round(4 + sp*3), g); g.thirst = 0; g.sat += 2; say(g, 'Ahh, a cold drink!', true); }
+  else if (f.type === 'bench') { g.energy = Math.min(100, g.energy + 25); g.sat += 1; say(g, 'Nice spot to rest.'); }
+  else if (f.type === 'restroom') { g.wc = true; g.sat += 3; }
+}
+function signMesh(text, bg){
+  const c = document.createElement('canvas'); c.width = 256; c.height = 72; const x = c.getContext('2d');
+  x.fillStyle = bg; x.fillRect(0, 0, 256, 72); x.fillStyle = '#fff'; x.font = 'bold 34px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 128, 38);
+  return new TH.Mesh(new TH.PlaneGeometry(.62, .18), new TH.MeshBasicMaterial({ map:new TH.CanvasTexture(c), side:TH.DoubleSide }));
+}
+function facModel(f){
+  const g = new TH.Group();
+  const add = (geo, c, p, s, r) => { const m = new TH.Mesh(GEO[geo], mat(c, geo === 'pyr')); m.position.set(...p); m.scale.set(...s); if (r) m.rotation.set(...r); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
+  const sign = (t, bg, p) => { const s = signMesh(t, bg); s.position.set(...p); s.rotation.y = Math.PI/2; g.add(s); };
+  switch (f.type) {
+    case 'snack': add('box','#f6efe0',[0,.22,0],[.55,.44,.5]); add('box','#e2483d',[0,.5,0],[.7,.05,.66]); for (const z of [-.22,0,.22]) add('box','#ffffff',[0,.53,z],[.7,.02,.08]); add('box','#a5713f',[.3,.2,0],[.06,.06,.5]); break;
+    case 'drinks': add('box','#2f6fd6',[0,.18,0],[.42,.26,.3]); add('cyl','#d8d8d2',[0,.45,0],[.012,.55,.012]); add('cone','#f2bd44',[0,.7,0],[.42,.14,.42]); for (const x of [-.12,.12]) add('cyl','#222222',[x,.05,.17],[.05,.02,.05],[Math.PI/2,0,0]); break;
+    case 'bench': add('box','#8a5a34',[0,.16,0],[.5,.04,.16]); add('box','#8a5a34',[0,.27,-.07],[.5,.14,.03]); for (const x of [-.2,.2]) add('box','#4a3a2a',[x,.08,0],[.04,.16,.14]); break;
+    case 'restroom': add('box','#dfe7ee',[0,.24,0],[.6,.48,.5]); add('pyr','#6b7a88',[0,.6,0],[.5,.24,.42]); add('box','#2f6fd6',[.301,.18,0],[.01,.3,.14]); break;
+    case 'proshop': add('box','#f6f1e4',[0,.32,0],[1.5,.64,1.4]); add('pyr','#2e6b3e',[0,.86,0],[1.25,.44,1.15]); for (const z of [-.4,.4]) add('box','#9fd3f0',[.752,.36,z],[.01,.26,.36]); add('box','#2e6b3e',[.8,.55,0],[.12,.03,1.2]); add('box','#6b4a2f',[.752,.24,0],[.01,.46,.24]); sign('PRO SHOP','#1f5c35',[.77,.74,0]); break;
+    case 'restaurant': add('box','#c98a5e',[-.15,.3,0],[1.2,.6,1.5]); add('pyr','#5a3a2e',[-.15,.8,0],[1.0,.42,1.25]); add('box','#b98b5c',[.7,.04,0],[.5,.06,1.5]);
+      for (const z of [-.45,.05,.55]) { add('cyl','#6b4a2f',[.72,.2,z],[.01,.36,.01]); add('cone','#ffffff',[.72,.4,z],[.22,.08,.22]); add('cyl','#8a5a34',[.72,.12,z],[.12,.02,.12]); }
+      for (const z of [-.4,.4]) add('box','#ffd28a',[.452,.32,z],[.01,.2,.3]); sign('RESTAURANT','#7a2e24',[.46,.54,0]); break;
+    case 'putting': add('box','#a3e05a',[0,.03,0],[1.8,.05,1.8]); for (const [x,z,c] of [[-.5,-.4,'#e2483d'],[.4,-.2,'#f2bd44'],[-.1,.5,'#2f6fd6']]) { add('cyl','#141c16',[x,.06,z],[.05,.01,.05]); add('cyl','#f4f4ef',[x,.22,z],[.008,.32,.008]); add('box',c,[x+.06,.34,z],[.12,.07,.01]); } break;
+    case 'range': add('box','#7a6a52',[0,.04,1.95],[1.8,.06,.5]); for (const x of [-.6,-.2,.2,.6]) { add('box','#5a9a3a',[x,.08,1.95],[.25,.02,.3]); add('sphere','#ffffff',[x,.11,1.85],[.025,.025,.025]); }
+      for (const [z,c] of [[.9,'#e2483d'],[-.2,'#f2bd44'],[-1.4,'#2f6fd6']]) { add('cyl',c,[0,.05,z],[.3,.02,.3]); add('cyl','#f4f4ef',[0,.25,z],[.008,.4,.008]); }
+      for (const x of [-.95,.95]) add('cyl','#9aa3ad',[x,.6,-2.3],[.015,1.2,.015]); break;
+    case 'carts': add('box','#a33b2f',[0,.3,-.15],[1.6,.6,1.2]); add('pyr','#6b7a88',[0,.82,-.15],[1.35,.44,1.05]); add('box','#f4f4ef',[0,.25,.452],[.8,.42,.01]);
+      for (const x of [-.45,.45]) { add('box','#f4f4ef',[x,.12,.75],[.24,.12,.4]); add('box','#1f5c35',[x,.42,.75],[.27,.02,.42]); } break;
+  }
+  const c = facCenter(f); g.position.set(W2(c.x), heightAt(c.x, c.y), Z2(c.y)); return g;
 }
 
 // ---------- building ----------
@@ -1208,7 +1338,8 @@ function paintAt(tx, ty){
     return;
   }
   for (const [x,y] of cells) {
-    const cur = tile(x,y); if (cur < 0 || cur === T.HOUSE) continue;
+    const cur = tile(x,y); if (cur < 0) continue;
+    if (cur === T.HOUSE) { const fi = FO[y*COLS+x]; if (S.tool === 'clear' && fi >= 0 && S.facilities[fi]) { removeFacility(fi); recompute(); changed = true; } continue; }
     if (S.tool === 'clear') {
       const hi = S.holes.findIndex(h => (h.tee.x===x && h.tee.y===y) || (h.pin.x===x && h.pin.y===y));
       if (hi >= 0) { removeHole(hi); changed = true; }
@@ -1242,9 +1373,9 @@ function doglegTap(x, y){
   updateHint();
 }
 let hist = [], future = [], curAct = null;
-function snap(){ return { g:G.slice(), e:E.slice(), br:BR.slice(), holes:S.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes })) }; }
+function snap(){ return { g:G.slice(), e:E.slice(), br:BR.slice(), fac:S.facilities.map(f => ({ ...f })), holes:S.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes })) }; }
 function restore(sn){
-  G.set(sn.g); E.set(sn.e); BR.set(sn.br); S.holes = sn.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes }));
+  G.set(sn.g); E.set(sn.e); BR.set(sn.br); S.facilities = sn.fac.map(f => ({ ...f })); S.holes = sn.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes }));
   for (const g of S.golfers) if (!g.leaving && g.hole >= S.holes.length) goHome(g);
   S.pendingTee = null; terrainDirty = true; recompute(); saveGame(); updateHint(); updateHUD();
 }
@@ -1641,7 +1772,7 @@ function renderClub(){
       h += `<div class="chips">${ATTRS.map(([k,l]) => `<button class="chip${ls.k === k ? ' on' : ''}" data-act="lk" data-k="${k}">${l}</button>`).join('')}</div>`;
       h += `<div class="btns"><button class="btn" data-act="giveLesson" ${S.lessonsLeft > 0 ? '' : 'disabled'}>${S.lessonsLeft > 0 ? 'Give lesson' : 'No lessons left today'}</button></div>`;
     }
-    const CATS = [['fees','Green fees'],['dues','Member dues'],['events','Events'],['prize','Pro winnings'],['build','Building'],['upkeep','Upkeep'],['lessons','Lesson fees']];
+    const CATS = [['fees','Green fees'],['dues','Member dues'],['food','Food & drink'],['shop','Pro shop'],['range','Range fees'],['carts','Cart rentals'],['events','Events'],['prize','Pro winnings'],['build','Building'],['upkeep','Upkeep'],['lessons','Lesson fees']];
     const tw = S.books, lw = S.lastBooks || {}, sum = o => Object.values(o).reduce((a,b) => a+b, 0);
     const rows = CATS.filter(([k]) => tw[k] || lw[k]).map(([k,l]) => `<tr><td>${l}</td><td class="${(tw[k] || 0) < 0 ? 'neg' : ''}">${tw[k] ? fmt(tw[k]) : '–'}</td><td class="${(lw[k] || 0) < 0 ? 'neg' : ''}">${lw[k] ? fmt(lw[k]) : '–'}</td></tr>`).join('');
     h += `<h3 class="sec">Finances</h3>` + (rows ? `<table><thead><tr><th>Money</th><th>This week</th><th>Last week</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td><b>Net</b></td><td><b>${fmt(sum(tw))}</b></td><td><b>${fmt(sum(lw))}</b></td></tr></tfoot></table>` : '') +
@@ -1882,7 +2013,7 @@ function renderScores(){
     `<div class="ginfo"><span class="small muted">${esc(sub)}</span>${T ? `<b>${T.icon} ${T.name}</b>` : ''}<span class="gq">“${quote}”</span><span class="small">Likes: <b>${T ? T.likes : 'tough, fair holes'}</b></span></div></div>` +
     `<div class="moods">${bar('Fun', sat)}${bar('Energy', g.energy ?? 100)}${bar('Hunger', 100 - (g.hunger || 0))}${bar('Thirst', 100 - (g.thirst || 0))}</div>` +
     `<div class="hstrip">${cells}<div class="hc tot"><span>Tot</span><b>${c.thru ? c.tot : 0}</b></div></div>` +
-    `<p class="small" style="margin:6px 0">${c.thru ? `<b>${toParStr(c.toPar)}</b> thru ${c.thru}` : 'Hasn’t finished a hole yet'}${g.mp ? '. Match: ' + esc(matchText(g.mp)) : ''}${g.leaving ? '. Round finished, heading in.' : ''}</p>` +
+    `<p class="small" style="margin:6px 0">${c.thru ? `<b>${toParStr(c.toPar)}</b> thru ${c.thru}` : 'Hasn’t finished a hole yet'}${g.mp ? '. Match: ' + esc(matchText(g.mp)) : ''}${g.spent ? '. Spent ' + fmt(g.spent) + ' here' : ''}${g.leaving ? '. Round finished, heading in.' : ''}</p>` +
     `<div class="thoughts">${(g.log || []).slice().reverse().map((t,i) => `<p class="${i ? 'muted' : ''}">${esc(t)}</p>`).join('') || '<p class="muted">Lining up the next shot…</p>'}</div></div>`;
   btns.innerHTML = '<button class="btn" data-sc="follow">Follow on the map</button><button class="btn alt" data-sc="list">Everyone on the course</button><button class="btn alt" data-sc="close">Close</button>';
 }
@@ -1912,10 +2043,11 @@ cv.addEventListener('pointerdown', e => {
   if (e.button === 2) { pend = { kind:'rotate', last:p }; return; }
   if (S.tool === 'move' || e.button === 1) { pend = { kind:'pan', last:p, start:p, moved:0 }; return; }
   warnedCash = false;
-  pend = { kind: S.tool === 'hole' || S.tool === 'dogleg' ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
+  S.cursor = tileAtScreen(p);
+  pend = { kind: S.tool === 'hole' || S.tool === 'dogleg' || TOOLS[S.tool].fac ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
 });
 cv.addEventListener('pointermove', e => {
-  if (!ptrs.has(e.pointerId)) return;
+  if (!ptrs.has(e.pointerId)) { if (S.tray && e.pointerType === 'mouse') S.cursor = tileAtScreen(local(e)); return; }
   const p = local(e); ptrs.set(e.pointerId, p);
   if (gest && ptrs.size >= 2) {
     const n = twoFinger(); S.follow = null;
@@ -1938,7 +2070,7 @@ cv.addEventListener('pointermove', e => {
   if (!pend.active) { if (moved < 6) return; pend.active = true; pend.key = pend.t.x+','+pend.t.y; checkpoint(); paintAt(pend.t.x, pend.t.y); }
   const steps = Math.max(1, Math.ceil(Math.hypot(p.x-pend.last.x, p.y-pend.last.y)/4));
   for (let i=1; i<=steps; i++) {
-    const q = { x:lerp(pend.last.x, p.x, i/steps), y:lerp(pend.last.y, p.y, i/steps) }, t = tileAtScreen(q), k = t.x+','+t.y;
+    const q = { x:lerp(pend.last.x, p.x, i/steps), y:lerp(pend.last.y, p.y, i/steps) }, t = tileAtScreen(q), k = t.x+','+t.y; S.cursor = t;
     if (k !== pend.key) { pend.key = k; paintAt(t.x, t.y); }
   }
   pend.last = p;
@@ -1951,7 +2083,7 @@ function endPtr(e, cancel){
   if (S.mode === 'play') { const a = aimP(); P.drag = null; if (a && a.power > .04 && !P.busy) shootP(a); else updateHint(); return; }
   if (!pend) return;
   if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; } }
-  if (pend.kind === 'tap') { if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
+  if (pend.kind === 'tap') { if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
   else if (pend.kind === 'paint' && !pend.active) { checkpoint(); paintAt(pend.t.x, pend.t.y); }
   pend = null;
 }
@@ -1989,7 +2121,8 @@ function updateHint(){
     $('hint').textContent = txt; return;
   }
   let h;
-  if (S.tool === 'dogleg') h = 'Tap near a hole to bend it there, $100. Line the corner with trees or bunkers. Tap a bend again to straighten the hole.';
+  if (TOOLS[S.tool] && TOOLS[S.tool].fac) { const F = FACS[TOOLS[S.tool].fac]; h = `${F.icon} ${F.name} (${F.w}×${F.h} tiles): ${F.blurb} ${fmt(F.cost)} to build, ${fmt(F.upkeep)} a day.${F.unique ? ' One per course.' : ''} Clear it to sell for half.`; }
+  else if (S.tool === 'dogleg') h = 'Tap near a hole to bend it there, $100. Line the corner with trees or bunkers. Tap a bend again to straighten the hole.';
   else if (S.tool === 'hole') h = S.pendingTee ? 'Now tap where the pin goes, 100 to 700 yards away. Tap the tee again to cancel.' : 'Tap where the tee box goes. Holes cost $200 plus the green.';
   else if (TOOLS[S.tool].elev) h = `Drag to ${S.tool === 'raise' ? 'raise' : 'lower'} the land one level, ${fmt(TOOLS[S.tool].cost)} a tile. Use the large brush for smooth hills. Water stays flat.`;
   else if (S.tool === 'move' && !S.tray) h = 'Drag to look around, pinch to zoom. Tap a golfer for their card, or open 🏗️ Build to design.';
@@ -2001,6 +2134,7 @@ function updateHint(){
   $('hint').textContent = h;
 }
 const TRAYS = {
+  fac:   { icon:'🏛️', name:'Facilities', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
   build: { icon:'🏗️', name:'Build', tools:['hole','dogleg','fairway','green','sand','path','bridge'] },
   land:  { icon:'🌳', name:'Landscape', tools:['trees','flowers','water','raise','lower','clear'] }
 };
@@ -2011,7 +2145,7 @@ function openTray(id){
 }
 $('undoBtn').addEventListener('click', () => { undo(); updateUndo(); });
 $('redoBtn').addEventListener('click', () => { redo(); updateUndo(); });
-function closeTray(){ S.tray = null; S.tool = 'move'; S.pendingTee = null; buildTools(); updateHint(); }
+function closeTray(){ S.cursor = null; S.tray = null; S.tool = 'move'; S.pendingTee = null; buildTools(); updateHint(); }
 function buildTools(){
   const nav = $('tools'); nav.innerHTML = '';
   if (S.mode === 'play') {
@@ -2024,14 +2158,16 @@ function buildTools(){
     const T0 = TRAYS[S.tray], tray = document.createElement('div'); tray.className = 'tray'; nav.appendChild(tray);
     const add = (cls, html, fn, id) => { const b = document.createElement('button'); b.className = cls; if (id) b.id = id; b.innerHTML = html; b.addEventListener('click', fn); tray.appendChild(b); return b; };
     add('tool done', '<span class="ic">✓</span><span class="nm">Done</span><span class="pr">Close</span>', closeTray);
-    for (const id of T0.tools) { const t = TOOLS[id];
+    if (S.tray === 'fac') add('tool', '<span class="ic">🏗️</span><span class="nm">‹ Build</span><span class="pr">Back</span>', () => openTray('build'));
+    for (const id of T0.tools) { const t = TOOLS[id].fac ? { ...FACS[TOOLS[id].fac], sw:null } : TOOLS[id];
       add('tool' + (S.tool === id ? ' on' : ''), `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${fmt(t.cost)}</span>`,
         () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; buildTools(); updateHint(); }); }
-    if (!['hole','dogleg'].includes(S.tool)) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
+    if (S.tray === 'build') add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac'));
+    if (!['hole','dogleg'].includes(S.tool) && !TOOLS[S.tool].fac) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
   }
   const dock = document.createElement('div'); dock.className = 'dock'; nav.appendChild(dock);
   const mk = (ic, nm, fn, on, extra) => { const b = document.createElement('button'); b.className = 'dockbtn' + (on ? ' on' : ''); b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>${extra || ''}`; b.addEventListener('click', fn); dock.appendChild(b); };
-  mk(TRAYS.build.icon, TRAYS.build.name, () => openTray('build'), S.tray === 'build');
+  mk(TRAYS.build.icon, TRAYS.build.name, () => S.tray === 'fac' ? closeTray() : openTray('build'), S.tray === 'build' || S.tray === 'fac');
   mk(TRAYS.land.icon, TRAYS.land.name, () => openTray('land'), S.tray === 'land');
   mk('🏌️', 'Play', startRound);
   mk('🏆', 'Club', () => openClub(), false, `<span class="badge hidden" id="clubPr"></span>`);
@@ -2119,12 +2255,12 @@ function showLevels(){
 function startLevel(i, cont){
   const L = LEVELS[i]; S.level = i; const sv = cont && store.saves[i];
   if (sv) {
-    G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
+    G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
     S.money = sv.money; S.earned = sv.earned; S.day = sv.day; S.fee = sv.fee; S.recent = sv.recent || []; S.won = !!sv.won;
     S.clubName = sv.clubName || L.name + ' Golf Club'; S.trophy = sv.trophy || 'Founders Cup';
     S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
   } else {
-    G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
+    G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.facilities = []; S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
     S.clubName = L.name + ' Golf Club'; S.trophy = 'Founders Cup';
     S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
     delete store.saves[i]; saveStore();
