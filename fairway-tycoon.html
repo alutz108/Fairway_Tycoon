@@ -319,12 +319,14 @@ const TOOLS = {
   flowers: { name:'Flowers', cost:35,  paint:T.FLOWERS, sw:'#e86aa6' },
   path:    { name:'Cart path', cost:15, paint:T.PATH, sw:'#d9d1bf' },
   water:   { name:'Pond',    cost:60,  paint:T.WATER, sw:'#3f86c8' },
+  dogleg:  { name:'Dogleg',  cost:100, icon:'↪️' },
+  bridge:  { name:'Bridge',  cost:80,  icon:'🌉' },
   raise:   { name:'Raise',   cost:40,  elev:1,  icon:'⛰️' },
   lower:   { name:'Lower',   cost:40,  elev:-1, icon:'🔻' },
   clear:   { name:'Clear',   cost:10,  paint:T.ROUGH, sw:'#5d9a45' }
 };
 const UPKEEP = { [T.FAIR]:1, [T.GREEN]:3, [T.SAND]:.5, [T.TEE]:1, [T.FLOWERS]:1, [T.PATH]:.2 };
-const ALL_TOOLS = ['hole','fairway','green','sand','path','trees','flowers','water','raise','lower','clear'];
+const ALL_TOOLS = ['hole','dogleg','fairway','green','sand','path','bridge','trees','flowers','water','raise','lower','clear'];
 const NATIVE_STYLE = {
   desert:    { rim:'#c79f6e', fill:'#dcbb8c', tuft:'#8a7a4a', name:'desert', dots:true },
   sandhills: { rim:'#d3bf8c', fill:'#e8d8aa', tuft:'#9a8f52', name:'waste area' },
@@ -417,7 +419,7 @@ function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let 
 const hash = (x,y) => { let h = x*374761393 + y*668265263; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 // ---------- state ----------
-let G = new Uint8Array(COLS*ROWS), E = new Int8Array(COLS*ROWS);
+let G = new Uint8Array(COLS*ROWS), E = new Int8Array(COLS*ROWS), BR = new Uint8Array(COLS*ROWS), FR = new Uint8Array(COLS*ROWS);
 const ELH = .22, EMAX = 8; // one elevation level = 0.22 tiles = about 5.5 yards
 const elevAt = (x, y) => { const xx = Math.floor(x), yy = Math.floor(y); return xx < 0 || yy < 0 || xx >= COLS || yy >= ROWS || G[yy*COLS+xx] === T.WATER ? 0 : E[yy*COLS+xx]; };
 const HILLS = [3, 2, 2, 4, 2, 3, 0, 3, 4];
@@ -440,13 +442,15 @@ function loadStore(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if 
 let store = loadStore();
 function saveStore(){ try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} }
 function saveGame(){
-  store.saves[S.level] = { grid:Array.from(G), elev:Array.from(E), holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, plays:h.plays, strokes:h.strokes })),
+  store.saves[S.level] = { grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
     members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft };
   saveStore();
 }
 
 function book(cat, amt){ S.books[cat] = (S.books[cat] || 0) + amt; }
+const isFringe = (x, y) => { const xx = Math.floor(x), yy = Math.floor(y); return xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS && FR[yy*COLS+xx] === 1; };
+const lieAt = (x, y) => { const t = at(x, y); return t === T.ROUGH && isFringe(x, y) ? T.FAIR : t; };
 const tile = (x,y) => (x<0||y<0||x>=COLS||y>=ROWS) ? -1 : G[y*COLS+x];
 const setTile = (x,y,t) => { G[y*COLS+x] = t; };
 const at = (x,y) => tile(Math.floor(x), Math.floor(y));
@@ -487,19 +491,32 @@ function genMap(L){
 }
 
 // ---------- hole analysis ----------
-function segX(a, b){
-  const p = [a.tee.x+.5, a.tee.y+.5, a.pin.x+.5, a.pin.y+.5], q = [b.tee.x+.5, b.tee.y+.5, b.pin.x+.5, b.pin.y+.5];
+const routeOf = h => [h.tee, ...(h.bend ? [h.bend] : []), h.pin].map(p => ({ x:p.x+.5, y:p.y+.5 }));
+function routeLen(h){ const r = routeOf(h); let L = 0; for (let i=1; i<r.length; i++) L += Math.hypot(r[i].x-r[i-1].x, r[i].y-r[i-1].y); return L; }
+function segsCross(p, q){
   const o = (ax,ay,bx,by,cx,cy) => Math.sign((bx-ax)*(cy-ay) - (by-ay)*(cx-ax));
   return o(p[0],p[1],p[2],p[3],q[0],q[1]) !== o(p[0],p[1],p[2],p[3],q[2],q[3]) && o(q[0],q[1],q[2],q[3],p[0],p[1]) !== o(q[0],q[1],q[2],q[3],p[2],p[3]);
 }
+function segX(a, b){
+  const sa = [], sb = [], ra = routeOf(a), rb = routeOf(b);
+  for (let i=1; i<ra.length; i++) sa.push([ra[i-1].x, ra[i-1].y, ra[i].x, ra[i].y]);
+  for (let i=1; i<rb.length; i++) sb.push([rb[i-1].x, rb[i-1].y, rb[i].x, rb[i].y]);
+  return sa.some(p => sb.some(q => segsCross(p, q)));
+}
+function doglegDir(h){
+  if (!h.bend) return null; const r = routeOf(h);
+  const ax = r[1].x - r[0].x, ay = r[1].y - r[0].y, bx = r[2].x - r[1].x, by = r[2].y - r[1].y;
+  const ang = Math.abs(Math.atan2(ax*by - ay*bx, ax*bx + ay*by));
+  return ang < .26 ? null : (ax*by - ay*bx) > 0 ? 'right' : 'left';
+}
 function holeInfo(h){
-  const tx=h.tee.x+.5, ty=h.tee.y+.5, px=h.pin.x+.5, py=h.pin.y+.5;
-  const L = Math.hypot(px-tx, py-ty), yards = Math.round(L*YD/5)*5;
+  const route = routeOf(h), L = routeLen(h), yards = Math.round(L*YD/5)*5;
   const drop = elevAt(h.tee.x, h.tee.y) - elevAt(h.pin.x, h.pin.y), plays = Math.round((yards - drop*ELH*YD)/5)*5;
   const par = plays <= 250 ? 3 : plays <= 470 ? 4 : 5;
   const n = Math.max(2, Math.ceil(L*2)); let fair=0, mid=0; const hz = new Set(), wz = new Set(), sz = new Set();
+  const pointAt = f => { let dist = f*L; for (let i=1; i<route.length; i++) { const a = route[i-1], b = route[i], sl = Math.hypot(b.x-a.x, b.y-a.y); if (dist <= sl || i === route.length-1) { const t = sl ? Math.min(1, dist/sl) : 0; return { x:a.x + (b.x-a.x)*t, y:a.y + (b.y-a.y)*t }; } dist -= sl; } return route[route.length-1]; };
   for (let i=0; i<=n; i++) {
-    const f=i/n, x=tx+(px-tx)*f, y=ty+(py-ty)*f;
+    const f=i/n, pt = pointAt(f), x=pt.x, y=pt.y;
     if (f>.15 && f<.85) { mid++; const t = at(x,y); if (t===T.FAIR || t===T.GREEN) fair++; }
     for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) {
       const xx=Math.floor(x)+dx, yy=Math.floor(y)+dy, t=tile(xx,yy);
@@ -517,17 +534,21 @@ function holeInfo(h){
   q += Math.min(scen/12, 1)*1.4;
   if (tile(h.tee.x,h.tee.y) === T.TEE) q += .5;
   if (drop >= 2) q += .8; else if (drop <= -3) q -= .3;
+  const dog = doglegDir(h); if (dog && par > 3) q += .7;
   if (par === 3 && yards < 110) { q -= 1; notes.push('Very short'); }
   if (yards > 640) { q -= 1; notes.push('Very long'); }
   let cross = 0; for (const o of S.holes) if (o !== h && segX(h,o)) cross++;
   if (cross) { q -= Math.min(3, cross*1.5); notes.push('Crosses another hole'); }
   const cart = hasCart(h.tee.x+.5, h.tee.y+.5) && hasCart(h.pin.x+.5, h.pin.y+.5);
   if (!cart && S.members.length) notes.push('No cart path access for members');
-  return { yards, par, q: clamp(q,0,10), cov, notes, cart, plays, drop, hz: hz.size, scen, water: wz.size > 0, sand: sz.size > 0 };
+  return { yards, par, q: clamp(q,0,10), cov, notes, cart, plays, drop, dog, hz: hz.size, scen, water: wz.size > 0, sand: sz.size > 0 };
 }
 function recompute(){
   NEAR = new Uint8Array(COLS*ROWS);
-  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) if (G[y*COLS+x] === T.PATH)
+  FR = new Uint8Array(COLS*ROWS);
+  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) { const t = G[y*COLS+x]; if (t !== T.ROUGH && t !== T.FAIR) continue;
+    for (let dy=-1; dy<=1 && !FR[y*COLS+x]; dy++) for (let dx=-1; dx<=1; dx++) if (tile(x+dx, y+dy) === T.GREEN) { FR[y*COLS+x] = 1; break; } }
+  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) if (G[y*COLS+x] === T.PATH || (BR[y*COLS+x] && G[y*COLS+x] === T.WATER))
     for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) { const xx = x+dx, yy = y+dy; if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) NEAR[yy*COLS+xx] = 1; }
   S.holes.forEach(h => h.info = holeInfo(h));
   if (!S.holes.length) { S.course = { stars:0, avgQ:0 }; return; }
@@ -592,12 +613,13 @@ function rebuildTerrain(){
   const TC = { [T.ROUGH]:grass, [T.FAIR]:'#86ca46', [T.GREEN]:'#a3e05a', [T.TEE]:'#93d452', [T.SAND]:'#f3e9cf', [T.WATER]:'#2c5878',
     [T.TREES]: LV.desert ? NS.fill : '#5a4330', [T.HOUSE]:'#cbc3b0', [T.FLOWERS]:'#6b4a33', [T.ROCK]:'#8d877d', [T.NATIVE]:NS.fill, [T.PATH]:'#c9bfa8' };
   const TCC = {}; for (const k in TC) TCC[k] = new TH.Color(TC[k]);
+  const FRINGE_C = new TH.Color('#96d257');
   const R = .74;
   for (let j=0; j<VH; j++) for (let i=0; i<VW; i++) {
     const vx = i/SUB, vy = j/SUB; let wsum = 0, hs = 0, r = 0, gg = 0, b = 0, gw = 0;
     for (let ty=Math.floor(vy-1); ty<=Math.floor(vy+1); ty++) for (let tx=Math.floor(vx-1); tx<=Math.floor(vx+1); tx++) {
       const d = Math.hypot(tx+.5-vx, ty+.5-vy); if (d >= R) continue;
-      const t = tile(clamp(tx,0,COLS-1), clamp(ty,0,ROWS-1)), w = (1 - d/R)**3, col = TCC[t] || TCC[T.ROUGH];
+      const t = tile(clamp(tx,0,COLS-1), clamp(ty,0,ROWS-1)), w = (1 - d/R)**3, col = (t === T.ROUGH || t === T.FAIR) && FR[clamp(ty,0,ROWS-1)*COLS + clamp(tx,0,COLS-1)] ? FRINGE_C : TCC[t] || TCC[T.ROUGH];
       const ev = t === T.WATER || t === T.HOUSE ? 0 : E[clamp(ty,0,ROWS-1)*COLS + clamp(tx,0,COLS-1)]*ELH;
       wsum += w; hs += w*((TH_H[t] ?? .04) + ev); r += w*col.r; gg += w*col.g; b += w*col.b; if (t === T.GREEN || t === T.TEE) gw += w;
     }
@@ -675,6 +697,11 @@ function buildProps(){
     bushes.push({ x:bx, y:by, s, r:hash(x,y+k)*6.28, h:0 });
     for (let b=0; b<6; b++) { const a = b*1.05 + k, d = .06 + (b%2)*.05; blooms.push({ x: bx + Math.cos(a)*d*s, y: by + Math.sin(a)*d*s, dy: .14*s - (b%2)*.03, s: .028, r:0, c:col }); }
   } });
+  for (let i=0; i<BR.length; i++) if (BR[i] && G[i] === T.WATER) {
+    const x = i % COLS, y = Math.floor(i/COLS), wx = W2(x+.5), wz = Z2(y+.5), along = tile(x-1,y) !== T.WATER || tile(x+1,y) !== T.WATER || BR[i-1] || BR[i+1];
+    const deck = new TH.Mesh(GEO.box, mat('#9a7048')); deck.scale.set(along ? 1.02 : .62, .06, along ? .62 : 1.02); deck.position.set(wx, -.02, wz); deck.castShadow = deck.receiveShadow = true; propGroup.add(deck);
+    for (const sgn of [-1,1]) { const rail = new TH.Mesh(GEO.box, mat('#7a5534')); rail.scale.set(along ? 1.02 : .04, .12, along ? .04 : 1.02); rail.position.set(wx + (along ? 0 : sgn*.3), .07, wz + (along ? sgn*.3 : 0)); rail.castShadow = true; propGroup.add(rail); }
+  }
   eachTile(T.ROCK, (x,y) => { const n = hash(x*9,y*2) < .5 ? 2 : 1; for (let k=0; k<n; k++) rocks.push({ x: x + .25 + hash(x+k*3,y*7)*.5, y: y + .25 + hash(x*7,y+k*3)*.5, s: .8 + hash(x,y+k)*.7, r: hash(x+k,y*3)*6.28, h: hash(x*5+k,y) }); });
   for (const st in byStyle) for (const part of STYLE[st]) instanced(byStyle[st], part);
   for (const part of STYLE.bush) instanced(bushes, part);
@@ -728,14 +755,21 @@ function buildRing(){
 let holeGroup = new TH.Group(), holeSig = '', flags = []; scene.add(holeGroup);
 const flagGeo = new TH.PlaneGeometry(.32, .19); flagGeo.translate(.16, 0, 0);
 function syncHoles(now){
-  const sig = S.holes.map(h => [h.tee.x,h.tee.y,h.pin.x,h.pin.y].join(',')).join('|') + S.mode + P.hole;
+  const sig = S.holes.map(h => [h.tee.x,h.tee.y,h.pin.x,h.pin.y,h.bend ? h.bend.x+'/'+h.bend.y : '',h.info.par,h.info.plays].join(',')).join('|') + S.mode + P.hole;
   if (sig !== holeSig) {
-    holeSig = sig; scene.remove(holeGroup); holeGroup = new TH.Group(); scene.add(holeGroup); flags = [];
+    holeSig = sig; scene.remove(holeGroup); holeGroup.traverse(o => { if (o.material && o.material.map) { o.material.map.dispose(); o.material.dispose(); } }); holeGroup = new TH.Group(); scene.add(holeGroup); flags = [];
     S.holes.forEach((h,i) => {
       const px = h.pin.x+.5, py = h.pin.y+.5, gy = heightAt(px, py);
       const pole = new TH.Mesh(GEO.cyl, mat('#f4f4ef')); pole.scale.set(.012,.95,.012); pole.position.set(W2(px), gy+.475, Z2(py)); pole.castShadow = true; holeGroup.add(pole);
       const flag = new TH.Mesh(flagGeo, new TH.MeshLambertMaterial({ color:0xe2483d, side:TH.DoubleSide })); flag.position.set(W2(px), gy+.84, Z2(py)); flag.castShadow = true; holeGroup.add(flag); flags.push(flag);
       const cup = new TH.Mesh(new TH.CircleGeometry(.055, 14), mat('#141c16')); cup.rotation.x = -Math.PI/2; cup.position.set(W2(px), gy+.012, Z2(py)); holeGroup.add(cup);
+      { const sx = h.tee.x + 1.15, sy = h.tee.y + .5, gy2 = heightAt(sx, sy), cvs = document.createElement('canvas'); cvs.width = 128; cvs.height = 80;
+        const c2 = cvs.getContext('2d'); c2.fillStyle = '#1f5c35'; c2.fillRect(0,0,128,80); c2.strokeStyle = '#f2e8cf'; c2.lineWidth = 4; c2.strokeRect(4,4,120,72);
+        c2.fillStyle = '#ffffff'; c2.font = 'bold 40px sans-serif'; c2.textAlign = 'left'; c2.textBaseline = 'middle'; c2.fillText(String(i+1), 12, 40);
+        c2.font = 'bold 20px sans-serif'; c2.fillText('Par ' + h.info.par, 58, 28); c2.font = '18px sans-serif'; c2.fillText(h.info.plays + ' yd', 58, 54);
+        const tex = new TH.CanvasTexture(cvs), board = new TH.Mesh(new TH.PlaneGeometry(.46, .29), new TH.MeshBasicMaterial({ map:tex, side:TH.DoubleSide }));
+        board.position.set(W2(sx), gy2 + .5, Z2(sy)); board.rotation.y = Math.PI/4; board.castShadow = true; holeGroup.add(board);
+        const post = new TH.Mesh(GEO.cyl, mat('#6b4a2f')); post.scale.set(.018, .4, .018); post.position.set(W2(sx), gy2 + .2, Z2(sy)); holeGroup.add(post); }
       for (const dx of [.28,.72]) { const tm = new TH.Mesh(GEO.sphere, mat('#2f6fd6')); tm.scale.setScalar(.035); const tx = h.tee.x+dx, ty = h.tee.y+.5; tm.position.set(W2(tx), heightAt(tx,ty)+.035, Z2(ty)); tm.castShadow = true; holeGroup.add(tm); }
     });
   }
@@ -883,7 +917,8 @@ function draw(now){
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,SW,SH);
   if (S.mode === 'build') {
     ctx.setLineDash([6,6]); ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(255,255,255,.6)';
-    for (const h of S.holes) { lineWorld(h.tee.x+.5, h.tee.y+.5, h.pin.x+.5, h.pin.y+.5); ctx.stroke(); }
+    for (const h of S.holes) { const r = routeOf(h); for (let k=1; k<r.length; k++) { lineWorld(r[k-1].x, r[k-1].y, r[k].x, r[k].y); ctx.stroke(); } }
+    ctx.setLineDash([]); for (const h of S.holes) if (h.bend) { ringWorld(h.bend.x+.5, h.bend.y+.5, .22); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fill(); }
     ctx.setLineDash([]);
   }
   if (S.pendingTee) {
@@ -959,7 +994,7 @@ function stepGolfer(g, dt){
 }
 function swing(g){
   const h = S.holes[g.hole]; if (!h) return goHome(g);
-  const px = h.pin.x+.5, py = h.pin.y+.5, lie = at(g.bx, g.by), d = Math.hypot(px-g.bx, py-g.by);
+  const px = h.pin.x+.5, py = h.pin.y+.5, lie = lieAt(g.bx, g.by), d = Math.hypot(px-g.bx, py-g.by);
   const putting = lie === T.GREEN || (d < 1.1 && lie !== T.SAND && lie !== T.WATER && lie !== T.TREES);
   const res = putting ? putt(g, px, py, d) : fullShot(g, px, py, d, lie);
   g.fl = { fx:g.bx, fy:g.by, tx:res.x, ty:res.y, t:0, T: putting ? .45 + Math.min(d,2)*.2 : .5 + res.len*.04, apex: putting ? 0 : Math.min(2.4, .4 + res.len*.13), res };
@@ -994,8 +1029,9 @@ function fullShot(g, px, py, d, lie){
   const maxD = 10*(.72 + .4*A(g,'dr'))*la.mult*(TT.dist || 1);
   let tx = px, ty = py, aimPin = true;
   if (d > maxD*1.02) {
-    aimPin = false; let best = -1e9; const base = Math.atan2(py-g.by, px-g.bx);
-    for (let ai=-5; ai<=5; ai++) for (const f of [.65,.8,.92,1]) {
+    aimPin = false; let best = -1e9; const hh = S.holes[g.hole], bases = [Math.atan2(py-g.by, px-g.bx)];
+    if (hh && hh.bend) { const bx = hh.bend.x+.5, by = hh.bend.y+.5; if (Math.hypot(px-g.bx, py-g.by) > Math.hypot(px-bx, py-by) + .5) bases.push(Math.atan2(by-g.by, bx-g.bx)); }
+    for (const base of bases) for (let ai=-5; ai<=5; ai++) for (const f of [.65,.8,.92,1]) {
       const a = base + ai*.17, dd = maxD*f, x = g.bx + Math.cos(a)*dd, y = g.by + Math.sin(a)*dd;
       const t = at(x,y); let v = t < 0 ? -20 : (LIEVAL[t] ?? 0)*1.3;
       v -= Math.hypot(px-x, py-y)*.55;
@@ -1125,6 +1161,17 @@ function paintAt(tx, ty){
   const r = S.brush === 3 ? 1 : 0;
   for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++) cells.push([tx+dx, ty+dy]);
   let changed = false;
+  if (S.tool === 'bridge') {
+    let water = false;
+    for (const [x,y] of cells) {
+      if (tile(x,y) !== T.WATER) continue; water = true; const i = y*COLS+x; if (BR[i]) continue;
+      if (S.money < tool.cost) { if (!warnedCash) { toast('Not enough cash for that'); warnedCash = true; } continue; }
+      S.money -= tool.cost; book('build', -tool.cost); spend(tool.cost); BR[i] = 1; changed = true;
+    }
+    if (!water && !warnedCash) { toast('Bridges go over water'); warnedCash = true; }
+    if (changed) { buildProps(); recompute(); }
+    return;
+  }
   if (tool.elev) {
     for (const [x,y] of cells) {
       const cur = tile(x,y); if (cur < 0 || cur === T.HOUSE || cur === T.WATER) continue;
@@ -1141,17 +1188,38 @@ function paintAt(tx, ty){
       const hi = S.holes.findIndex(h => (h.tee.x===x && h.tee.y===y) || (h.pin.x===x && h.pin.y===y));
       if (hi >= 0) { removeHole(hi); changed = true; }
     }
+    if (S.tool === 'clear' && BR[y*COLS+x]) { if (S.money >= 10) { S.money -= 10; book('build', -10); spend(10); BR[y*COLS+x] = 0; changed = true; } continue; }
     if (cur === tool.paint) continue;
     const cost = S.tool === 'clear' ? (cur === T.WATER ? 40 : cur === T.ROCK ? 80 : 10) : tool.cost;
     if (S.money < cost) { if (!warnedCash) { toast('Not enough cash for that'); warnedCash = true; } continue; }
-    S.money -= cost; book('build', -cost); spend(cost); setTile(x, y, tool.paint); if (tool.paint === T.WATER) E[y*COLS+x] = 0; changed = true;
+    S.money -= cost; book('build', -cost); spend(cost); setTile(x, y, tool.paint); if (tool.paint === T.WATER) E[y*COLS+x] = 0; else BR[y*COLS+x] = 0; changed = true;
   }
   if (changed) { terrainDirty = true; recompute(); checkGoals(); }
 }
+function doglegTap(x, y){
+  if (S.event) return toast('The course is locked while an event is on');
+  const cx = x+.5, cy = y+.5;
+  const hb = S.holes.findIndex(h => h.bend && Math.hypot(h.bend.x+.5-cx, h.bend.y+.5-cy) < 1);
+  if (hb >= 0) { checkpoint(); S.holes[hb].bend = null; recompute(); terrainDirty = true; toast(`Hole ${hb+1} is straight again. Plays ${S.holes[hb].info.plays} yards.`); updateHint(); return; }
+  let best = -1, bd = 3.5;
+  S.holes.forEach((h,i) => { const r = routeOf(h);
+    for (let k=1; k<r.length; k++) { const a = r[k-1], b = r[k], vx = b.x-a.x, vy = b.y-a.y, l2 = vx*vx + vy*vy || 1, t = clamp(((cx-a.x)*vx + (cy-a.y)*vy)/l2, 0, 1), d = Math.hypot(a.x + vx*t - cx, a.y + vy*t - cy); if (d < bd) { bd = d; best = i; } } });
+  if (best < 0) return toast('Tap near one of your holes to bend it there');
+  const h = S.holes[best];
+  if (Math.hypot(h.tee.x-x, h.tee.y-y) < 2 || Math.hypot(h.pin.x-x, h.pin.y-y) < 2) return toast('Put the bend at least 2 tiles from the tee and the green');
+  const old = h.bend; h.bend = { x, y };
+  if (routeLen(h)*YD > 720) { h.bend = old; return toast('That bend makes the hole too long. Try a spot closer to the straight line.'); }
+  if (S.money < TOOLS.dogleg.cost) { h.bend = old; return toast(`A dogleg costs ${fmt(TOOLS.dogleg.cost)}.`); }
+  const nb = h.bend; h.bend = old; checkpoint(); h.bend = nb;
+  S.money -= TOOLS.dogleg.cost; book('build', -TOOLS.dogleg.cost); spend(TOOLS.dogleg.cost);
+  recompute(); terrainDirty = true;
+  toast(h.info.dog ? `Hole ${best+1} now doglegs ${h.info.dog}. Par ${h.info.par}, plays ${h.info.plays} yards.` : `Bend added to hole ${best+1}. Move it farther off the straight line for a real dogleg.`, 2600);
+  updateHint();
+}
 let hist = [], future = [], curAct = null;
-function snap(){ return { g:G.slice(), e:E.slice(), holes:S.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, plays:h.plays, strokes:h.strokes })) }; }
+function snap(){ return { g:G.slice(), e:E.slice(), br:BR.slice(), holes:S.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes })) }; }
 function restore(sn){
-  G.set(sn.g); E.set(sn.e); S.holes = sn.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, plays:h.plays, strokes:h.strokes }));
+  G.set(sn.g); E.set(sn.e); BR.set(sn.br); S.holes = sn.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes }));
   for (const g of S.golfers) if (!g.leaving && g.hole >= S.holes.length) goHome(g);
   S.pendingTee = null; terrainDirty = true; recompute(); saveGame(); updateHint(); updateHUD();
 }
@@ -1220,10 +1288,10 @@ function startRound(){
 }
 function teeUp(i){
   const h = S.holes[i]; P.hole = i; P.strokes = 0; P.bx = h.tee.x+.5; P.by = h.tee.y+.5; P.busy = false; P.fl = null;
-  toast(`Hole ${i+1}: par ${h.info.par}, ${h.info.yards} yards`); updateHint();
+  toast(`Hole ${i+1}: par ${h.info.par}, ${h.info.plays} yards${h.info.dog ? ', dogleg ' + h.info.dog : ''}`); updateHint();
 }
 function endRound(){ S.mode = 'build'; P.fl = null; P.drag = null; buildTools(); updateHint(); }
-const playLie = () => at(P.bx, P.by);
+const playLie = () => lieAt(P.bx, P.by);
 function pinOf(){ const h = S.holes[P.hole]; return { x:h.pin.x+.5, y:h.pin.y+.5 }; }
 function onGreenP(){ const lie = playLie(), p = pinOf(); return lie === T.GREEN || (Math.hypot(p.x-P.bx, p.y-P.by) < 1.1 && lie !== T.SAND && lie !== T.WATER && lie !== T.TREES); }
 function maxDP(){
@@ -1819,7 +1887,7 @@ cv.addEventListener('pointerdown', e => {
   if (e.button === 2) { pend = { kind:'rotate', last:p }; return; }
   if (S.tool === 'move' || e.button === 1) { pend = { kind:'pan', last:p, start:p, moved:0 }; return; }
   warnedCash = false;
-  pend = { kind: S.tool === 'hole' ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
+  pend = { kind: S.tool === 'hole' || S.tool === 'dogleg' ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
 });
 cv.addEventListener('pointermove', e => {
   if (!ptrs.has(e.pointerId)) return;
@@ -1858,7 +1926,7 @@ function endPtr(e, cancel){
   if (S.mode === 'play') { const a = aimP(); P.drag = null; if (a && a.power > .04 && !P.busy) shootP(a); else updateHint(); return; }
   if (!pend) return;
   if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; } }
-  if (pend.kind === 'tap') holeTap(pend.t.x, pend.t.y);
+  if (pend.kind === 'tap') { if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
   else if (pend.kind === 'paint' && !pend.active) { checkpoint(); paintAt(pend.t.x, pend.t.y); }
   pend = null;
 }
@@ -1890,13 +1958,14 @@ function updateHint(){
     const p = pinOf(), d = Math.hypot(p.x-P.bx, p.y-P.by), gr = onGreenP(), a = aimP();
     const dhp = (elevAt(p.x,p.y) - elevAt(P.bx,P.by))*ELH;
     const away = gr ? `${Math.round(d*75)} ft` : `${Math.round(d*YD)} yds${Math.abs(dhp*YD) >= 4 ? ` (plays ${Math.round((d + dhp)*YD)}, ${dhp > 0 ? 'uphill' : 'downhill'})` : ''}`;
-    let txt = `${S.pro.name}: hole ${P.hole+1} of ${S.holes.length}, par ${hl.info.par}. Stroke ${P.strokes+1}, ${away} to the pin from the ${playLie() === T.NATIVE ? nativeOf().name : playLie() === T.FLOWERS ? 'flower beds' : LIENAME[playLie()] || 'rough'}.`;
+    let txt = `${S.pro.name}: hole ${P.hole+1} of ${S.holes.length}, par ${hl.info.par}. Stroke ${P.strokes+1}, ${away} to the pin from the ${isFringe(P.bx, P.by) && playLie() === T.FAIR && at(P.bx, P.by) === T.ROUGH ? 'fringe' : playLie() === T.NATIVE ? nativeOf().name : playLie() === T.FLOWERS ? 'flower beds' : LIENAME[playLie()] || 'rough'}.`;
     if (a && a.power > .02) txt = `Power ${Math.round(a.power*100)}%, ${gr ? Math.round(a.dist*75) + ' ft putt' : Math.round(a.dist*YD) + ' yard shot'}. Let go to hit.`;
     else if (!P.busy) txt += ' Pull back anywhere on the map and let go.';
     $('hint').textContent = txt; return;
   }
   let h;
-  if (S.tool === 'hole') h = S.pendingTee ? 'Now tap where the pin goes, 100 to 700 yards away. Tap the tee again to cancel.' : 'Tap where the tee box goes. Holes cost $200 plus the green.';
+  if (S.tool === 'dogleg') h = 'Tap near a hole to bend it there, $100. Line the corner with trees or bunkers. Tap a bend again to straighten the hole.';
+  else if (S.tool === 'hole') h = S.pendingTee ? 'Now tap where the pin goes, 100 to 700 yards away. Tap the tee again to cancel.' : 'Tap where the tee box goes. Holes cost $200 plus the green.';
   else if (TOOLS[S.tool].elev) h = `Drag to ${S.tool === 'raise' ? 'raise' : 'lower'} the land one level, ${fmt(TOOLS[S.tool].cost)} a tile. Use the large brush for smooth hills. Water stays flat.`;
   else if (S.tool === 'move') h = 'Drag to move around. Pinch, scroll or use + and − to zoom.';
   else if (S.tool === 'clear') h = 'Drag to clear back to rough. Clearing a tee or pin removes that hole.';
@@ -1979,7 +2048,7 @@ function openGoals(){
   $('goalList').innerHTML = goalState().map(g => `<div class="goal${g.met ? ' met' : ''}"><span class="ck">${g.met ? '✓' : ''}</span><div>${g.label}<small>${g.prog}</small></div></div>`).join('');
   if (!S.holes.length) $('holeTable').innerHTML = '<p class="muted">No holes yet. Pick the Hole tool and tap a tee spot, then a pin spot.</p>';
   else $('holeTable').innerHTML = `<table><thead><tr><th>Hole</th><th>Par</th><th>Yards</th><th>Design</th><th>Avg</th></tr></thead><tbody>` +
-    S.holes.map((h,i) => `<tr><td>${i+1}</td><td>${h.info.par}</td><td>${h.info.yards}${h.info.plays !== h.info.yards ? `<br><span class="small muted">plays ${h.info.plays}</span>` : ''}</td><td>${(h.info.q/2).toFixed(1)} ★</td><td>${h.plays ? (h.strokes/h.plays).toFixed(1) : '–'}</td></tr>` +
+    S.holes.map((h,i) => `<tr><td>${i+1}</td><td>${h.info.par}</td><td>${h.info.yards}${h.info.plays !== h.info.yards ? `<br><span class="small muted">plays ${h.info.plays}</span>` : ''}${h.info.dog ? `<br><span class="small muted">dogleg ${h.info.dog}</span>` : ''}</td><td>${(h.info.q/2).toFixed(1)} ★</td><td>${h.plays ? (h.strokes/h.plays).toFixed(1) : '–'}</td></tr>` +
       (h.info.notes.length ? `<tr><td></td><td class="note" colspan="4">${h.info.notes.join('. ')}.</td></tr>` : '')).join('') + `</tbody></table>`;
   $('goals').classList.remove('hidden');
 }
@@ -2023,12 +2092,12 @@ function showLevels(){
 function startLevel(i, cont){
   const L = LEVELS[i]; S.level = i; const sv = cont && store.saves[i];
   if (sv) {
-    G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, plays:h.plays||0, strokes:h.strokes||0 }));
+    G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
     S.money = sv.money; S.earned = sv.earned; S.day = sv.day; S.fee = sv.fee; S.recent = sv.recent || []; S.won = !!sv.won;
     S.clubName = sv.clubName || L.name + ' Golf Club'; S.trophy = sv.trophy || 'Founders Cup';
     S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
   } else {
-    G = genMap(L); E = genElev(L, G); S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
+    G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
     S.clubName = L.name + ' Golf Club'; S.trophy = 'Founders Cup';
     S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
     delete store.saves[i]; saveStore();

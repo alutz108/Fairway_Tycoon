@@ -29,6 +29,10 @@ All 9 settings are unlocked; each has an optional challenge (holes, star rating,
 - **Paint tools:** Fairway $30, Green $60, Bunker $25, Cart path $15, Trees $20, Flowers $35, Pond $60, Clear $10 (water→$40, rock→$80). Brush 1×1 or 3×3. Clearing a tee or pin removes that hole.
 - **Move tool** for one-finger panning.
 - **Elevation:** Raise / Lower tools ($40 per tile per level, levels 0–8, one level = 0.22 tiles ≈ 5.5 yds; `E` Int8Array, `ELH`, `EMAX`, `elevAt`). Water and the clubhouse stay flat; painting water flattens a tile. New courses get natural hills per setting (`HILLS`, aligned with `LEVELS`; `genElev`). Rendering adds elevation into the blended terrain heights. Holes show "plays as" yardage (`info.plays`, `info.drop`); par uses plays yardage; elevated tees (2+ levels down to the green) add design score. Shots: AI golfers compensate for target elevation, carry is shortened uphill / lengthened downhill based on the landing spot; play mode applies the same physics and the hint shows plays-as distance.
+- **Dogleg tool** ($100): tap near a hole's route to put a bend point there (`h.bend`, 2+ tiles from tee and green, total ≤ 720 yds); tap the bend again to straighten for free. Hole length, plays-as yardage, par, fairway coverage and hazard checks follow the bent route (`routeOf`, `routeLen`); crossing checks test every segment pair (`segX`). Bends sharper than ~15° count as a dogleg (`info.dog` 'left'/'right', +0.7 design score on par 4/5). AI golfers also search shot targets toward the corner while they're before the bend, so they follow the fairway around it (or cut it if they can land in a good spot). Route lines and a bend dot draw in build mode.
+- **Fringe:** rough/fairway tiles touching a green become fringe (`FR`, `isFringe`, `lieAt`): drawn as a lighter collar and played like fairway (chip/putt friendly). The play hint names it.
+- **Bridge tool** ($80, water tiles only, stored in `BR`, saved as `bridges`): wooden deck with rails over water; counts as cart path for member/senior cart access. Clear removes a bridge ($10); painting a tile to anything else removes it.
+- **Hole signs:** every tee gets a sign showing hole number, par and plays-as yards (canvas texture, rebuilt when the hole changes).
 - **Undo / Redo** (first two buttons in the tool bar): snapshot-based history of grid, elevation and holes (`checkpoint`, `undo`, `redo`, 40 steps). One checkpoint per paint stroke or hole. Undo refunds what that action cost; redo charges it again. Cleared when you switch courses; locked during events.
 - Hole design score (0–10) from fairway coverage, nearby hazards, green quality, scenery, tee box, length, and crossing other holes. Course star rating = average design + par variety + golfer satisfaction.
 
@@ -93,20 +97,20 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 | `loop` | `frame()` → sim steps, camera follow, `draw()` |
 
 ### Key data shapes
-- **Hole:** `{ tee:{x,y}, pin:{x,y}, plays, strokes, info:{ yards, par, q, notes, cart } }`
+- **Hole:** `{ tee:{x,y}, pin:{x,y}, bend?:{x,y}, plays, strokes, info:{ yards, par, q, notes, cart } }`
 - **Golfer:** `{ id, x, y, bx, by, hole, strokes, state:'walk'|'address'|'flight', type, skill, at? (attributes) or pow/acc/put (AI), color, pants, skin, hat, sat, card[], name?, mid? (member id), ep? (event player), mp?/side? (member match), country?, cart? }`
 - **Member:** `{ id, name, type, country, at:{dr,ac,ch,sd,rc,pt}, skill (avg), lessons, shirt, pants, skin, sat, rounds, best, titles, rec:{w,l,h}, h2h:{[oppId]:{name,w,l,h}} }` (old saves upgraded by `fixMember`)
 - **Match:** `{ id, a, b (member ids), ca[], cb[] (hole scores), done:{a,b} }`
 - **Event player:** `{ name, skill, pow, acc, put, type?, country?, mid?, team?, guest?, card[], started, done, sat }`
 - **Offer:** `{ id, tier, name, org, blurb, field, skill, type?, prestige, purse, pro, base, gate, reqs:[[key,n]], expires }`
 - **Club pro:** `{ name, country, at:{dr,ac,ch,sd,rc,pt}, skill, shirt, pants, skin, starts, wins, top10, earnings, log[] }`
-- **Save (per level index):** `grid, elev, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft`
+- **Save (per level index):** `grid, elev, bridges, holes, money, earned, day, fee, recent, won, members, mid, dues, prestige, eventLast, history, clubName, trophy, matchLog, matchId, typeSat, pro, offers, offerId, books, lastBooks, coins, lessonsLeft`
 
 ---
 
 ## 3. Roadmap (from the full game spec)
 1. ✅ Construction upgrade: undo/redo, hills and elevation.
-2. Better holes: dogleg holes (bend point), fringe collar on greens, bridges, hole signs.
+2. ✅ Better holes: dogleg holes (bend point), fringe collar on greens, bridges, hole signs.
 3. Facilities: pro shop, snack bar/restaurant, driving range, putting green, cart barn, restrooms, benches; revenue from shop, food and drink, range and cart rentals; fix hunger/thirst/energy.
 4. Staff and maintenance: superintendent, groundskeepers, shop/restaurant staff, cart attendants; salaries; course condition (mowing, watering, greens, bunkers); water and electricity costs.
 5. Ratings breakdown (difficulty, beauty, variety, fairness, green quality, condition, pace of play, satisfaction) and deeper golfer traits (iron accuracy, short game, course management, patience, spending).
