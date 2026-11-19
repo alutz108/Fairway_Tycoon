@@ -14,6 +14,12 @@ Works in any modern browser on phones, tablets and computers, and can be install
 Saves are stored in each browser on each device.
 
 ## 3D engine
-The game uses three.js (r128), loaded from cdnjs. The offline helper caches it after the first visit.
+The game uses three.js (r128), included locally in `vendor/three.min.js` so it works offline.
 On a computer: right-click drag or Q / E to rotate, arrow keys to pan, + / − to zoom.
 On a phone: twist two fingers to rotate.
+
+## Landscape
+Turn your phone sideways: the course fills the screen and the controls move to a side panel.
+
+## Installing
+Open the GitHub Pages link in Safari on iPhone, tap Share, then Add to Home Screen.
