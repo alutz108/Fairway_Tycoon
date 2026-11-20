@@ -1,5 +1,5 @@
 // Bump VERSION every time you upload a new index.html so phones pick up the update.
-const VERSION = 'fairway-v35';
+const VERSION = 'fairway-v36';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './vendor/three.min.js'];
 const THREE_JS = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 // Firebase sign-in code, saved so a signed-in player can open the game offline.

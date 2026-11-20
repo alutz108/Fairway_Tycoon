@@ -9,6 +9,17 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Club attention, event value, member cap
+- The red number on 🏆 Club counts **attention items** (`clubAttention`): invitations waiting, crew short-handed, equipment under 40%, unhappy members (<45 mood), dues far above fair. The Club tab opens with a red **Needs your attention** box (each item has a button that jumps to the right tab), and each tab shows its own red count.
+- Every event card (invitations, club events, team cups) and every setup screen shows an **estimate** (`eventMath`): how long it runs (field × 1.6 s + holes × your seconds per hole), your normal daily public income (green fees + food + shop + range + carts, from last week), what closing costs, and the estimated net plus prestige. Green if it pays, red if it costs.
+- Member cap = 11 per hole, max 200 (`memberCap`), explained in the Members tab.
+
+### Cart paths
+A spot has cart access within ~3 tiles of a cart path or bridge (`NEAR`, radius 3). Carts now **drive along the path** (`cartRoute`: BFS over path + bridge tiles, cached until the course changes): from the ball to the nearest path tile, along the path, then off to the next ball. A hole only counts as having cart access (and stops the "Wish I had a cart path" / "No cart path" complaints) when its tee and green are both near the **same connected** path network.
+
+### Hole editor: green shape
+✏️ Edit hole → **Green shape** (shape buttons with pictures) reshapes that hole's green around the pin (`reshapeGreen`), automatically turned to face the tee; **↻ Turn it** rotates 45°. New tiles cost $60; old green outside the new shape becomes fairway. Saved on the hole as `gshape`/`grot`.
+
 ### Build menus
 🏗️ Build → Holes (Hole, Edit hole, Dogleg, Clubhouse, 🚩 All pins) · Grass & paths (Fairway, Green, Cart path, Bridge) · Bunkers (4 styles) · Green shapes · Facilities · Upgrades (badge = affordable) · Buy land. 🌳 Landscape → Rough · Trees · Plants (Shrubs, Flowers) · Water (Creek, Pond) · Hills (Raise, Lower) · Landmarks, plus Clear. Opening a top-level menu selects the Move tool so nothing gets painted by accident.
 
@@ -22,7 +33,7 @@ Scotland/Ireland-style seaside links: few trees, fescue, many pot bunkers, rocks
 Each facility level adds real detail (`facModel`): range – extra bays and a ball dispenser, then a covered roof, floodlights and another target; pro shop – awning and displays, then a second floor; restaurant – more patio umbrellas, then an upper floor; snack/drinks – umbrella table and cooler, then more seating; putting green – extra flags, then benches and lights; cart barn – more parked carts, then an extension; bench – shade umbrella, then a pergola; restroom – planters, then a bigger roof and lamp.
 
 ### Tee boxes
-Each hole draws one long tee strip (from the back tee to the farthest forward set) with up to three marker sets (`teeSpots`): back = the hole's tee tile (blue), middle ~0.75–0.85 tiles toward the pin/bend (white), forward ~1.4–1.7 tiles (red); short holes get fewer, and a set is skipped if it would sit on water, trees, rocks, a building or a green. Golfers pick a set (`pickTeeSet`): tour/event players and your pro play the back tees, grinders and strong players (skill ≥ .78) the back, seniors and beginners (skill < .4) the forward tees, everyone else the middle (`setGolferTee` on arrival, each new hole, edits). Listed yardage is from the back tees.
+Tee tiles are now flat and mown-fairway colored, and each hole draws one long raised tee strip (from just behind the back tee to the farthest forward set; short holes get a small one) with up to three marker sets (`teeSpots`): back = the hole's tee tile (blue), middle ~0.75–0.85 tiles toward the pin/bend (white), forward ~1.4–1.7 tiles (red); short holes get fewer, and a set is skipped if it would sit on water, trees, rocks, a building or a green. Golfers pick a set (`pickTeeSet`): tour/event players and your pro play the back tees, grinders and strong players (skill ≥ .78) the back, seniors and beginners (skill < .4) the forward tees, everyone else the middle (`setGolferTee` on arrival, each new hole, edits). Listed yardage is from the back tees.
 
 ### Pin positions
 Hole editor → **Pin position on the green**: Front / Middle / Back (relative to the tee) / 🎲 Random, free; 🏗️ Build → Holes → **🚩 All pins** does the same for every hole at once (`openPinsAll`), using the connected green tiles around the pin (`greenTilesOf`, `setPin`). **Change every pin each morning** (`S.pinDaily`, saved) moves every pin to a random spot on its green at the start of each day (not during events or cups).

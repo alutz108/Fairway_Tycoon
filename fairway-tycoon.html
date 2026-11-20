@@ -313,6 +313,15 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .tool.cat .nm{font-weight:700}
 .tiprow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
 .tipic{font-size:1.2rem;line-height:1.2;flex:0 0 auto}
+.attn{border:2px solid #e2483d;background:rgba(226,72,61,.07);border-radius:14px;padding:10px 12px;margin:2px 0 10px}
+.attnrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.86rem}
+.attnrow:last-child{border-bottom:0}
+.tabs button{position:relative}
+.tdot{position:absolute;top:-4px;right:-2px;background:#e2483d;color:#fff;border-radius:999px;font-size:.62rem;font-weight:700;min-width:16px;height:16px;line-height:16px;padding:0 4px}
+.emath{font-size:.8rem;border-radius:10px;padding:8px 10px;margin:6px 0;line-height:1.4}
+.emath.good{background:rgba(79,191,90,.13)}
+.emath.bad{background:rgba(226,72,61,.1)}
+.shapechip svg{vertical-align:middle}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
@@ -850,18 +859,18 @@ function holeInfo(h){
   if (yards > 640) { q -= 1; notes.push('Very long'); }
   let cross = 0; for (const o of S.holes) if (o !== h && segX(h,o)) cross++;
   if (cross) { q -= Math.min(3, cross*1.5); notes.push('Crosses another hole'); }
-  const cart = hasCart(h.tee.x+.5, h.tee.y+.5) && hasCart(h.pin.x+.5, h.pin.y+.5);
+  const cart = !!cartRoute(h.tee.x+.5, h.tee.y+.5, h.pin.x+.5, h.pin.y+.5);
   if (!cart && S.members.length) notes.push('No cart path access for members');
   return { yards, par, q: clamp(q,0,10), cov, notes, cart, plays, drop, dog, gs, hz: hz.size, scen, water: wz.size > 0, sand: sz.size > 0 };
 }
 function recompute(){
   NEAR = new Uint8Array(COLS*ROWS);
-  FR = new Uint8Array(COLS*ROWS); FO = new Int16Array(COLS*ROWS).fill(-1); S.hasPath = G.includes(T.PATH);
+  FR = new Uint8Array(COLS*ROWS); FO = new Int16Array(COLS*ROWS).fill(-1); S.hasPath = G.includes(T.PATH); routeCache.clear();
   S.facilities.forEach((f, fi) => { const F = FACS[f.type]; for (let dy=0; dy<F.h; dy++) for (let dx=0; dx<F.w; dx++) { const xx = f.x+dx, yy = f.y+dy; if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) FO[yy*COLS+xx] = fi; } });
   for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) { const t = G[y*COLS+x]; if (t !== T.ROUGH && t !== T.FAIR) continue;
     for (let dy=-1; dy<=1 && !FR[y*COLS+x]; dy++) for (let dx=-1; dx<=1; dx++) if (tile(x+dx, y+dy) === T.GREEN) { FR[y*COLS+x] = 1; break; } }
   for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) if (G[y*COLS+x] === T.PATH || (BR[y*COLS+x] && G[y*COLS+x] === T.WATER))
-    for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) { const xx = x+dx, yy = y+dy; if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) NEAR[yy*COLS+xx] = 1; }
+    for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) { if (dx*dx + dy*dy > 10) continue; const xx = x+dx, yy = y+dy; if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) NEAR[yy*COLS+xx] = 1; }
   S.holes.forEach(h => h.info = holeInfo(h));
   if (!S.holes.length) { S.course = { stars:0, avgQ:0 }; return; }
   const r = courseRatings(), avgQ = r.design;
@@ -982,7 +991,7 @@ const gridLines = new TH.LineSegments(gridGeo, new TH.LineBasicMaterial({ color:
 const RING = 14;
 const water = new TH.Mesh(new TH.PlaneGeometry(COLS + RING*2, ROWS + RING*2), new TH.MeshLambertMaterial({ color:0x1d5fa8, transparent:true, opacity:.92 }));
 water.rotation.x = -Math.PI/2; water.position.y = -.1; water.receiveShadow = true; scene.add(water);
-const TH_H = { [T.ROUGH]:.04, [T.FAIR]:.02, [T.GREEN]:.06, [T.TEE]:.11, [T.SAND]:-.06, [T.WATER]:-.42, [T.TREES]:.05, [T.HOUSE]:.02, [T.FLOWERS]:.08, [T.ROCK]:.32, [T.NATIVE]:.09, [T.PATH]:.03, [T.POT]:-.075, [T.GBUNK]:-.07, [T.WASTE]:-.01, [T.FCUT]:.03, [T.DEEP]:.06, [T.FESCUE]:.1, [T.SHRUB]:.07 };
+const TH_H = { [T.ROUGH]:.04, [T.FAIR]:.02, [T.GREEN]:.06, [T.TEE]:.03, [T.SAND]:-.06, [T.WATER]:-.42, [T.TREES]:.05, [T.HOUSE]:.02, [T.FLOWERS]:.08, [T.ROCK]:.32, [T.NATIVE]:.09, [T.PATH]:.03, [T.POT]:-.075, [T.GBUNK]:-.07, [T.WASTE]:-.01, [T.FCUT]:.03, [T.DEEP]:.06, [T.FESCUE]:.1, [T.SHRUB]:.07 };
 function heightAt(x, y){
   const vx = clamp(x*SUB, 0, VW-1.001), vy = clamp(y*SUB, 0, VH-1.001), i = Math.floor(vx), j = Math.floor(vy), fx = vx-i, fy = vy-j;
   const h = (ii,jj) => HGT[jj*VW+ii];
@@ -991,7 +1000,7 @@ function heightAt(x, y){
 function rebuildTerrain(){
   const LV = LEVELS[S.level], NS = nativeOf();
   const grass = LV.lush ? '#3f8530' : LV.links ? '#6a8a3e' : '#4c8a33';
-  const TC = { [T.ROUGH]:grass, [T.FAIR]:'#86ca46', [T.GREEN]:'#a3e05a', [T.TEE]:'#93d452', [T.SAND]:'#f3e9cf', [T.WATER]:'#2c5878',
+  const TC = { [T.ROUGH]:grass, [T.FAIR]:'#86ca46', [T.GREEN]:'#a3e05a', [T.TEE]:'#86ca46', [T.SAND]:'#f3e9cf', [T.WATER]:'#2c5878',
     [T.TREES]: LV.desert ? NS.fill : '#5a4330', [T.HOUSE]:'#cbc3b0', [T.FLOWERS]:'#6b4a33', [T.ROCK]:'#8d877d', [T.NATIVE]:NS.fill, [T.PATH]:'#c9bfa8',
     [T.POT]:'#eadcb2', [T.GBUNK]:'#f6eed8', [T.WASTE]:'#d6c398', [T.FCUT]:LV.lush ? '#5f9e38' : '#6aa83d', [T.DEEP]:LV.lush ? '#336723' : '#3a6f26', [T.FESCUE]:'#c4b664', [T.SHRUB]:'#5b4532' };
   const TCC = {}; for (const k in TC) TCC[k] = new TH.Color(TC[k]);
@@ -1204,9 +1213,9 @@ function syncHoles(now){
         board.position.set(W2(sx), gy2 + .5, Z2(sy)); board.rotation.y = Math.PI/4; board.castShadow = true; holeGroup.add(board);
         const post = new TH.Mesh(GEO.cyl, mat('#6b4a2f')); post.scale.set(.018, .4, .018); post.position.set(W2(sx), gy2 + .2, Z2(sy)); holeGroup.add(post); }
       { const sp = teeSpots(h), ang = Math.atan2(h.pin.y - h.tee.y, h.pin.x - h.tee.x), px = -Math.sin(ang), py = Math.cos(ang);
-        const far = sp.fwd || sp.mid;
+        const far = sp.fwd || sp.mid || { x: sp.back.x + Math.cos(ang)*.3, y: sp.back.y + Math.sin(ang)*.3 };
         if (far) { const b = sp.back, len = Math.hypot(far.x - b.x, far.y - b.y) + .75, cx = (b.x + far.x)/2, cy = (b.y + far.y)/2, strip = new TH.Mesh(GEO.box, mat('#a0dc74'));
-          strip.scale.set(len, .045, .5); strip.rotation.y = -ang; strip.position.set(W2(cx), Math.max(heightAt(b.x, b.y), heightAt(far.x, far.y)) + .015, Z2(cy)); strip.receiveShadow = true; holeGroup.add(strip); }
+          strip.scale.set(len, .07, .52); strip.rotation.y = -ang; strip.position.set(W2(cx), (heightAt(b.x, b.y) + heightAt(far.x, far.y) + heightAt(cx, cy))/3 + .02, Z2(cy)); strip.receiveShadow = true; holeGroup.add(strip); }
         for (const [k, t] of Object.entries(sp)) {
           for (const sgn of [-1, 1]) { const tm = new TH.Mesh(GEO.sphere, mat(TEE_COL[k])); tm.scale.setScalar(.035); const mx = t.x + px*.22*sgn, my = t.y + py*.22*sgn; tm.position.set(W2(mx), heightAt(mx, my) + .055, Z2(my)); tm.castShadow = true; holeGroup.add(tm); }
         } }
@@ -1573,7 +1582,15 @@ function stepGolfer(g, dt){
       g.x = drv.x; g.y = drv.y; g.cart = false; g.inCart = drv; drv.passenger = g; return;
     }
     if (g.passenger && g.passenger.inCart !== g) g.passenger = null;
-    const riding = !drv && !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
+    let riding = !drv && !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty));
+    if (riding) { const rk = Math.round(tx*4) + ',' + Math.round(ty*4); if (g.rKey !== rk) { g.rKey = rk; const r = cartRoute(g.x, g.y, tx, ty); g.route = r ? r.slice() : null; } if (!g.route) riding = false; }
+    else { g.rKey = null; g.route = null; }
+    g.cart = riding;
+    if (riding && g.route.length) {   // drive along the path, then the last bit to the ball
+      const [rx, ry] = g.route[0], wd = Math.hypot(rx - g.x, ry - g.y), st = 4.6*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
+      if (wd <= st) { g.x = rx; g.y = ry; g.route.shift(); } else { g.x += (rx - g.x)/wd*st; g.y += (ry - g.y)/wd*st; }
+      return;
+    }
     const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 4.6 : 2.6)*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
     if (d <= step) { g.x = tx; g.y = ty;
       if (g.leaving) { g.done = true; finishRound(g); }
@@ -1717,7 +1734,7 @@ function holeOut(g){
   const prev = h; g.hole++; g.strokes = 0;
   if (g.hole < S.holes.length) {
     const n = S.holes[g.hole];
-    const far = Math.hypot(n.tee.x - prev.pin.x, n.tee.y - prev.pin.y) > 9, cart = hasCart(prev.pin.x+.5, prev.pin.y+.5) && hasCart(n.tee.x+.5, n.tee.y+.5);
+    const far = Math.hypot(n.tee.x - prev.pin.x, n.tee.y - prev.pin.y) > 9, cart = !!cartRoute(prev.pin.x+.5, prev.pin.y+.5, n.tee.x+.5, n.tee.y+.5);
     if ((g.mid || g.rented) && !g.ep) { if (cart) g.sat += 1.5; else if (far) { g.sat -= 4; if (!text && Math.random() < .6) text = 'No cart path out here?'; } }
     else if (far) { g.sat -= 3; if (!text && Math.random() < .6) text = 'Long walk to the next tee.'; }
     setGolferTee(g, n); g.toTee = true; g.state = 'walk'; planDetour(g, prev, n);
@@ -2700,7 +2717,7 @@ function taste(g, h, diff){
   return { d, say };
 }
 function fairDues(){ return Math.round((30 + S.course.stars*25 + S.holes.length*3)/5)*5; }
-function memberCap(){ return Math.max(6, S.holes.length*6); }
+function memberCap(){ return Math.min(200, Math.max(10, S.holes.length*11)); }
 const hcp = s => Math.max(0, Math.round((1-s)*30));
 const mood = s => s >= 70 ? '😀 Happy' : s >= 45 ? '🙂 Okay' : '😠 Unhappy';
 const skillLabel = s => s >= 1 ? 'Tour star' : s >= .85 ? 'Pro' : 'Hcp ' + hcp(s);
@@ -2786,6 +2803,7 @@ const CUPS = {
   rival: { name:'Challenge Cup',     icon:'⚔️', blurb:'Your best members take on a rival club from the county, Ryder Cup–style.', need: () => [[S.holes.length >= 18, '18 holes'], [S.members.length >= 4, '4 members']] }
 };
 const CUP_COOLDOWN = 7;
+const cupIncome = k => k === 'club' ? -400 : Math.round((k === 'inter' ? 1500 : 2500) + S.course.stars*(k === 'inter' ? 600 : 700));
 const cupCool = k => { const l = (S.cupLast || {})[k]; return l == null ? 0 : Math.max(0, CUP_COOLDOWN - (S.day - l)); };
 const ptsTxt = p => (Math.floor(p) || (p % 1 ? '' : '0')) + (p % 1 ? '½' : '');
 const bySkill = arr => arr.slice().sort((a, b) => (b.skill || 0) - (a.skill || 0));
@@ -2808,6 +2826,7 @@ function cupSetupHtml(){
   if (cs.kind === 'inter') h += `<label class="small muted" for="cupOpp">Opponent</label><select class="big" id="cupOpp" data-cupopp="1">${otherClubs().map(i => `<option value="${i}"${i === cs.opp ? ' selected' : ''}>${esc(store.saves[i].clubName || LEVELS[i].name)}</option>`).join('')}</select>`;
   h += `<div class="spread"><span>Players per team</span><div class="chips">${[2,3,4,5,6,7,8].filter(n => n <= maxN).map(n => `<button class="chip${n === cs.size ? ' on' : ''}" data-act="cupSize" data-n="${n}">${n}</button>`).join('')}</div></div>`;
   h += `<div class="cupteams">` + [A, B].map((T0, i) => `<div><input class="namebox" data-cupname="${i}" value="${esc(cs.names[i])}" ${cs.kind !== 'club' && i === 1 && cs.kind === 'inter' ? '' : ''} maxlength="32" style="border-color:${TEAM_COL[i]}"><ol class="small">${T0.map(p => `<li>${esc(p.name)} <span class="muted">Hcp ${hcp(p.skill || .6)}</span></li>`).join('')}</ol></div>`).join('') + `</div>`;
+  h += eventMath(cs.size*2, cupIncome(cs.kind), cs.kind === 'club' ? .75 : 1.5).html;
   h += `<div class="btns"><button class="btn" data-act="cupGo">Tee off</button><button class="btn alt" data-act="cupCancel">Cancel</button></div>`;
   return h;
 }
@@ -2870,7 +2889,7 @@ function cupsHtml(){
   let h = `<h3 class="sec">Team cups</h3><p class="small muted">Ryder Cup–style match play between two teams of members. Each match is worth a point, a halved match half a point.</p>`;
   for (const [k, C] of Object.entries(CUPS)) {
     const miss = C.need().filter(([ok]) => !ok).map(([, l]) => l), cd = cupCool(k), ok = !miss.length && !cd && !S.event;
-    h += `<div class="ev${ok ? '' : ' off'}"><h3>${C.icon} ${C.name}</h3><p class="small" style="margin:4px 0">${C.blurb}</p><p class="meta">${miss.length ? 'Needs ' + miss.join(', ') + '.' : cd ? `Available again in ${cd} day${cd === 1 ? '' : 's'}.` : 'Ready to play.'}</p><button class="btn" data-act="cupSetup" data-kind="${k}" ${ok ? '' : 'disabled'}>Set up</button></div>`;
+    h += `<div class="ev${ok ? '' : ' off'}"><h3>${C.icon} ${C.name}</h3><p class="small" style="margin:4px 0">${C.blurb}</p><p class="meta">${miss.length ? 'Needs ' + miss.join(', ') + '.' : cd ? `Available again in ${cd} day${cd === 1 ? '' : 's'}.` : 'Ready to play.'}</p>${S.holes.length ? eventMath(12, cupIncome(k), k === 'club' ? .75 : 1.5).html : ''}<button class="btn" data-act="cupSetup" data-kind="${k}" ${ok ? '' : 'disabled'}>Set up</button></div>`;
   }
   return h;
 }
@@ -3132,6 +3151,77 @@ function shapeSVG(k){
   return `<svg viewBox="0 0 9 9" width="36" height="36" aria-hidden="true"><g fill="#86cc5c">${dots}</g><line x1="4.5" y1="4.6" x2="4.5" y2="2.2" stroke="#fff" stroke-width=".22"/><path d="M4.5 2.2 L6 2.7 L4.5 3.2z" fill="#e2483d"/></svg>`;
 }
 
+// ---------- what needs attention in the Club ----------
+function clubAttention(){
+  const out = [], inv = S.offers.length, sh = S.holes.length ? crewShort() : { any:false }, unhappy = S.members.filter(m => m.sat < 45).length;
+  if (inv) out.push({ icon:'📨', tab:'events', text:`${inv} invitation${inv === 1 ? '' : 's'} waiting${S.offers.some(o => o.tour) ? ', including your tour stop' : ''}`, btn:'See events' });
+  if (sh.any) out.push({ icon:'⚠️', tab:'staff', text:'Your crew is short-handed, so the course is wearing down', btn:'Hire crew' });
+  if (S.cond.equip < 40) out.push({ icon:'🛠️', tab:'staff', text:`Equipment is at ${Math.round(S.cond.equip)}% and slowing your crew`, btn:'Repair' });
+  if (unhappy) out.push({ icon:'😠', tab:'members', text:`${unhappy} member${unhappy === 1 ? ' is' : 's are'} unhappy and might quit`, btn:'See members' });
+  if (S.members.length && S.dues > fairDues()*1.25) out.push({ icon:'💲', tab:'members', text:`Dues of ${fmt(S.dues)} are well above the fair ${fmt(fairDues())}, so fewer people join`, btn:'Adjust dues' });
+  return out;
+}
+const tabCounts = () => { const c = {}; for (const a of clubAttention()) c[a.tab] = (c[a.tab] || 0) + 1; return c; };
+function attentionHtml(){
+  const items = clubAttention(); if (!items.length) return '';
+  return `<div class="attn"><h3 class="sec" style="margin-top:0">🔴 Needs your attention</h3>` + items.map(a => `<div class="attnrow"><span>${a.icon} ${esc(a.text)}</span><button class="btn alt sm" data-gotab="${a.tab}">${a.btn}</button></div>`).join('') + `</div>`;
+}
+
+// ---------- is an event worth it? ----------
+function dailyPublicIncome(){
+  const B = S.lastBooks && Object.keys(S.lastBooks).length ? S.lastBooks : S.books, days = S.lastBooks && Object.keys(S.lastBooks).length ? 7 : Math.max(1, ((S.day - 1) % 7) + 1);
+  return Math.round(['fees','food','shop','range','carts'].reduce((a, k) => a + Math.max(0, (B && B[k]) || 0), 0)/days);
+}
+function eventMath(field, income, prestige){
+  const spH = S.paceLog && S.paceLog.length ? S.paceLog.reduce((a, b) => a + b, 0)/S.paceLog.length : 19.5;
+  const secs = Math.max(0, field - 1)*1.6 + S.holes.length*spH*1.15 + 15, days = secs/DAY, lost = Math.round(dailyPublicIncome()*days), net = income - lost;
+  return { days, lost, net, html: `<div class="emath ${net >= 0 ? 'good' : 'bad'}">📊 Takes about ${days < 1 ? 'part of a day' : days.toFixed(1) + ' days'}. You normally make about ${fmt(dailyPublicIncome())} a day from public golfers, so closing costs about ${fmt(lost)}. <b>Estimated net: ${net >= 0 ? '+' : '−'}${fmt(Math.abs(net)).replace('−','')}</b>${prestige ? `, plus +${prestige} prestige, which brings more golfers and members afterward` : ''}.</div>` };
+}
+
+// ---------- reshape a hole's green ----------
+function reshapeGreen(h, shape, turn){
+  const old = greenTilesOf(h); if (!old.length && tile(h.pin.x, h.pin.y) !== T.GREEN) old.push([h.pin.x, h.pin.y]);
+  if (turn) h.grot = ((h.grot ?? 0) + 1) % 8; else h.grot = ((Math.round(Math.atan2(h.pin.y - h.tee.y, h.pin.x - h.tee.x)/(Math.PI/4)) % 8) + 8) % 8;
+  h.gshape = shape;
+  const keep = S.shapeRot; S.shapeRot = h.grot; const cells = shapeCells(h.pin.x, h.pin.y, shape); S.shapeRot = keep;
+  const ok = ([x, y]) => { const t = tile(x, y); return ownedAt(x, y) && t >= 0 && t !== T.WATER && t !== T.HOUSE && t !== T.ROCK && t !== T.TEE; };
+  const want = new Set(cells.filter(ok).map(c => c + '')); want.add(h.pin.x + ',' + h.pin.y);
+  const add = [...want].filter(k => !old.some(c => c + '' === k)), cost = add.length*TOOLS.green.cost;
+  if (S.money < cost) return toast(`That green needs ${add.length} new tiles, ${fmt(cost)}.`);
+  checkpoint();
+  for (const c of old) if (!want.has(c + '')) setTile(c[0], c[1], T.FAIR);
+  for (const k of want) { const [x, y] = k.split(',').map(Number); setTile(x, y, T.GREEN); TS[y*COLS + x] = 0; }
+  S.money -= cost; if (cost) { book('build', -cost); spend(cost); }
+  terrainDirty = true; recompute(); crewCheckAfterPaint();
+  toast(`${GSHAPES[shape].icon} Hole ${S.holes.indexOf(h) + 1} now has a ${GSHAPES[shape].name.toLowerCase()} green${cost ? ` (${fmt(cost)})` : ''}. The old green outside the new shape became fairway.`, 3200);
+}
+
+// ---------- carts drive along your paths ----------
+const routeCache = new Map();
+const pathAt = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && (G[y*COLS + x] === T.PATH || BR[y*COLS + x] === 1);
+function nearestPath(x, y){
+  let best = null, bd = 1e9; const fx = Math.floor(x), fy = Math.floor(y);
+  for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) { const tx = fx + dx, ty = fy + dy; if (!pathAt(tx, ty)) continue; const d = Math.hypot(tx + .5 - x, ty + .5 - y); if (d <= 3.3 && d < bd) { bd = d; best = [tx, ty]; } }
+  return best;
+}
+function cartRoute(x0, y0, x1, y1){
+  const a = nearestPath(x0, y0), b = nearestPath(x1, y1); if (!a || !b) return null;
+  const key = a + '|' + b; if (routeCache.has(key)) return routeCache.get(key);
+  const start = a[1]*COLS + a[0], goal = b[1]*COLS + b[0], prev = new Int32Array(COLS*ROWS).fill(-2); prev[start] = -1;
+  const q = [start]; let found = start === goal;
+  for (let qi = 0; qi < q.length && !found; qi++) {
+    const i = q[qi], x = i % COLS, y = (i - x)/COLS;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+      const nx = x + dx, ny = y + dy; if (!pathAt(nx, ny)) continue;
+      if (dx && dy && !pathAt(x + dx, y) && !pathAt(x, y + dy)) continue;
+      const n = ny*COLS + nx; if (prev[n] !== -2) continue; prev[n] = i; if (n === goal) { found = true; break; } q.push(n);
+    }
+  }
+  let r = null;
+  if (found) { r = []; for (let i = goal; i !== -1; i = prev[i]) r.push([(i % COLS) + .5, Math.floor(i/COLS) + .5]); r.reverse(); }
+  routeCache.set(key, r); return r;
+}
+
 // ---------- clubhouse location ----------
 const houseAt = () => S.house || { x:CHX, y:CHY };
 function setDoor(){ const h = houseAt(); DOOR.x = h.x + 2.4; DOOR.y = h.y + 1; }
@@ -3290,10 +3380,11 @@ function closeClub(){
 }
 function memberOption(m, sel){ return `<option value="${m.id}"${sel ? ' selected' : ''}>${flagTxt(m.country) ? flagTxt(m.country) + ' ' : ''}${esc(m.name)} (Hcp ${hcp(m.skill)})</option>`; }
 function renderClub(){
-  document.querySelectorAll('#club .tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === clubTab));
+  const tc = tabCounts(); document.querySelectorAll('#club .tabs button').forEach(b => { b.classList.toggle('on', b.dataset.tab === clubTab); let d = b.querySelector('.tdot'); if (!d) { d = document.createElement('span'); d.className = 'tdot'; b.appendChild(d); } d.textContent = tc[b.dataset.tab] || ''; d.classList.toggle('hidden', !tc[b.dataset.tab]); });
   $('clubTitle').textContent = S.clubName || 'The clubhouse';
   let h = '';
   if (clubTab === 'club') {
+    h += attentionHtml();
     h += `<button class="mcard" data-act="profile" data-mid="pro"><span class="mav" style="background:${S.pro.shirt}">${flagTxt(S.pro.country) || '🏌️'}</span><span class="mi"><b>${esc(S.pro.name)}</b><span class="small muted">Your club pro: ${S.pro.starts} start${S.pro.starts === 1 ? '' : 's'}, ${S.pro.wins} win${S.pro.wins === 1 ? '' : 's'}, ${fmt(S.pro.earnings)} won</span></span><span class="chev" aria-hidden="true">›</span></button>`;
     const ls = S.lessonSetup || (S.lessonSetup = { mid:(S.members[0] || {}).id, k:'dr' });
     if (!S.members.find(m => m.id === ls.mid) && S.members.length) ls.mid = S.members[0].id;
@@ -3326,7 +3417,7 @@ function renderClub(){
     h += ts.length ? ts.map(id => { const a = S.typeSat[id], v = a.reduce((x,y) => x+y, 0)/a.length; return `<div class="spread"><span>${TYPES[id].icon} ${TYPES[id].name}</span><b>${mood(v)}</b></div>`; }).join('') + `<p class="small muted">Each type of golfer wants something different. Open a member’s profile to see what their type likes.</p>`
       : `<p class="small muted">Once golfers finish rounds, you’ll see how each type of golfer rates your course.</p>`;
   } else if (clubTab === 'members') {
-    h += `<p class="muted small">${S.members.length} of ${memberCap()} spots filled. People apply when your rating is good and dues are fair. Tap a member to edit them.</p>`;
+    h += `<p class="muted small">${S.members.length} of ${memberCap()} spots filled (11 per hole, up to 200). People apply when your rating is good and dues are fair. Tap a member to edit them.</p>`;
     h += `<div class="spread"><span>Weekly dues</span><div class="group"><button data-act="duesDown" aria-label="Lower dues">−</button><span style="padding:0 8px;font-weight:700">${fmt(S.dues)}</span><button data-act="duesUp" aria-label="Raise dues">+</button></div></div>`;
     h += `<p class="small muted">Fair dues for your course right now are about ${fmt(fairDues())} a week.</p>`;
     if (!S.members.length) h += `<p class="muted">No members yet. Add some yourself, or wait for applications once you have a few holes open.</p>`;
@@ -3363,6 +3454,7 @@ function renderClub(){
         S.setup.players.forEach((p,i) => { const m = p.mid && S.members.find(m => m.id === p.mid);
           h += `<div class="mrow"><input data-pid="${i}" value="${esc(p.name)}" maxlength="24" aria-label="Player ${i+1} name">${p.country ? `<select data-pidc="${i}" aria-label="Country for ${esc(p.name)}">${COUNTRIES.map(c => `<option value="${c.code}"${c.code === p.country ? ' selected' : ''}>${FLAGS_OK ? c.flag + ' ' + c.code : c.code}</option>`).join('')}</select>` : ''}<span class="small">${m ? 'Hcp ' + hcp(m.skill) : skillLabel(p.skill)}</span><button class="x" data-act="rmPlayer" data-pid="${i}" aria-label="Remove ${esc(p.name)}">✕</button></div>`; });
       }
+      { const ps = S.setup.players, n = t.kind === 'team' ? new Set(ps.map(p => p.team)).size : ps.length; h += eventMath(ps.length, t.kind ? n*t.entry - t.cost : eventIncome(t), t.prestige).html; }
       h += `<div class="btns">${!t.kind && S.setup.players.length < t.field ? '<button class="btn alt" data-act="addPlayer">Add a player</button>' : ''}<button class="btn" data-act="teeOff">Tee off</button><button class="btn alt" data-act="cancelSetup">Cancel</button></div>`;
     } else {
       h += `<h3 class="sec" style="margin-top:4px">📨 Invitations</h3>`;
@@ -3370,7 +3462,7 @@ function renderClub(){
       for (const o of S.offers) {
         const rl = reqList(o), ok = rl.every(r => r.ok), left = o.expires - S.day;
         h += `<div class="ev${o.tour ? ' tourev' : ''}"><h3>${o.tour ? '🏌️ ' : ''}${esc(o.name)}</h3><p class="meta">${o.org}. Field of ${o.field} players. ${o.tour ? 'Your own tour stop: it waits until you’re ready.' : `Expires in ${left} day${left === 1 ? '' : 's'}.`}</p><p class="small" style="margin:4px 0">${o.blurb}</p>` +
-          `<p class="meta">Pays about ${fmt(eventIncome(o))} to host.${o.pro ? ` Your pro can enter for a share of the ${fmt(o.purse)} purse.` : ''}</p>` +
+          `<p class="meta">Pays about ${fmt(eventIncome(o))} to host.${o.pro ? ` Your pro can enter for a share of the ${fmt(o.purse)} purse.` : ''}</p>` + (S.holes.length ? eventMath(o.field, eventIncome(o), o.prestige).html : '') +
           `<ul class="reqs">${rl.map(r => `<li class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} ${r.label}${!r.ok && r.have != null ? ` <span class="muted">(${r.have} now)</span>` : ''}</li>`).join('')}</ul>` +
           `<div class="btns" style="margin-top:6px"><button class="btn" data-act="setup" data-type="${o.id}" ${ok ? '' : 'disabled'}>${ok ? 'Accept and set up' : 'Requirements not met'}</button>${o.tour ? '' : `<button class="btn alt" data-act="decline" data-type="${o.id}">Decline</button>`}</div></div>`;
       }
@@ -3384,7 +3476,7 @@ function renderClub(){
         const field = t.kind === 'member' ? 'up to ' + t.field + ' members' : 'up to ' + t.field + ' teams';
         const money = t.kind === 'member' ? `Entry fees ${fmt(t.entry)} each, costs ${fmt(t.cost)}.` : `Entry fees ${fmt(t.entry)} a team, costs ${fmt(t.cost)}.`;
         h += `<div class="ev${ok ? '' : ' off'}"><h3>${t.name}</h3><p class="meta">${t.org}. Field of ${field}.</p><p class="small" style="margin:4px 0">${t.blurb}${t.kind === 'member' ? ` Played for the ${esc(S.trophy)}.` : ''}</p>` +
-          `<p class="meta">${money}${cd ? ` Available again in ${cd} day${cd === 1 ? '' : 's'}.` : ''}</p>` +
+          `<p class="meta">${money}${cd ? ` Available again in ${cd} day${cd === 1 ? '' : 's'}.` : ''}</p>` + (S.holes.length ? (() => { const n = Math.min(t.field, S.members.length); return eventMath(t.kind === 'team' ? n*2 : n, n*t.entry - t.cost, t.prestige).html; })() : '') +
           `<ul class="reqs">${rl.map(r => `<li class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} ${r.label}</li>`).join('')}</ul>` +
           `<button class="btn" data-act="setup" data-type="${t.id}" ${ok ? '' : 'disabled'}>Set up</button></div>`;
       }
@@ -3396,6 +3488,7 @@ function renderClub(){
   }
   $('clubBody').innerHTML = h;
 }
+$('clubBody').addEventListener('click', e => { const gt = e.target.closest('[data-gotab]'); if (gt) { clubTab = gt.dataset.gotab; renderClub(); $('club').querySelector('.card').scrollTop = 0; } });
 $('clubBody').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return; const a = b.dataset.act;
   if (a === 'duesDown') S.dues = Math.max(10, S.dues - 5);
@@ -3739,6 +3832,8 @@ function openHoleEd(){
       <button class="btn alt" data-ed="up" ${editSel === 0 ? 'disabled' : ''}>◀ Play earlier</button><button class="btn alt" data-ed="down" ${editSel >= n-1 ? 'disabled' : ''}>Play later ▶</button>
       <button class="btn alt danger" data-ed="del">🗑️ Delete hole</button>
     </div>
+    <h3 class="sec">Green shape</h3><div class="chips">${Object.entries(GSHAPES).map(([k, G0]) => `<button class="chip shapechip${h.gshape === k ? ' on' : ''}" data-gs="${k}">${shapeSVG(k).replace('width="36" height="36"', 'width="22" height="22"')} ${G0.name}</button>`).join('')}${h.gshape ? '<button class="chip" data-ed="grot">↻ Turn it</button>' : ''}</div>
+    <p class="small muted">Reshapes this hole’s green around the pin. New green tiles cost $60; old green outside the shape becomes fairway.</p>
     <p class="small muted">Moving a tee or pin costs $100. Moving the pin off the green adds one green tile there.</p>`;
   $('holeEd').classList.remove('hidden');
 }
@@ -3772,9 +3867,11 @@ function editMoveTo(x, y){
   updateHint(); openHoleEd();
 }
 $('holeEdBody').addEventListener('click', e => {
-  const b = e.target.closest('[data-ed]'); if (!b || b.disabled) return; const a = b.dataset.ed, i = editSel, h = S.holes[i]; if (!h) return;
+  const b = e.target.closest('[data-ed],[data-gs]'); if (!b || b.disabled) return; const a = b.dataset.ed, i = editSel, h = S.holes[i]; if (!h) return;
   if (S.event) return toast('The course is locked while an event is on');
   if (a === 'pfront' || a === 'pmiddle' || a === 'pback' || a === 'prandom') { if (setPin(h, a.slice(1))) { recompute(); toast(`Hole ${i+1}: pin moved to the ${a === 'prandom' ? 'new spot' : a.slice(1)} of the green. Now ${h.info.yards} yards.`); } else toast('Paint a bigger green first, then you can move the pin around on it.'); openHoleEd(); return; }
+  if (b.dataset.gs) { reshapeGreen(h, b.dataset.gs, false); openHoleEd(); return; }
+  if (a === 'grot' && h.gshape) { reshapeGreen(h, h.gshape, true); openHoleEd(); return; }
   if (a === 'pdaily0' || a === 'pdaily1') { S.pinDaily = a === 'pdaily1'; toast(S.pinDaily ? 'Pins will move to a new spot on every green each morning.' : 'Pins stay where you put them.'); openHoleEd(); return; }
   if (a === 'tee' || a === 'pin') { S.editMove = { hole:i, which:a }; $('holeEd').classList.add('hidden'); updateHint(); toast(a === 'tee' ? 'Tap where the new tee box goes.' : 'Tap where the new pin goes.'); return; }
   checkpoint();
@@ -3893,7 +3990,7 @@ $('feeUp').addEventListener('click', () => { S.fee = Math.min(200, S.fee + 5); u
 function updateUndo(){ const u = $('undoBtn'), r = $('redoBtn'); if (u) u.disabled = !hist.length; if (r) r.disabled = !future.length; }
 function updateHUD(){
   updateUndo();
-  const cp = $('clubPr'); if (cp) { cp.textContent = S.offers.length; cp.classList.toggle('hidden', !S.offers.length); }
+  const cp = $('clubPr'); if (cp) { const na = S.active ? clubAttention().length : 0; cp.textContent = na; cp.classList.toggle('hidden', !na); }
   const m = $('money'); m.textContent = fmt(S.money); m.classList.toggle('neg', S.money < 0);
   $('stars').innerHTML = `<b>★</b> ${S.course.stars.toFixed(1)}`;
   $('coins').textContent = `🪙 ${S.coins}`;
