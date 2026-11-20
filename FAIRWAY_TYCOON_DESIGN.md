@@ -16,7 +16,8 @@ Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fai
 - **Performance:** 1024 shadow map on phones; when paused and idle for 1.5s the scene draws at ~15fps (`lastInteract`, `idleN`).
 - **iPhone hardening:** no page pinch-zoom (`gesturestart`), no rubber-band scroll, no long-press callout, persistent storage requested.
 - **Backup / restore** (empire screen): copy the whole save store as a code; paste a code to restore.
-- **GitHub package:** three.js is bundled locally (`vendor/three.min.js`, MIT license included) and cached by the service worker so the home-screen app works offline. The Claude artifact still loads three.js from cdnjs.
+- **Load safety net:** a small script before the game shows the error on the start screen if loading fails (or THREE is missing after 4s) and keeps the save backup button working; `window.__ftReady` is set when startup finishes. Save conversion runs in try/catch.
+- **GitHub package:** three.js is bundled locally (`vendor/three.min.js`, MIT license included) and cached by the service worker so the home-screen app works offline; if `vendor/three.min.js` is missing, index.html falls back to cdnjs, and the service worker caches files one by one so a missing file can't block updates. The Claude artifact still loads three.js from cdnjs.
 
 ### Controls layout (bottom dock)
 The bottom of the screen is a five-button dock: 🏗️ **Build**, 🌳 **Landscape**, 🏌️ **Play**, 🏆 **Club** (red badge = waiting invitations), 📋 **Golfers** (scorecards). Build and Landscape open a tray above the dock (`TRAYS`, `openTray`, `closeTray`, `S.tray`):
