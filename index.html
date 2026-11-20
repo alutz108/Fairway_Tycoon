@@ -291,7 +291,15 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .signin .card{max-width:400px}
 .linkbtn{background:none;border:0;padding:6px 0;color:var(--brand);font-weight:600;text-decoration:underline;text-underline-offset:2px;font-size:.85rem}
 .acct{display:flex;align-items:center;gap:8px;background:var(--chip);border-radius:12px;padding:8px 12px;font-size:.84rem;margin:8px 0}
-@media (prefers-reduced-motion: reduce){#toast{transition:none}}
+.hud #crewChip{font:inherit;font-size:1rem;background:#e2483d;color:#fff;border:0;border-radius:999px;width:38px;height:38px;padding:0;flex:0 0 auto;cursor:pointer;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.07)}}
+.crewcard{border:2px solid var(--line);border-radius:14px;padding:12px;margin:4px 0 8px}
+.crewcard.short{border-color:#e2483d;background:rgba(226,72,61,.07)}
+.ev.owned{opacity:.75}
+.windlbl{position:absolute;right:6px;top:calc(30% - 62px);width:52px;padding:4px 0;border-radius:12px;background:rgba(14,34,22,.78);color:#fff;text-align:center;font-size:.8rem;line-height:1.1;pointer-events:none}
+.windlbl .warr{display:block;font-size:1.2rem;transition:transform .3s}
+.windlbl small{display:block;font-size:.62rem;opacity:.8}
+@media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
 <body>
@@ -300,7 +308,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
     <div class="row">
       <button class="lvl" id="lvlBtn" aria-label="Open goals and course info"><span id="lvlName">Fairways Tycoon</span><span id="goalMini">Goals and course</span></button>
       <span id="money">$0</span>
-      <button id="stars" aria-label="Course rating breakdown"><b>★</b> 0.0</button><button id="coins" aria-label="Coins, open your club pro">🪙 0</button>
+      <button id="stars" aria-label="Course rating breakdown"><b>★</b> 0.0</button><button id="crewChip" class="hidden" aria-label="Crew is short-handed, open Staff" title="Crew is short-handed">⚠️</button><button id="coins" aria-label="Coins, open your club pro">🪙 0</button>
     </div>
     <div class="row">
       <div class="day"><span id="dayLbl">Day 1</span><div class="daybar"><i id="dayFill"></i></div></div>
@@ -310,6 +318,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
   </header>
   <main id="stage"><canvas id="gl" aria-hidden="true"></canvas><canvas id="map" aria-label="Golf course map"></canvas><div class="zoom"><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="rotL" aria-label="Rotate left">⟲</button><button id="rotR" aria-label="Rotate right">⟳</button><button id="zFit" class="fit" aria-label="Show whole course">Fit</button></div><div class="undoBox hidden" id="undoBox"><button id="undoBtn" aria-label="Undo, refunds the cost">↶</button><button id="redoBtn" aria-label="Redo">↷</button></div><div id="playUI" class="hidden">
   <div class="vmeter" aria-hidden="true"><i class="over" id="meterOver"></i><i id="meterSweet" class="sweet"></i><i id="meterFull" class="full"></i><b id="meterFill"></b><span id="meterMark" class="hidden"></span><em id="meterLbl" class="hidden"></em></div>
+  <div class="windlbl" id="windLbl"></div>
   <button class="pbtn view" id="viewBtn" aria-label="Switch view">🗺️</button>
   <div class="pbar"><button class="pbtn" id="aimL" aria-label="Aim left">◀</button><div class="pclub"><button id="clubPrev" aria-label="Longer club">‹</button><span id="clubName">Driver</span><button id="clubNext" aria-label="Shorter club">›</button></div><button class="pbtn" id="aimR" aria-label="Aim right">▶</button><button class="pbtn swing" id="swingBtn">Swing</button></div>
 </div><button id="eventChip" class="hidden"></button><div id="toast" role="status" aria-live="polite"></div></main>
@@ -441,7 +450,8 @@ body{overflow:hidden;-webkit-touch-callout:none}
 'use strict';
 const $ = id => document.getElementById(id);
 const COLS = 34, ROWS = 46, YD = 25, DAY = 40, MAXG = 30;
-const T = { ROUGH:0, FAIR:1, GREEN:2, TEE:3, SAND:4, WATER:5, TREES:6, HOUSE:7, FLOWERS:8, ROCK:9, NATIVE:10, PATH:11, POT:12, WASTE:13, GBUNK:14, FCUT:15, DEEP:16, FESCUE:17 };
+const T = { ROUGH:0, FAIR:1, GREEN:2, TEE:3, SAND:4, WATER:5, TREES:6, HOUSE:7, FLOWERS:8, ROCK:9, NATIVE:10, PATH:11, POT:12, WASTE:13, GBUNK:14, FCUT:15, DEEP:16, FESCUE:17, SHRUB:18 };
+const SPEC = ['', 'round', 'pine', 'palm', 'blossom', 'willow', 'autumn', 'cypress'];
 const isBunker = t => t === T.SAND || t === T.POT || t === T.GBUNK || t === T.WASTE;
 const rollOf = (t, gr = .2) => t === T.FAIR || t === T.TEE ? .45 : t === T.GREEN ? gr : t === T.FCUT ? .3 : t === T.WASTE ? .15 : t === T.ROUGH ? .08 : 0;
 const CHX = Math.floor(COLS/2) - 1, CHY = ROWS - 2, AF = COLS*ROWS/468, MK = Math.hypot(COLS, ROWS)/31.6;
@@ -458,18 +468,27 @@ const TOOLS = {
   fcut:    { name:'First cut', cost:20, paint:T.FCUT, sw:'#6dae3f' },
   deep:    { name:'Deep rough', cost:10, paint:T.DEEP, sw:'#3a6f26' },
   fescue:  { name:'Fescue',  cost:15,  paint:T.FESCUE, sw:'#c4b664' },
-  trees:   { name:'Trees',   cost:20,  paint:T.TREES, sw:'#2f6b2f' },
+  shrubs:  { name:'Shrubs',  cost:25,  paint:T.SHRUB, sw:'#3f7f3a' },
+  river:   { name:'Creek',   cost:35,  paint:T.WATER, thin:true, icon:'〰️' },
+  tree_round:   { name:'Oaks',     cost:20, paint:T.TREES, species:'round',   icon:'🌳' },
+  tree_pine:    { name:'Pines',    cost:20, paint:T.TREES, species:'pine',    icon:'🌲' },
+  tree_autumn:  { name:'Maples',   cost:25, paint:T.TREES, species:'autumn',  icon:'🍁' },
+  tree_blossom: { name:'Cherry blossom', cost:30, paint:T.TREES, species:'blossom', icon:'🌸' },
+  tree_willow:  { name:'Willows',  cost:25, paint:T.TREES, species:'willow',  icon:'🌿' },
+  tree_palm:    { name:'Palms',    cost:30, paint:T.TREES, species:'palm',    icon:'🌴' },
+  tree_cypress: { name:'Cypress',  cost:25, paint:T.TREES, species:'cypress', icon:'🌲' },
+  trees:   { name:'Mixed trees', cost:20, paint:T.TREES, sw:'#2f6b2f' },
   flowers: { name:'Flowers', cost:35,  paint:T.FLOWERS, sw:'#e86aa6' },
   path:    { name:'Cart path', cost:15, paint:T.PATH, sw:'#d9d1bf' },
   water:   { name:'Pond',    cost:60,  paint:T.WATER, sw:'#3f86c8' },
   dogleg:  { name:'Dogleg',  cost:100, icon:'↪️' },
   bridge:  { name:'Bridge',  cost:80,  icon:'🌉' },
-  ...Object.fromEntries(Object.entries({ snack:'🌭', drinks:'🥤', bench:'🪑', restroom:'🚻', proshop:'🛍️', range:'🎯', putting:'⛳', carts:'🚗', restaurant:'🍽️' }).map(([k]) => ['f_' + k, { fac:k }])),
+  ...Object.fromEntries(Object.entries({ snack:'🌭', drinks:'🥤', bench:'🪑', restroom:'🚻', proshop:'🛍️', range:'🎯', putting:'⛳', carts:'🚗', restaurant:'🍽️', windmill:1, lighthouse:1, gazebo:1, fountain:1, statue:1 }).map(([k]) => ['f_' + k, { fac:k }])),
   raise:   { name:'Raise',   cost:40,  elev:1,  icon:'⛰️' },
   lower:   { name:'Lower',   cost:40,  elev:-1, icon:'🔻' },
   clear:   { name:'Clear',   cost:10,  paint:T.ROUGH, sw:'#5d9a45' }
 };
-const UPKEEP = { [T.FAIR]:1, [T.GREEN]:3, [T.SAND]:.5, [T.TEE]:1, [T.FLOWERS]:1, [T.PATH]:.2, [T.POT]:.8, [T.GBUNK]:.7, [T.WASTE]:.2, [T.FCUT]:.6, [T.DEEP]:.1 };
+const UPKEEP = { [T.FAIR]:1, [T.GREEN]:3, [T.SAND]:.5, [T.TEE]:1, [T.FLOWERS]:1, [T.PATH]:.2, [T.POT]:.8, [T.GBUNK]:.7, [T.WASTE]:.2, [T.FCUT]:.6, [T.DEEP]:.1, [T.SHRUB]:.3 };
 const ALL_TOOLS = ['hole','dogleg','fairway','green','sand','pot','gbunk','waste','fcut','deep','fescue','path','bridge','trees','flowers','water','raise','lower','clear'];
 const NATIVE_STYLE = {
   desert:    { rim:'#c79f6e', fill:'#dcbb8c', tuft:'#8a7a4a', name:'desert', dots:true },
@@ -477,7 +496,7 @@ const NATIVE_STYLE = {
   fescue:    { rim:'#b9ad63', fill:'#cfc27a', tuft:'#a39548', name:'fescue' }
 };
 const nativeOf = () => NATIVE_STYLE[LEVELS[S.level].native || 'sandhills'];
-const LIEVAL = { [T.GREEN]:5, [T.FAIR]:4, [T.TEE]:3.5, [T.ROUGH]:1, [T.SAND]:-2, [T.TREES]:-4, [T.WATER]:-12, [T.HOUSE]:-12, [T.FLOWERS]:-3, [T.ROCK]:-15, [T.NATIVE]:-1, [T.PATH]:2.5, [T.POT]:-4, [T.GBUNK]:-2.5, [T.WASTE]:-.5, [T.FCUT]:2.5, [T.DEEP]:-1.5, [T.FESCUE]:-3 };
+const LIEVAL = { [T.GREEN]:5, [T.FAIR]:4, [T.TEE]:3.5, [T.ROUGH]:1, [T.SAND]:-2, [T.TREES]:-4, [T.WATER]:-12, [T.HOUSE]:-12, [T.FLOWERS]:-3, [T.ROCK]:-15, [T.NATIVE]:-1, [T.PATH]:2.5, [T.POT]:-4, [T.GBUNK]:-2.5, [T.WASTE]:-.5, [T.FCUT]:2.5, [T.DEEP]:-1.5, [T.FESCUE]:-3, [T.SHRUB]:-3 };
 const LEVELS = [
   { name:'Meadow Run', style:'Open farmland', blurb:'Gentle rolling farmland with a pond or two. The easiest place to learn.',
     seed:11, cash:12000, fee:30, tree:'round', trees:.12, ponds:1, sand:2, goals:{ holes:3, stars:2, earned:1500 } },
@@ -563,6 +582,7 @@ function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let 
 const hash = (x,y) => { let h = x*374761393 + y*668265263; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 // ---------- state ----------
+let TS = new Uint8Array(COLS*ROWS);
 let G = new Uint8Array(COLS*ROWS), E = new Int8Array(COLS*ROWS), BR = new Uint8Array(COLS*ROWS), FR = new Uint8Array(COLS*ROWS), FO = new Int16Array(COLS*ROWS).fill(-1);
 const ELH = .22, EMAX = 8; // one elevation level = 0.22 tiles = about 5.5 yards
 const elevAt = (x, y) => { const xx = Math.floor(x), yy = Math.floor(y); return xx < 0 || yy < 0 || xx >= COLS || yy >= ROWS || G[yy*COLS+xx] === T.WATER ? 0 : E[yy*COLS+xx]; };
@@ -597,9 +617,9 @@ for (const k of Object.keys(store.saves)) { try { migrateSave(+k, store.saves[k]
 ensureEmpire();
 function saveStore(fromCloud){ if (!fromCloud) store.savedAt = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} if (!fromCloud) cloudQueue(); }
 function saveGame(){
-  store.saves[S.level] = { grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
+  store.saves[S.level] = { species:Array.from(TS), grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
-    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, loan:S.loan, stars:S.course.stars, value:propertyValue() };
+    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
   saveStore();
 }
 
@@ -675,7 +695,7 @@ function holeInfo(h){
     if (f>.15 && f<.85) { mid++; const t = at(x,y); if (t===T.FAIR || t===T.GREEN) fair++; }
     for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) {
       const xx=Math.floor(x)+dx, yy=Math.floor(y)+dy, t=tile(xx,yy);
-      if (isBunker(t) || t===T.WATER || t===T.TREES || t===T.NATIVE || t===T.ROCK || t===T.FLOWERS || t===T.DEEP || t===T.FESCUE) { hz.add(xx+','+yy); if (t===T.WATER) wz.add(xx+','+yy); else if (isBunker(t)) sz.add(xx+','+yy); }
+      if (isBunker(t) || t===T.WATER || t===T.TREES || t===T.NATIVE || t===T.ROCK || t===T.FLOWERS || t===T.DEEP || t===T.FESCUE || t===T.SHRUB) { hz.add(xx+','+yy); if (t===T.WATER) wz.add(xx+','+yy); else if (isBunker(t)) sz.add(xx+','+yy); }
     }
   }
   const cov = mid ? fair/mid : 0; const notes = []; let q = 0;
@@ -684,8 +704,9 @@ function holeInfo(h){
   let gs = 0; for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) if (tile(h.pin.x+dx, h.pin.y+dy) === T.GREEN) gs++;
   if (tile(h.pin.x,h.pin.y) === T.GREEN) { q += gs >= 5 ? 1.5 : .8; if (gs < 5) notes.push('Green is small, paint more green'); } else { q -= 3; notes.push('Pin is off the green'); }
   let scen = 0;
-  for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) { const t = tile(h.pin.x+dx, h.pin.y+dy); if (t===T.WATER || t===T.TREES || t===T.ROCK || t===T.FLOWERS) scen++; }
-  for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) { const t = tile(h.tee.x+dx, h.tee.y+dy); if (t===T.WATER || t===T.TREES || t===T.ROCK || t===T.FLOWERS) scen++; }
+  for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) { const t = tile(h.pin.x+dx, h.pin.y+dy); if (t===T.WATER || t===T.TREES || t===T.ROCK || t===T.FLOWERS || t===T.SHRUB) scen++; }
+  for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) { const t = tile(h.tee.x+dx, h.tee.y+dy); if (t===T.WATER || t===T.TREES || t===T.ROCK || t===T.FLOWERS || t===T.SHRUB) scen++; }
+  const lm = landmarksNear(h); scen += lm*6;
   q += Math.min(scen/12, 1)*1.4;
   if (tile(h.tee.x,h.tee.y) === T.TEE) q += .5;
   if (drop >= 2) q += .8; else if (drop <= -3) q -= .3;
@@ -824,7 +845,7 @@ const gridLines = new TH.LineSegments(gridGeo, new TH.LineBasicMaterial({ color:
 const RING = 14;
 const water = new TH.Mesh(new TH.PlaneGeometry(COLS + RING*2, ROWS + RING*2), new TH.MeshLambertMaterial({ color:0x1d5fa8, transparent:true, opacity:.92 }));
 water.rotation.x = -Math.PI/2; water.position.y = -.1; water.receiveShadow = true; scene.add(water);
-const TH_H = { [T.ROUGH]:.04, [T.FAIR]:.02, [T.GREEN]:.06, [T.TEE]:.11, [T.SAND]:-.06, [T.WATER]:-.42, [T.TREES]:.05, [T.HOUSE]:.02, [T.FLOWERS]:.08, [T.ROCK]:.32, [T.NATIVE]:.09, [T.PATH]:.03, [T.POT]:-.075, [T.GBUNK]:-.07, [T.WASTE]:-.01, [T.FCUT]:.03, [T.DEEP]:.06, [T.FESCUE]:.1 };
+const TH_H = { [T.ROUGH]:.04, [T.FAIR]:.02, [T.GREEN]:.06, [T.TEE]:.11, [T.SAND]:-.06, [T.WATER]:-.42, [T.TREES]:.05, [T.HOUSE]:.02, [T.FLOWERS]:.08, [T.ROCK]:.32, [T.NATIVE]:.09, [T.PATH]:.03, [T.POT]:-.075, [T.GBUNK]:-.07, [T.WASTE]:-.01, [T.FCUT]:.03, [T.DEEP]:.06, [T.FESCUE]:.1, [T.SHRUB]:.07 };
 function heightAt(x, y){
   const vx = clamp(x*SUB, 0, VW-1.001), vy = clamp(y*SUB, 0, VH-1.001), i = Math.floor(vx), j = Math.floor(vy), fx = vx-i, fy = vy-j;
   const h = (ii,jj) => HGT[jj*VW+ii];
@@ -835,7 +856,7 @@ function rebuildTerrain(){
   const grass = LV.lush ? '#3f8530' : '#4c8a33';
   const TC = { [T.ROUGH]:grass, [T.FAIR]:'#86ca46', [T.GREEN]:'#a3e05a', [T.TEE]:'#93d452', [T.SAND]:'#f3e9cf', [T.WATER]:'#2c5878',
     [T.TREES]: LV.desert ? NS.fill : '#5a4330', [T.HOUSE]:'#cbc3b0', [T.FLOWERS]:'#6b4a33', [T.ROCK]:'#8d877d', [T.NATIVE]:NS.fill, [T.PATH]:'#c9bfa8',
-    [T.POT]:'#eadcb2', [T.GBUNK]:'#f6eed8', [T.WASTE]:'#d6c398', [T.FCUT]:LV.lush ? '#5f9e38' : '#6aa83d', [T.DEEP]:LV.lush ? '#336723' : '#3a6f26', [T.FESCUE]:'#c4b664' };
+    [T.POT]:'#eadcb2', [T.GBUNK]:'#f6eed8', [T.WASTE]:'#d6c398', [T.FCUT]:LV.lush ? '#5f9e38' : '#6aa83d', [T.DEEP]:LV.lush ? '#336723' : '#3a6f26', [T.FESCUE]:'#c4b664', [T.SHRUB]:'#5b4532' };
   const TCC = {}; for (const k in TC) TCC[k] = new TH.Color(TC[k]);
   const DRY_C = new TH.Color('#a99a5c'), FRINGE_C = new TH.Color('#96d257'), PAD = { range:new TH.Color('#80c24c'), putting:new TH.Color('#a3e05a') }, PAD_C = new TH.Color('#d6ccb8');
   // heights: blended so slopes stay smooth
@@ -871,7 +892,7 @@ function rebuildTerrain(){
     PAL_DATA[o] = clamp(c.r*255, 0, 255); PAL_DATA[o+1] = clamp(c.g*255, 0, 255); PAL_DATA[o+2] = clamp(c.b*255, 0, 255); PAL_DATA[o+3] = 255;
     PAL_DATA[o2] = r.r*255; PAL_DATA[o2+1] = r.g*255; PAL_DATA[o2+2] = r.b*255; PAL_DATA[o2+3] = rim ? rim[1]*255 : 0;
   };
-  for (let t=0; t<18; t++) { const c = (TCC[t] || TCC[T.ROUGH]).clone(); if (t === T.FAIR || t === T.TEE || t === T.ROUGH || t === T.FCUT) c.lerp(DRY_C, dryT); if (t === T.GREEN) c.lerp(DRY_C, dryG); setPal(t, c, RIM[t]); }
+  for (let t=0; t<20; t++) { const c = (TCC[t] || TCC[T.ROUGH]).clone(); if (t === T.FAIR || t === T.TEE || t === T.ROUGH || t === T.FCUT) c.lerp(DRY_C, dryT); if (t === T.GREEN) c.lerp(DRY_C, dryG); setPal(t, c, RIM[t]); }
   setPal(20, FRINGE_C.clone().lerp(DRY_C, dryG)); setPal(21, PAD.range); setPal(22, PAD.putting); setPal(23, PAD_C);
   palTex.needsUpdate = true;
   let v = 0;
@@ -936,7 +957,7 @@ function buildProps(){
   const trees = [], bushes = [], blooms = [], rocks = [];
   const BLOOM = ['#e85d9a','#f4a6c8','#ffffff','#d63a7a','#f7c6dc'];
   const mix = FOREST[S.level] || { [LEVELS[S.level].tree || 'round']:1 }, byStyle = {};
-  eachTile(T.TREES, (x,y) => { const n = hash(x*7,y*3) < .4 ? 3 : 2; for (let k=0; k<n; k++) { const st = pickStyle(mix, hash(x*13+k*5, y*17+k)); (byStyle[st] = byStyle[st] || []).push({ x: x + .18 + hash(x+k*11,y)*.64, y: y + .18 + hash(x,y+k*13)*.64, s: .9 + hash(x+k,y+k)*.45, r: hash(x*3+k,y)*6.28, h: hash(x+k*2,y*5) }); } });
+  eachTile(T.TREES, (x,y) => { const n = hash(x*7,y*3) < .4 ? 3 : 2; for (let k=0; k<n; k++) { const sp = TS[y*COLS+x], st = sp && STYLE[SPEC[sp]] ? SPEC[sp] : pickStyle(mix, hash(x*13+k*5, y*17+k)); (byStyle[st] = byStyle[st] || []).push({ x: x + .18 + hash(x+k*11,y)*.64, y: y + .18 + hash(x,y+k*13)*.64, s: .9 + hash(x+k,y+k)*.45, r: hash(x*3+k,y)*6.28, h: hash(x+k*2,y*5) }); } });
   eachTile(T.FLOWERS, (x,y) => { for (let k=0; k<3; k++) {
     const bx = x + .2 + hash(x+k*5,y*2)*.6, by = y + .2 + hash(x*2,y+k*7)*.6, s = .8 + hash(x+k,y)*.4, col = BLOOM[Math.floor(hash(x*3+k,y*5)*BLOOM.length)];
     bushes.push({ x:bx, y:by, s, r:hash(x,y+k)*6.28, h:0 });
@@ -952,6 +973,22 @@ function buildProps(){
   for (const part of STYLE.bush) instanced(bushes, part);
   instanced(blooms, { g:'sphere', p:[0,0,0], s:[1,1,1] });
   for (const part of STYLE.rock) instanced(rocks, part);
+  // shrubs: rounded bushes on mulch
+  const shrubsA = [], shrubsB = [];
+  eachTile(T.SHRUB, (x,y) => { for (let k=0; k<3; k++) (hash(x*3+k, y*7) < .5 ? shrubsA : shrubsB).push({ x: x + .2 + hash(x+k*9, y*2)*.6, y: y + .2 + hash(x*2, y+k*5)*.6, s: .75 + hash(x+k, y*3)*.5, r: hash(x, y+k)*6.28, h:0 }); });
+  instanced(shrubsA, { g:'ico1', c:'#3f7f3a', p:[0,.1,0], s:[.2,.16,.2], flat:true });
+  instanced(shrubsB, { g:'ico1', c:'#5a9a3e', p:[0,.09,0], s:[.17,.14,.17], flat:true });
+  // creeks: narrow water gets pebble banks and reeds
+  const pebbles = [], reeds = [];
+  eachTile(T.WATER, (x,y) => {
+    const nb = [[1,0],[-1,0],[0,1],[0,-1]], wet = nb.filter(([dx,dy]) => tile(x+dx, y+dy) === T.WATER).length;
+    if (wet > 2) return;
+    for (const [dx,dy] of nb) { const t = tile(x+dx, y+dy); if (t === T.WATER || t < 0 || t === T.HOUSE) continue;
+      for (let k=0; k<3; k++) { const along = hash(x*5+k, y*3+dx+dy*7) - .5; pebbles.push({ x: x + .5 + dx*.5 + (dy ? along : 0)*.9, y: y + .5 + dy*.5 + (dx ? along : 0)*.9, s: .3 + hash(x+k*3, y*9)*.35, r: hash(x*7+k, y)*6.28, h: hash(x+k, y*2) }); }
+      if (hash(x*11+dx, y*13+dy) < .5) reeds.push({ x: x + .5 + dx*.42, y: y + .5 + dy*.42, s: .9 + hash(x, y*5)*.4, r: 0, h: 0 }); }
+  });
+  for (const part of STYLE.rock) instanced(pebbles, part);
+  instanced(reeds, { g:'cone', c:'#557a3a', p:[0,.14,0], s:[.04,.28,.04] });
   const tufts = [], TUFT = { [T.FESCUE]:['#e2d27e','#d6c46c','#efe09a'], [T.DEEP]:['#4f8f34','#5c9c3c','#467f2e'], [T.WASTE]:['#9c8d58','#879a4c'] };
   for (const ty of [T.FESCUE, T.DEEP, T.WASTE]) eachTile(ty, (x,y) => {
     const n = ty === T.FESCUE ? 6 : ty === T.DEEP ? 5 : 2;
@@ -981,7 +1018,7 @@ function buildProps(){
   add('cyl', '#f4f4ef', [1.05,.7,.95], [.015,1.4,.015]);
   const fl = new TH.Mesh(new TH.PlaneGeometry(.3,.18), new TH.MeshLambertMaterial({ color:0x1f5c35, side:TH.DoubleSide })); fl.position.set(1.2,1.3,.95); hg.add(fl);
   hg.position.set(W2(CHX+1), base, Z2(CHY+1)); propGroup.add(hg);
-  for (const f of S.facilities) propGroup.add(facModel(f));
+  spinners = []; for (const f of S.facilities) { const m = facModel(f); if (m.userData.spin) spinners.push(m.userData.spin); propGroup.add(m); }
   holeSig = '';
 }
 
@@ -1006,6 +1043,7 @@ function buildRing(){
 }
 
 // --- holes (flags, cups, tee markers) ---
+let spinners = [];
 let holeGroup = new TH.Group(), holeSig = '', flags = []; scene.add(holeGroup);
 const flagGeo = new TH.PlaneGeometry(.32, .19); flagGeo.translate(.16, 0, 0);
 function syncHoles(now){
@@ -1027,7 +1065,7 @@ function syncHoles(now){
       for (const dx of [.28,.72]) { const tm = new TH.Mesh(GEO.sphere, mat('#2f6fd6')); tm.scale.setScalar(.035); const tx = h.tee.x+dx, ty = h.tee.y+.5; tm.position.set(W2(tx), heightAt(tx,ty)+.035, Z2(ty)); tm.castShadow = true; holeGroup.add(tm); }
     });
   }
-  flags.forEach((f,i) => { f.rotation.y = .6 + Math.sin(now/420 + i)*.35; });
+  const fw = S.weather || { mph:6, dir:-.6 }; flags.forEach((f,i) => { f.rotation.y = -fw.dir + Math.sin(now/(420 - Math.min(fw.mph, 25)*10) + i)*(.4 - Math.min(fw.mph, 25)*.012); });
 }
 
 // --- golfers ---
@@ -1080,6 +1118,7 @@ function syncGolfers(){
     const follow = g.state === 'flight' && g.fl && g.fl.t < .45 && g.fl.apex > 0;
     let swingA = 0; if (g.state === 'address') { const k = 1 - clamp(g.t/.5, 0, 1); swingA = k < .6 ? lerp(0, -2.1, k/.6) : lerp(-2.1, 1.7, (k-.6)/.4); } else if (follow) swingA = 1.7;
     placePerson(rec, g.x, g.y, { cart: g.cart && g.state === 'walk', walking: g.state === 'walk', swing: g.state === 'address' || follow, swingA, face: follow ? rec.head : face });
+    if (g.cel > 0) { rec.root.position.y += Math.abs(Math.sin(g.cel*11))*.2; rec.legL.rotation.x = -.5; rec.legR.rotation.x = .5; }
     if (g.fl) { const f = g.fl, t = clamp(f.t/f.T, 0, 1); placeBall(rec, true, lerp(f.fx, f.tx, t), lerp(f.fy, f.ty, t), f.apex*4*t*(1-t)*.42); }
     else placeBall(rec, !g.leaving && !g.toTee, g.bx, g.by, 0);
   }
@@ -1176,8 +1215,10 @@ function draw(now){
   if (Math.abs(view.yawT - view.yaw) > .001) view.yaw += (view.yawT - view.yaw)*.18;
   playCamStep(); updateCamera(); syncHoles(now); syncGolfers();
   water.material.opacity = .9 + Math.sin(now/900)*.025;
+  for (const sp of spinners) sp.rotation.x = now/1000*(.6 + (S.weather ? S.weather.mph : 6)/12);
   const dusk = S.mode === 'build' ? clamp((S.dayT/DAY - .72)/.28, 0, 1) : 0;
-  sun.color.setRGB(1, lerp(.945, .72, dusk), lerp(.86, .5, dusk)); sun.intensity = lerp(.9, .68, dusk); hemi.intensity = lerp(.5, .4, dusk);
+  const wl = S.active ? WX[wx().k].light : 1;
+  sun.color.setRGB(1, lerp(.945, .72, dusk), lerp(.86, .5, dusk)); sun.intensity = lerp(.9, .68, dusk)*wl; hemi.intensity = lerp(.5, .4, dusk)*(.75 + .25*wl);
   renderer.render(scene, camera);
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,SW,SH);
   if (S.mode === 'build') {
@@ -1218,6 +1259,7 @@ function draw(now){
     ctx.beginPath(); ctx.moveTo(p.x-6, p.y-14+b); ctx.lineTo(p.x+6, p.y-14+b); ctx.lineTo(p.x, p.y-5+b); ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   if (dusk > 0) { ctx.fillStyle = `rgba(255,140,60,${dusk*.08})`; ctx.fillRect(0, 0, SW, SH); }
+  if (S.active) drawWeather(now);
 }
 
 // ---------- simulation ----------
@@ -1225,7 +1267,7 @@ function nextInterval(){
   const st = S.course.stars, n = S.holes.length;
   const fair = 12 + st*10 + n*2;
   const pf = clamp(1.45 - .55*S.fee/fair, .1, 1.4);
-  const perDay = n*2.5*(.35 + st/5)*pf*(1 + Math.min(S.prestige, 20)*.04);
+  const perDay = n*2.5*(.35 + st/5)*pf*(1 + Math.min(S.prestige, 20)*.04)*WX[wx().k].golf;
   return DAY / Math.max(.25, perDay) * (.6 + Math.random()*.8);
 }
 function makeGolfer(o){
@@ -1235,9 +1277,13 @@ function makeGolfer(o){
   S.golfers.push(g); return g;
 }
 function spawn(){
-  if (S.golfers.length >= MAXG || !S.holes.length || S.event) return;
-  arriveExtras(makeGolfer({ ...visitor(), name: randName() }));
-  S.money += S.fee; book('fees', S.fee); S.earned += S.fee; S.dayFees += S.fee; S.dayGolfers++;
+  if (S.golfers.length >= MAXG || !S.holes.length || S.event) return 0;
+  const r = Math.random(), want = r < .25 ? 1 : r < .6 ? 2 : r < .8 ? 3 : 4, n = Math.min(want, MAXG - S.golfers.length), grp = n > 1 ? (S.grpId = (S.grpId || 0) + 1) : 0;
+  for (let i=0; i<n; i++) {
+    arriveExtras(makeGolfer({ ...visitor(), name: randName(), grp, slot:i }));
+    S.money += S.fee; book('fees', S.fee); S.earned += S.fee; S.dayFees += S.fee; S.dayGolfers++;
+  }
+  return n;
 }
 function say(g, text, force){ if (!text) return; if (!force && g.quiet > 0) return; g.thought = { text, t:2.4 }; g.quiet = 3; (g.log = g.log || []).push(text); if (g.log.length > 5) g.log.shift(); }
 function goHome(g){ g.leaving = true; g.state = 'walk'; g.fl = null; }
@@ -1259,18 +1305,21 @@ function finishRound(g){
 function stepGolfer(g, dt){
   if (g.thought) { g.thought.t -= dt; if (g.thought.t <= 0) g.thought = null; }
   g.quiet -= dt;
+  if (g.cel > 0) g.cel -= dt;
+  if (g.pendingSay) { g.pendingSay.t -= dt; if (g.pendingSay.t <= 0) { say(g, g.pendingSay.text, true); g.pendingSay = null; } }
   if (!g.leaving && !S.holes[g.hole]) goHome(g);
   if (g.state === 'walk') {
-    const dtr = !g.leaving && g.detour, tx = g.leaving ? DOOR.x : dtr ? dtr.x : g.bx - .3, ty = g.leaving ? DOOR.y : dtr ? dtr.y : g.by + .14;
+    const sl = g.toTee ? (g.slot || 0) : 0, dtr = !g.leaving && g.detour, tx = g.leaving ? DOOR.x : dtr ? dtr.x : g.bx - .3 - sl*.24, ty = g.leaving ? DOOR.y : dtr ? dtr.y : g.by + .14 + sl*.12;
     const riding = !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
-    const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 11 : 6)*(staffN('marshal') ? 1.12 : 1)*dt;
+    const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 11 : 6)*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
     if (d <= step) { g.x = tx; g.y = ty;
       if (g.leaving) { g.done = true; finishRound(g); }
       else if (dtr) { g.detour = null; useFacility(g, dtr.f); }
-      else { g.state = 'address'; g.t = .5; g.toTee = false; }
+      else { g.state = 'address'; g.t = .5; g.atTee = g.toTee; g.toTee = false; }
     } else { g.x += dx/d*step; g.y += dy/d*step; }
   } else if (g.state === 'address') {
-    g.t -= dt; if (g.t <= 0) swing(g);
+    if (g.grp && g.atTee && S.golfers.some(o => o !== g && o.grp === g.grp && !o.done && !o.leaving && (o.hole < g.hole || (o.hole === g.hole && o.toTee)))) { g.t = .5; g.waiting = true; }
+    else { g.waiting = false; if (g.atTee && g.slot) { g.t -= dt*.6; if (g.t <= 0) { g.x = g.bx - .3; g.y = g.by + .14; g.atTee = false; swing(g); } } else { g.t -= dt; if (g.t <= 0) { g.atTee = false; swing(g); } } }
   } else if (g.state === 'flight' && g.fl) {
     g.fl.t += dt; if (g.fl.t >= g.fl.T) land(g);
   }
@@ -1302,7 +1351,7 @@ function lieAdj(lie, g){
   if (lie === T.TREES) return { mult:.35 + .25*rc, err:2.1 - .8*rc };
   if (lie === T.ROUGH) return { mult:.72 + .2*rc, err:1.5 - .4*rc };
   if (lie === T.NATIVE) return { mult:.6 + .2*rc, err:1.6 - .5*rc };
-  if (lie === T.FLOWERS) return { mult:.5 + .2*rc, err:1.7 - .6*rc };
+  if (lie === T.FLOWERS || lie === T.SHRUB) return { mult:.5 + .2*rc, err:1.7 - .6*rc };
   if (lie === T.PATH) return { mult:.9, err:1 };
   return { mult:1, err:1 };
 }
@@ -1336,8 +1385,9 @@ function fullShot(g, px, py, d, lie){
   const dh0 = (elevAt(tx,ty) - elevAt(g.bx,g.by))*ELH*(.4 + .6*A(g,'cm'));
   let ddE = dd + dh0, x = g.bx + Math.cos(ang)*ddE, y = g.by + Math.sin(ang)*ddE;
   ddE = Math.max(.3, ddE - (elevAt(x,y) - elevAt(g.bx,g.by))*ELH); x = g.bx + Math.cos(ang)*ddE; y = g.by + Math.sin(ang)*ddE;
+  const wd = windDrift(ddE, A(g,'cm')); x += wd.x; y += wd.y;
   const lt = at(x,y);
-  let roll = rollOf(lt);
+  let roll = rollOf(lt)*(wx().k === 'rain' ? .5 : 1);
   if (aimPin) roll *= .4;
   x += Math.cos(ang)*roll; y += Math.sin(ang)*roll;
   return { x, y, len:dd, aimPin, putt:false };
@@ -1377,9 +1427,16 @@ function holeOut(g){
   const hd = (S.clock || 0) - (g.ht0 ?? 0); g.ht0 = S.clock || 0;
   if (hd > 14 && (g.patience ?? .5) < .4) { g.sat -= 2; if (!tz.say) tz.say = 'This is taking forever.'; }
   if (g.mp) (g.side === 'a' ? g.mp.ca : g.mp.cb).push(sc);
-  let text = sc === 1 ? 'Hole in one!!' : diff <= -2 ? 'Eagle!' : diff === -1 ? 'Birdie!' :
-    diff === 0 ? (h.info.q >= 7.5 ? 'Great hole.' : 'Solid par.') : diff === 1 ? (Math.random() < .4 ? 'Bogey. Fair enough.' : null) : 'This hole is brutal.';
-  if (diff >= 0 && h.info.q < 4 && Math.random() < .6) text = 'Kind of a boring hole.';
+  let text = sc === 1 ? pick(LINES.ace) : diff <= -2 ? pick(LINES.eagle) : diff === -1 ? pick(LINES.birdie) :
+    diff === 0 ? (h.info.q >= 7.5 ? pick(LINES.parGreat) : Math.random() < .45 ? pick(LINES.par) : null) : diff === 1 ? (Math.random() < .45 ? pick(LINES.bogey) : null) : diff === 2 ? pick(LINES.double) : pick(LINES.worse);
+  if (diff >= 0 && h.info.q < 4 && Math.random() < .5) text = pick(LINES.boring);
+  if (diff <= -1) { g.cel = sc === 1 ? 2 : diff <= -2 ? 1.6 : 1.1; if (Math.random() < .55) mateSay(g, true); }
+  else if (diff >= 2 && Math.random() < .3) mateSay(g, false);
+  const w = wx();
+  if (w.k === 'rain') { g.sat -= .8; if (!text && Math.random() < .3) text = pick(LINES.rain); }
+  else if (w.k === 'sunny') { g.sat += .4; if (!text && Math.random() < .12) text = pick(LINES.sunny); }
+  if (w.mph >= 14 && diff >= 1 && !text && Math.random() < .35) text = pick(LINES.windy);
+  if (!text && landmarksNear(h) && Math.random() < .3) { text = pick(LINES.view); g.sat += 1; }
   if (h.info.notes.includes('Needs more fairway') && Math.random() < .5) text = 'Where’s the fairway?';
   g.energy = Math.max(0, (g.energy ?? 100) - (g.cart ? 2 : 5)); g.hunger = Math.min(100, (g.hunger || 0) + 6); g.thirst = Math.min(100, (g.thirst || 0) + 7);
   if (g.hunger > 75 || g.thirst > 75) { g.sat -= 1.5; if (!text && Math.random() < .4) text = g.thirst >= g.hunger ? 'I could really use a drink.' : 'I’m getting hungry.'; }
@@ -1392,15 +1449,15 @@ function holeOut(g){
     if ((g.mid || g.rented) && !g.ep) { if (cart) g.sat += 1.5; else if (far) { g.sat -= 4; if (!text && Math.random() < .6) text = 'No cart path out here?'; } }
     else if (far) { g.sat -= 3; if (!text && Math.random() < .6) text = 'Long walk to the next tee.'; }
     g.bx = n.tee.x+.5; g.by = n.tee.y+.5; g.toTee = true; g.state = 'walk'; planDetour(g, prev, n);
-  } else { goHome(g); if (!text) text = g.sat > 60 ? 'What a round!' : g.sat < 40 ? 'Not coming back.' : null; }
+  } else { goHome(g); if (!text) text = g.sat > 60 ? pick(LINES.goodEnd) : g.sat < 40 ? pick(LINES.badEnd) : null; }
   say(g, text, sc === 1 || diff <= -1);
 }
 function endDay(){
   let up = 0; for (let i=0; i<G.length; i++) up += UPKEEP[G[i]] || 0; for (const f of S.facilities) up += FACS[f.type].upkeep; up = Math.round(up);
   S.money -= up; book('upkeep', -up);
   const mt = maintDay(), lm = loanDay(), news = clubDay();
-  toast(`Day ${S.day}: ${S.dayGolfers} golfer${S.dayGolfers===1?'':'s'}, +${fmt(S.dayFees)} fees, −${fmt(up + mt.total)} upkeep, staff and bills. Condition ${Math.round(condScore())}%.` + (mt.warn ? ' ' + mt.warn : '') + (lm ? ' ' + lm : '') + (news ? ' ' + news : ''), 3800);
-  S.day++; S.dayFees = 0; S.dayGolfers = 0; S.dayRounds = 0; planMembers();
+  toast(`Day ${S.day}: ${S.dayGolfers} golfer${S.dayGolfers===1?'':'s'}, +${fmt(S.dayFees)} fees, −${fmt(up + mt.total)} upkeep, staff and bills. Condition ${Math.round(condScore())}%.` + (mt.warn ? ' ' + mt.warn : '') + (lm ? ' ' + lm : '') + (news ? ' ' + news : '') + ` Tomorrow: ${WX[(S.forecast || wx()).k].icon} ${WX[(S.forecast || wx()).k].name}.`, 4200);
+  S.day++; S.dayFees = 0; S.dayGolfers = 0; S.dayRounds = 0; S.weather = S.forecast || rollWeather(); S.forecast = rollWeather(); planMembers();
   recompute(); checkGoals();
   if (S.money < -2000) { S.active = false; delete store.saves[S.level]; if (store.empire.owned.length > 1) store.empire.owned = store.empire.owned.filter(i => i !== S.level); saveStore(); $('broke').classList.remove('hidden'); return; }
   saveGame();
@@ -1410,7 +1467,7 @@ function sim(dt){
   S.dayT += dt; if (S.dayT >= DAY) { S.dayT -= DAY; endDay(); if (!S.active) return; }
   if (S.event) eventStep(dt);
   else if (S.holes.length) {
-    S.spawnT -= dt; if (S.spawnT <= 0) { spawn(); S.spawnT = nextInterval(); }
+    S.spawnT -= dt; if (S.spawnT <= 0) { const n = spawn(); S.spawnT = nextInterval()*Math.max(1, n); }
     while (S.memberQueue.length && S.memberQueue[0].t <= S.dayT) {
       const q = S.memberQueue.shift(), m = S.members.find(m => m.id === q.mid);
       if (m && !busy(m.id) && S.golfers.length < MAXG) arriveExtras(makeGolfer(memberGolfer(m)));
@@ -1418,6 +1475,69 @@ function sim(dt){
   }
   for (const g of S.golfers) stepGolfer(g, dt);
   S.golfers = S.golfers.filter(g => !g.done);
+}
+
+// ---------- weather ----------
+const WX = {
+  sunny:  { icon:'☀️', name:'Sunny',  golf:1.2,  light:1 },
+  cloudy: { icon:'⛅', name:'Cloudy', golf:1,    light:.8 },
+  windy:  { icon:'💨', name:'Windy',  golf:.85,  light:.92 },
+  rain:   { icon:'🌧️', name:'Rain',   golf:.45,  light:.6 }
+};
+function rollWeather(){
+  const L = LEVELS[S.level] || {}, links = !!L.coast || /Links|Dunes/.test(L.name || '');
+  const w = L.desert ? { sunny:.66, cloudy:.16, windy:.15, rain:.03 } : links ? { sunny:.34, cloudy:.24, windy:.3, rain:.12 } : { sunny:.44, cloudy:.26, windy:.17, rain:.13 };
+  let r = Math.random(), k = 'sunny'; for (const [kk, p] of Object.entries(w)) { if (r < p) { k = kk; break; } r -= p; }
+  const mph = Math.round(k === 'windy' ? 14 + Math.random()*12 : k === 'rain' ? 5 + Math.random()*10 : k === 'cloudy' ? 3 + Math.random()*8 : Math.random()*8);
+  const temp = Math.round(L.desert ? 78 + Math.random()*22 : k === 'rain' ? 56 + Math.random()*14 : 62 + Math.random()*24);
+  return { k, mph, dir: Math.random()*Math.PI*2, temp };
+}
+const wx = () => S.weather || (S.weather = rollWeather());
+// Wind pushes a ball in the air. Better course management reads it better.
+function windDrift(len, cm){
+  const w = wx(); if (!w.mph) return { x:0, y:0 };
+  const d = w.mph/18*(len/10)*.9*(1 - .45*clamp(cm, 0, 1));
+  return { x: Math.cos(w.dir)*d, y: Math.sin(w.dir)*d };
+}
+const windArrow = () => { const w = wx(); return w.mph >= 4 ? ` 💨${w.mph}` : ''; };
+// Rain streaks drawn on the overlay canvas.
+const RAIN = Array.from({ length:90 }, () => ({ x:Math.random(), y:Math.random(), s:.6 + Math.random()*.6 }));
+function drawWeather(now){
+  const w = S.weather; if (!w) return;
+  if (w.k === 'rain') {
+    ctx.fillStyle = 'rgba(40,58,78,.16)'; ctx.fillRect(0, 0, SW, SH);
+    ctx.strokeStyle = 'rgba(210,225,240,.45)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (const d of RAIN) { const y = ((d.y + now/900*d.s) % 1)*SH, x = ((d.x + now/5000) % 1)*SW; ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 11*d.s); }
+    ctx.stroke();
+  } else if (w.k === 'cloudy') { ctx.fillStyle = 'rgba(40,50,60,.07)'; ctx.fillRect(0, 0, SW, SH); }
+}
+
+// ---------- golfer chatter ----------
+const LINES = {
+  ace:    ['HOLE IN ONE!!', 'It went in! It actually went in!', 'Drinks are on me!', 'Somebody film that!'],
+  eagle:  ['Eagle!', 'Eagle! Ring the bell!', 'Two under, baby!', 'That’s going on the fridge.'],
+  birdie: ['Birdie!', 'Birdie, let’s go!', 'Dropped it in!', 'Flagged it.', 'Now we’re cooking.', 'Tweet tweet!', 'Did everyone see that?'],
+  parGreat: ['Great hole.', 'What a hole design.', 'I could play this hole all day.', 'Par on a beauty.'],
+  par:    ['Solid par.', 'Par. I’ll take it.', 'Fairway, green, two putts.', 'Boring is good.', 'Par is a good score.', 'Nothing fancy.', 'Steady as she goes.', 'Textbook.'],
+  bogey:  ['Bogey. Fair enough.', 'One too many.', 'Should’ve laid up.', 'Lipped out. Ugh.', 'Bogey, but I’ll get it back.', 'That putt was robbed.'],
+  double: ['This hole is brutal.', 'Double. Moving on.', 'That got away from me.', 'Who designed this?', 'I need a mulligan.'],
+  worse:  ['Never again.', 'I’m taking up tennis.', 'Don’t tell anyone my score.', 'That hole owes me a ball.'],
+  boring: ['Kind of a boring hole.', 'Pretty plain hole.', 'Needs a bunker or something.', 'Forgot I played that one.'],
+  view:   ['What a view!', 'Look at that windmill!', 'Gorgeous out here.', 'I’d frame this hole.', 'Best scenery around.'],
+  sunny:  ['Beautiful day for golf!', 'Perfect weather.', 'Should’ve worn sunscreen.'],
+  rain:   ['Soggy out here.', 'My socks are wet.', 'Rain delay, anyone?', 'The greens are slow today.'],
+  windy:  ['This wind is brutal!', 'Where did my ball go?', 'Club up, it’s blowing.', 'Hold onto your hat!'],
+  goodEnd:['What a round!', 'Coming back next week.', 'Best course in the county.', 'Telling all my friends.'],
+  badEnd: ['Not coming back.', 'Rough day.', 'I want my money back.', 'Never again.'],
+  mateGood: f => [`Nice birdie, ${f}!`, `Great shot, ${f}!`, `Show off, ${f}.`, `${f}’s on fire!`],
+  mateBad:  f => [`Tough break, ${f}.`, `Shake it off, ${f}.`, `We’ve all been there, ${f}.`]
+};
+const firstName = g => (g.name || 'pal').split(' ')[0];
+function mateSay(g, good){
+  if (!g.grp) return;
+  const mates = S.golfers.filter(o => o !== g && o.grp === g.grp && !o.leaving && !o.done);
+  if (!mates.length) return;
+  const m = pick(mates); m.pendingSay = { text: pick((good ? LINES.mateGood : LINES.mateBad)(firstName(g))), t: .9 };
 }
 
 // ---------- goals ----------
@@ -1456,25 +1576,28 @@ const condScore = () => S.cond.turf*.4 + S.cond.greens*.4 + S.cond.bunkers*.2;
 const repairCost = () => Math.round((200 + (100 - S.cond.equip)*15)/10)*10;
 function hireStaff(role){ const st = { id:++S.staffId, role, name:randName() }; S.staff.push(st); return st; }
 function maintCalc(){
-  const c = S.cond, eff = (1 + .3*Math.min(1, staffN('super'))) * (.6 + .4*c.equip/100);
-  let fair = 0, gr = 0, sand = 0; for (const t of G) { if (t === T.FAIR || t === T.TEE) fair++; else if (t === T.GREEN) gr++; else if (t === T.SAND || t === T.POT || t === T.GBUNK) sand++; }
+  const c = S.cond, eff = (1 + .3*Math.min(1, staffN('super'))) * (.6 + .4*c.equip/100) * (1 + .25*gearLv('mow'));
+  let fair = 0, gr = 0, sand = 0; for (const t of G) { if (t === T.FAIR || t === T.TEE) fair++; else if (t === T.FCUT) fair += .5; else if (t === T.GREEN) gr++; else if (t === T.SAND || t === T.POT || t === T.GBUNK) sand++; }
+  fair = Math.round(fair);
   const W = WATERING[S.water] || WATERING.normal;
   const turfCov = fair ? Math.min(1, staffN('grounds')*60*eff/fair) : 1;
   const greenCov = gr ? Math.min(1, (staffN('greens')*25 + staffN('grounds')*4)*eff/gr) : 1;
   const sandCov = sand ? Math.min(1, (staffN('greens')*20 + staffN('grounds')*4)*eff/sand) : 1;
-  const sal = S.staff.reduce((a,s) => a + ROLES[s.role].wage, 0), wat = Math.round((fair + gr)*W.cost), fert = S.fert ? Math.round((fair + gr)*.15) : 0, pow = 15 + S.facilities.length*8;
-  return { fair, gr, sand, W, turfCov, greenCov, sandCov, sal, wat, fert, pow, total: sal + wat + fert + pow };
+  const sal = S.staff.reduce((a,s) => a + ROLES[s.role].wage, 0), wat = Math.round((fair + gr)*W.cost*[1, .6, .35][gearLv('spr')]*(S.weather && S.weather.k === 'rain' ? .2 : 1)), fert = S.fert ? Math.round((fair + gr)*.15) : 0, pow = 15 + S.facilities.filter(f => FACS[f.type].kind !== 'scenery').length*8;
+  return { fair, gr, sand, W, eff, turfCov, greenCov, sandCov, sal, wat, fert, pow, total: sal + wat + fert + pow };
 }
 function maintDay(){
   const c = S.cond, m = maintCalc(), tr = Math.min(3, (S.dayRounds || 0)*.04), dry = LEVELS[S.level].desert && S.water !== 'high' ? 2 : 0;
-  c.turf = clamp(c.turf + 8*m.turfCov - 5 + m.W.fx + (S.fert ? 1.5 : 0) - dry - tr, 5, 100);
-  c.greens = clamp(c.greens + 9*m.greenCov - 6 + m.W.fx*.5 + (S.fert ? 1 : 0) - tr*1.2, 5, 100);
+  const rain = S.weather && S.weather.k === 'rain';
+  c.turf = clamp(c.turf + 8*m.turfCov - 5 + m.W.fx + (S.fert ? 1.5 : 0) - dry - tr + gearLv('spr') + (rain ? 2 : 0), 5, 100);
+  c.greens = clamp(c.greens + 9*m.greenCov - 6 + m.W.fx*.5 + (S.fert ? 1 : 0) - tr*1.2 + gearLv('roll')*1.5 + (rain ? 1 : 0), 5, 100);
   c.bunkers = clamp(c.bunkers + 6*m.sandCov - 4 - tr*.5, 5, 100);
-  c.equip = clamp(c.equip - (.8 + S.staff.filter(s => ['grounds','greens','super'].includes(s.role)).length*.15), 0, 100);
+  c.equip = clamp(c.equip - (.8 + S.staff.filter(s => ['grounds','greens','super'].includes(s.role)).length*.15)*(gearLv('shed') ? .5 : 1), 0, 100);
   const pay = (cat, a) => { if (a) { S.money -= a; book(cat, -a); } };
   pay('salaries', m.sal); pay('water', m.wat); pay('fert', m.fert); pay('power', m.pow);
   const key = [c.turf, c.greens].map(v => Math.round(v/8)).join(); if (key !== S.condKey) { S.condKey = key; terrainDirty = true; }
-  const warn = c.greens < 45 ? 'Your greens are in rough shape.' : c.turf < 45 ? 'Your fairways need mowing.' : c.bunkers < 40 ? 'Bunkers need raking.' : c.equip < 25 ? 'Equipment needs repair.' : '';
+  const sh = crewShort(m);
+  const warn = sh.any ? `⚠️ Your crew is short-handed, so the course is wearing down. Hire more in Club → Staff.` : c.greens < 55 ? 'Your greens are in rough shape.' : c.turf < 55 ? 'Your fairways need mowing.' : c.bunkers < 50 ? 'Bunkers need raking.' : c.equip < 30 ? 'Equipment needs repair.' : '';
   return { total: m.total, warn };
 }
 function condThought(g){
@@ -1486,10 +1609,12 @@ function condThought(g){
   return null;
 }
 function staffTab(){
+  return crewCard() + staffTab0() + gearSection();
+}
+function staffTab0(){
   const c = S.cond, m = maintCalc();
   const bar = (l, v) => `<div class="mbar"><span>${l} <b>${Math.round(v)}%</b></span><div><i style="width:${Math.round(v)}%;background:${v >= 70 ? '#4fbf5a' : v >= 45 ? '#e8b93a' : '#e2483d'}"></i></div></div>`;
   let h = `<h3 class="sec" style="margin-top:4px">Course condition</h3><div class="moods">${bar('Turf', c.turf)}${bar('Greens', c.greens)}${bar('Bunkers', c.bunkers)}${bar('Equipment', c.equip)}</div>`;
-  h += `<p class="small muted">Your crew covers ${Math.round(m.turfCov*100)}% of fairways and tees, ${Math.round(m.greenCov*100)}% of greens and ${Math.round(m.sandCov*100)}% of bunkers. Below 100% the course slowly wears down, golfers complain, putts roll worse and your rating drops.</p>`;
   h += `<h3 class="sec">Maintenance</h3><div class="spread"><span>Watering</span><div class="chips">${Object.entries(WATERING).map(([k,W]) => `<button class="chip${S.water === k ? ' on' : ''}" data-act="water" data-v="${k}">${W.name}</button>`).join('')}</div></div>`;
   if (LEVELS[S.level].desert) h += `<p class="small muted">Desert turf dries out unless watering is on High.</p>`;
   h += `<div class="spread"><span>Fertilizer</span><div class="chips"><button class="chip${!S.fert ? ' on' : ''}" data-act="fert" data-v="0">Off</button><button class="chip${S.fert ? ' on' : ''}" data-act="fert" data-v="1">On</button></div></div>`;
@@ -1503,6 +1628,49 @@ function staffTab(){
     const cnt = staffN(k), need = (R.needs && !R.needs.some(hasFac)) || (R.holes && S.holes.length < R.holes), full = R.max && cnt >= R.max;
     return `<div class="ev${need || full ? ' off' : ''}"><div class="spread" style="margin:0"><h3>${R.icon} ${R.name}</h3><button class="btn sm" data-act="hire" data-role="${k}" ${need || full ? 'disabled' : ''}>Hire, ${fmt(R.wage)}/day</button></div><p class="small" style="margin:4px 0 0">${R.blurb}${cnt ? ` You have ${cnt}.` : ''}${need ? (R.holes && S.holes.length < R.holes ? ` Unlocks at ${R.holes} holes.` : ` Needs a ${R.needName}.`) : ''}${full ? ' Max reached.' : ''}</p></div>`;
   }).join('');
+  return h;
+}
+
+// Equipment shed: one-time upgrades that change daily maintenance.
+const GEAR = {
+  mow:  { name:'Mower fleet',      icon:'🚜', tiers:[[4000, 'Faster mowers. Your crew covers 25% more grass.'], [9000, 'Pro mower fleet. Your crew covers 50% more grass.']] },
+  spr:  { name:'Irrigation',       icon:'💦', tiers:[[5000, 'Sprinkler system. Water bills 40% lower and turf +1 a day.'], [10000, 'Smart irrigation. Water bills 65% lower and turf +2 a day.']] },
+  roll: { name:'Greens roller',    icon:'🛞', tiers:[[3500, 'Smoother greens. Greens +1.5 a day, so putts roll truer.']] },
+  shed: { name:'Maintenance shed', icon:'🛠️', tiers:[[6000, 'A proper workshop. Equipment wears out half as fast.']] }
+};
+const gearLv = k => (S.gear && S.gear[k]) || 0;
+// How many more crew the course needs for full coverage.
+function crewShort(m = maintCalc()){
+  const eff = m.eff;
+  const g = Math.max(0, Math.ceil(m.fair/(60*eff) - 1e-6) - staffN('grounds'));
+  const gk = Math.max(0, Math.ceil(Math.max((m.gr - staffN('grounds')*4*eff)/(25*eff), (m.sand - staffN('grounds')*4*eff)/(20*eff)) - 1e-6) - staffN('greens'));
+  return { grounds:g, greens:gk, any: g + gk > 0 };
+}
+function crewCheckAfterPaint(){
+  const s = crewShort();
+  if (s.any && !S.crewWarned) { S.crewWarned = true; toast(`Your crew can’t keep up with this much grass. Hire ${s.grounds ? s.grounds + ' groundskeeper' + (s.grounds > 1 ? 's' : '') : ''}${s.grounds && s.greens ? ' and ' : ''}${s.greens ? s.greens + ' greenskeeper' + (s.greens > 1 ? 's' : '') : ''} in 🏆 Club → Staff.`, 4200); }
+  if (!s.any) S.crewWarned = false;
+  updateHUD();
+}
+function crewCard(){
+  const m = maintCalc(), s = crewShort(m);
+  const bar = (l, v) => `<div class="mbar"><span>${l} <b>${Math.round(v*100)}%</b></span><div><i style="width:${Math.round(v*100)}%;background:${v >= .99 ? '#4fbf5a' : v >= .7 ? '#e8b93a' : '#e2483d'}"></i></div></div>`;
+  let h = `<div class="crewcard${s.any ? ' short' : ''}"><h3 class="sec" style="margin-top:0">${s.any ? '⚠️ Crew is short-handed' : '✅ Crew coverage'}</h3><div class="moods">${bar('Fairways and tees', m.turfCov)}${bar('Greens', m.greenCov)}${bar('Bunkers', m.sandCov)}</div>`;
+  if (s.any) {
+    const cost = s.grounds*ROLES.grounds.wage + s.greens*ROLES.greens.wage;
+    h += `<p class="small" style="margin:6px 0">Below 100%, the course wears down every day: golfers complain, putts roll worse and your rating drops. You need ${s.grounds ? `<b>${s.grounds} more groundskeeper${s.grounds > 1 ? 's' : ''}</b>` : ''}${s.grounds && s.greens ? ' and ' : ''}${s.greens ? `<b>${s.greens} more greenskeeper${s.greens > 1 ? 's' : ''}</b>` : ''}.</p>`;
+    h += `<button class="btn" data-act="hireNeed">Hire them, ${fmt(cost)} a day</button>`;
+  } else h += `<p class="small muted" style="margin:6px 0 0">Your crew can look after everything you’ve built.</p>`;
+  return h + `</div>`;
+}
+function gearSection(){
+  let h = `<h3 class="sec">🛠️ Equipment shed</h3><p class="small muted">One-time upgrades that make upkeep cheaper and the course better.</p>`;
+  for (const [k, G0] of Object.entries(GEAR)) {
+    const lv = gearLv(k), next = G0.tiers[lv], have = lv ? G0.tiers[lv-1][1] : '';
+    h += `<div class="ev${next ? '' : ' owned'}"><div class="spread" style="margin:0"><h3>${G0.icon} ${G0.name}${lv ? ` <span class="small muted">level ${lv}</span>` : ''}</h3>` +
+      (next ? `<button class="btn sm" data-act="gear" data-k="${k}" ${S.money < next[0] ? 'disabled' : ''}>${lv ? 'Upgrade' : 'Buy'}, ${fmt(next[0])}</button>` : `<span class="small" style="color:var(--brand);font-weight:700">Owned ✓</span>`) +
+      `</div><p class="small" style="margin:4px 0 0">${next ? next[1] : have}</p></div>`;
+  }
   return h;
 }
 
@@ -1527,8 +1695,9 @@ function courseRatings(){
   const overPar = pl ? over/pl : .3 + avg(h => Math.min(h.info.hz || 0, 14))*.06;
   r.overPar = overPar; r.challenge = clamp(10 - Math.abs(overPar - .8)*5, 0, 10);
   r.challengeLabel = overPar < .3 ? 'Easy' : overPar < 1.1 ? 'Fair' : overPar < 1.8 ? 'Tough' : 'Brutal';
-  let flowers = 0; for (const t of G) if (t === T.FLOWERS) flowers++;
-  r.beauty = clamp(avg(h => Math.min(1, (h.info.scen || 0)/12)*7 + (h.info.drop >= 2 ? 1 : 0)) + Math.min(2, flowers/20), 0, 10);
+  let flowers = 0; for (const t of G) if (t === T.FLOWERS || t === T.SHRUB) flowers++;
+  const marks = S.facilities.filter(f => FACS[f.type].kind === 'scenery').length;
+  r.beauty = clamp(avg(h => Math.min(1, (h.info.scen || 0)/12)*7 + (h.info.drop >= 2 ? 1 : 0)) + Math.min(2, flowers/20) + Math.min(2.5, marks*.7), 0, 10);
   const pars = new Set(H.map(h => h.info.par)).size, dogs = H.filter(h => h.info.dog).length/n, elev = H.filter(h => Math.abs(h.info.drop || 0) >= 1).length/n;
   const mean = avg(h => h.info.plays), spread = Math.sqrt(avg(h => (h.info.plays - mean)**2));
   r.variety = clamp((pars-1)*2.5 + Math.min(1, dogs/.3)*2 + Math.min(1, elev/.3)*1.5 + Math.min(1.5, spread/120), 0, 10);
@@ -1558,6 +1727,7 @@ function openRating(){
 }
 $('ratingClose').addEventListener('click', () => $('rating').classList.add('hidden'));
 $('stars').addEventListener('click', openRating);
+$('crewChip').addEventListener('click', () => openClub('staff'));
 $('showRating').addEventListener('click', () => { $('goals').classList.add('hidden'); openRating(); });
 const traitTxt = g => { const p = g.patience ?? .5, s = g.spend ?? .5; return `${p > .66 ? 'Very patient' : p > .33 ? 'Patient' : 'Impatient'}, ${s > .66 ? 'big spender' : s > .33 ? 'average spender' : 'thrifty'}`; };
 
@@ -1684,8 +1854,14 @@ const FACS = {
   range:      { name:'Driving Range', icon:'🎯', w:2, h:5, cost:8000, upkeep:50, unique:true, kind:'arrive', blurb:'Golfers pay to warm up and play a little better.' },
   putting:    { name:'Putting Green', icon:'⛳', w:2, h:2, cost:3000, upkeep:30, unique:true, kind:'arrive', blurb:'Free practice green. Golfers chip and putt a bit better.' },
   carts:      { name:'Cart Barn',     icon:'🚗', w:2, h:2, cost:5000, upkeep:40, unique:true, kind:'arrive', blurb:'Rents carts to visitors, seniors especially. Needs cart paths.' },
-  restaurant: { name:'Restaurant',    icon:'🍽️', w:2, h:2, cost:9000, upkeep:90, unique:true, kind:'leave', blurb:'Golfers eat after their round and leave happier.' }
+  restaurant: { name:'Restaurant',    icon:'🍽️', w:2, h:2, cost:9000, upkeep:90, unique:true, kind:'leave', blurb:'Golfers eat after their round and leave happier.' },
+  windmill:   { name:'Windmill',      icon:'🌬️', w:2, h:2, cost:6000, upkeep:10, kind:'scenery', blurb:'A working windmill. Nearby holes look stunning and golfers love the view.' },
+  lighthouse: { name:'Lighthouse',    icon:'🗼', w:1, h:1, cost:5000, upkeep:10, kind:'scenery', blurb:'A striped lighthouse. Perfect beside water or the coast.' },
+  gazebo:     { name:'Gazebo',        icon:'⛺', w:2, h:2, cost:2500, upkeep:5,  kind:'scenery', blurb:'A white gazebo. Adds charm to any hole.' },
+  fountain:   { name:'Fountain',      icon:'⛲', w:1, h:1, cost:2000, upkeep:6,  kind:'scenery', blurb:'A stone fountain. Lovely by a tee box or the clubhouse.' },
+  statue:     { name:'Founder statue', icon:'🗿', w:1, h:1, cost:1200, upkeep:2, kind:'scenery', blurb:'A bronze statue of your club’s founder.' }
 };
+const landmarksNear = h => S.facilities.filter(f => FACS[f.type].kind === 'scenery').filter(f => { const c = facCenter(f); return Math.hypot(c.x - h.pin.x - .5, c.y - h.pin.y - .5) < 6 || Math.hypot(c.x - h.tee.x - .5, c.y - h.tee.y - .5) < 6; }).length;
 for (const [k,v] of Object.entries({ putting:1, proshop:1.5, carts:2, range:2.5, restaurant:3 })) FACS[k].req = v;
 const facCenter = f => { const F = FACS[f.type]; return { x: f.x + F.w/2, y: f.y + F.h/2 }; };
 const hasFac = t => S.facilities.some(f => f.type === t);
@@ -1764,6 +1940,31 @@ function facModel(f){
     case 'range': add('box','#7a6a52',[0,.04,1.95],[1.8,.06,.5]); for (const x of [-.6,-.2,.2,.6]) { add('box','#5a9a3a',[x,.08,1.95],[.25,.02,.3]); add('sphere','#ffffff',[x,.11,1.85],[.025,.025,.025]); }
       for (const [z,c] of [[.9,'#e2483d'],[-.2,'#f2bd44'],[-1.4,'#2f6fd6']]) { add('cyl',c,[0,.05,z],[.3,.02,.3]); add('cyl','#f4f4ef',[0,.25,z],[.008,.4,.008]); }
       for (const x of [-.95,.95]) add('cyl','#9aa3ad',[x,.6,-2.3],[.015,1.2,.015]); break;
+    case 'windmill': {
+      add('cyl','#f1e6d0',[0,.6,0],[.36,1.2,.36]); add('cone','#8a4a32',[0,1.36,0],[.42,.36,.42]);
+      add('box','#6b4a2f',[.37,.28,0],[.02,.34,.18]);
+      const hub = new TH.Group(); hub.position.set(.4, 1.02, 0); g.add(hub);
+      for (let i=0; i<4; i++) { const arm = new TH.Group(); arm.rotation.x = i*Math.PI/2; hub.add(arm);
+        const sail = new TH.Mesh(GEO.box, mat('#efe7d6')); sail.position.set(0, .42, .05); sail.scale.set(.02, .74, .16); sail.castShadow = true; arm.add(sail);
+        const spar = new TH.Mesh(GEO.box, mat('#6b4a2f')); spar.position.set(.01, .4, 0); spar.scale.set(.03, .8, .03); arm.add(spar); }
+      add('sphere','#4a3a2a',[.4,1.02,0],[.06,.06,.06]); g.userData.spin = hub; break; }
+    case 'lighthouse': {
+      for (let i=0; i<5; i++) add('cyl', i % 2 ? '#ffffff' : '#d23c32', [0,.15 + i*.27,0], [.2 - i*.018, .27, .2 - i*.018]);
+      add('cyl','#3a3a3a',[0,1.5,0],[.17,.04,.17]); add('cyl','#ffe9a0',[0,1.62,0],[.1,.2,.1]); add('cone','#3a3a3a',[0,1.8,0],[.14,.16,.14]);
+      add('box','#f6efe0',[.22,.12,0],[.18,.24,.22]); break; }
+    case 'gazebo': {
+      add('cyl','#e8dcc2',[0,.05,0],[.85,.1,.85]);
+      for (let i=0; i<6; i++) { const a = i/6*Math.PI*2; add('cyl','#ffffff',[Math.cos(a)*.68,.42,Math.sin(a)*.68],[.035,.7,.035]); }
+      add('cone','#2e6b3e',[0,.98,0],[.95,.42,.95]); add('sphere','#f2bd44',[0,1.22,0],[.05,.05,.05]);
+      for (let i=0; i<2; i++) add('box','#8a5a34',[-.3+i*.6,.2,0],[.4,.04,.14]); break; }
+    case 'fountain': {
+      add('cyl','#cfc8bb',[0,.08,0],[.44,.16,.44]); add('cyl','#4aa3e0',[0,.15,0],[.39,.02,.39]);
+      add('cyl','#cfc8bb',[0,.32,0],[.06,.34,.06]); add('cyl','#cfc8bb',[0,.48,0],[.2,.05,.2]); add('cyl','#4aa3e0',[0,.51,0],[.17,.01,.17]);
+      add('cone','#bfe6ff',[0,.62,0],[.05,.2,.05]); for (let i=0; i<6; i++) { const a = i/6*Math.PI*2; add('sphere','#cfeeff',[Math.cos(a)*.13,.42,Math.sin(a)*.13],[.025,.06,.025]); } break; }
+    case 'statue': {
+      add('box','#b9b2a6',[0,.18,0],[.36,.36,.36]); add('box','#a8a194',[0,.38,0],[.42,.05,.42]);
+      add('cyl','#8a6a3a',[0,.6,0],[.07,.36,.07]); add('sphere','#8a6a3a',[0,.84,0],[.07,.08,.07]);
+      add('cyl','#8a6a3a',[.09,.66,0],[.02,.22,.02],[0,0,-.9]); add('cyl','#9aa3ad',[.2,.6,0],[.01,.3,.01],[0,0,.4]); break; }
     case 'carts': add('box','#a33b2f',[0,.3,-.15],[1.6,.6,1.2]); add('pyr','#6b7a88',[0,.82,-.15],[1.35,.44,1.05]); add('box','#f4f4ef',[0,.25,.452],[.8,.42,.01]);
       for (const x of [-.45,.45]) { add('box','#f4f4ef',[x,.12,.75],[.24,.12,.4]); add('box','#1f5c35',[x,.42,.75],[.27,.02,.42]); } break;
   }
@@ -1788,7 +1989,7 @@ let warnedCash = false;
 function paintAt(tx, ty){
   if (S.event) { if (!warnedCash) { toast('The course is locked while an event is on'); warnedCash = true; } return; }
   const tool = TOOLS[S.tool], cells = [];
-  const r = S.brush === 3 ? 1 : 0;
+  const r = S.brush === 3 && !tool.thin ? 1 : 0;
   for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++) cells.push([tx+dx, ty+dy]);
   let changed = false;
   if (S.tool === 'bridge') {
@@ -1820,12 +2021,12 @@ function paintAt(tx, ty){
       if (hi >= 0) { removeHole(hi); changed = true; }
     }
     if (S.tool === 'clear' && BR[y*COLS+x]) { if (S.money >= 10) { S.money -= 10; book('build', -10); spend(10); BR[y*COLS+x] = 0; changed = true; } continue; }
-    if (cur === tool.paint) continue;
+    if (cur === tool.paint && !(tool.species && TS[y*COLS+x] !== SPEC.indexOf(tool.species))) continue;
     const cost = S.tool === 'clear' ? (cur === T.WATER ? 40 : cur === T.ROCK ? 80 : 10) : tool.cost;
     if (S.money < cost) { if (!warnedCash) { toast('Not enough cash for that'); warnedCash = true; } continue; }
-    S.money -= cost; book('build', -cost); spend(cost); setTile(x, y, tool.paint); if (tool.paint === T.WATER) E[y*COLS+x] = 0; else BR[y*COLS+x] = 0; changed = true;
+    S.money -= cost; book('build', -cost); spend(cost); setTile(x, y, tool.paint); TS[y*COLS+x] = tool.species ? SPEC.indexOf(tool.species) : 0; if (tool.paint === T.WATER) E[y*COLS+x] = 0; else BR[y*COLS+x] = 0; changed = true;
   }
-  if (changed) { terrainDirty = true; recompute(); checkGoals(); }
+  if (changed) { terrainDirty = true; recompute(); checkGoals(); if ([T.FAIR, T.GREEN, T.FCUT, T.SAND, T.POT, T.GBUNK, T.TEE].includes(tool.paint)) crewCheckAfterPaint(); }
 }
 function doglegTap(x, y){
   if (S.event) return toast('The course is locked while an event is on');
@@ -1902,7 +2103,7 @@ function holeTap(x, y){
 
 // ---------- play mode ----------
 const P = { hole:0, strokes:0, bx:0, by:0, scores:[], fl:null, drag:null, busy:false, coins:0, paid:false, aim:0, club:0, meter:{ phase:'idle', v:0, power:0 }, overview:false, camInit:false };
-const LIENAME = { [T.ROUGH]:'rough', [T.FAIR]:'fairway', [T.GREEN]:'green', [T.TEE]:'tee box', [T.SAND]:'bunker', [T.TREES]:'trees', [T.PATH]:'cart path', [T.POT]:'pot bunker', [T.GBUNK]:'grass-faced bunker', [T.WASTE]:'waste area', [T.FCUT]:'first cut', [T.DEEP]:'deep rough', [T.FESCUE]:'fescue' };
+const LIENAME = { [T.ROUGH]:'rough', [T.FAIR]:'fairway', [T.GREEN]:'green', [T.TEE]:'tee box', [T.SAND]:'bunker', [T.TREES]:'trees', [T.PATH]:'cart path', [T.POT]:'pot bunker', [T.GBUNK]:'grass-faced bunker', [T.WASTE]:'waste area', [T.FCUT]:'first cut', [T.DEEP]:'deep rough', [T.FESCUE]:'fescue', [T.SHRUB]:'shrubs' };
 function startRound(){
   if (S.event) return toast('Wait for the event to finish before playing a round');
   if (!S.holes.length) return toast('Build a hole first');
@@ -1964,13 +2165,13 @@ function hitP(acc){
   const ang = P.aim + off*(putting ? .45 : 1.1)*lieErr + gauss()*(putting ? .005 + .01*(1-sk) : (.008 + .02*Math.max(0, 1-sk))*lieErr) + (over ? gauss()*over*.7 : 0);
   const dd = Math.max(.05, clubMaxP()*Math.min(m.power, 1.1)*(1 + gauss()*(putting ? .025 + .03*(1-sk) : (.02 + .03*Math.max(0, 1-sk))*lieErr)));
   let x = P.bx + Math.cos(ang)*dd, y = P.by + Math.sin(ang)*dd, holed = false;
-  if (!putting) { const d2 = Math.max(.05, dd - (elevAt(x,y) - elevAt(P.bx,P.by))*ELH); x = P.bx + Math.cos(ang)*d2; y = P.by + Math.sin(ang)*d2; }
+  if (!putting) { const d2 = Math.max(.05, dd - (elevAt(x,y) - elevAt(P.bx,P.by))*ELH); x = P.bx + Math.cos(ang)*d2; y = P.by + Math.sin(ang)*d2; const wd = windDrift(d2, A(S.pro,'cm')); x += wd.x; y += wd.y; }
   if (putting) {
     const t = clamp((p.x-P.bx)*Math.cos(ang) + (p.y-P.by)*Math.sin(ang), 0, dd);
     const cx = P.bx + Math.cos(ang)*t, cy = P.by + Math.sin(ang)*t;
     if (Math.hypot(p.x-cx, p.y-cy)*75 < 1.4 && (dd-t)*75 < 6) { holed = true; x = p.x; y = p.y; }
   } else {
-    const lt = at(x,y), roll = rollOf(lt, .15);
+    const lt = at(x,y), roll = rollOf(lt, .15)*(wx().k === 'rain' ? .5 : 1);
     x += Math.cos(ang)*roll*Math.min(1, m.power); y += Math.sin(ang)*roll*Math.min(1, m.power);
   }
   const q = Math.abs(acc) <= sw/2 ? (over ? 'Big swing!' : 'Pure strike!') : acc > 0 ? 'Pushed it right.' : 'Pulled it left.';
@@ -1995,6 +2196,7 @@ function updatePlayUI(){
   else lbl.classList.add('hidden');
   $('swingBtn').textContent = m.phase === 'idle' ? 'Swing' : m.phase === 'power' ? 'Set power' : 'Hit!';
   $('swingBtn').disabled = !!(P.busy || P.fl);
+  { const w = wx(), el = $('windLbl'); if (w.mph >= 2) { const rel = (w.dir - P.aim)*180/Math.PI; el.innerHTML = `<span class="warr" style="transform:rotate(${rel.toFixed(0)}deg)">⬆</span><b>${w.mph}</b><small>mph</small>`; el.classList.remove('hidden'); } else el.classList.add('hidden'); }
   $('viewBtn').textContent = P.overview ? '🏌️' : '🗺️'; $('viewBtn').setAttribute('aria-label', P.overview ? 'Golfer view' : 'Hole view');
 }
 function playCamStep(){
@@ -2409,6 +2611,8 @@ $('clubBody').addEventListener('click', e => {
     m.at[ls.k] = Math.min(1, m.at[ls.k] + .01); m.skill = avgSkill(m); m.sat = Math.min(100, m.sat + 4); m.lessons++;
     toast(`${S.pro.name} gave ${m.name} a ${name.toLowerCase()} lesson. +${LESSON_COINS} 🪙, +${fmt(LESSON_FEE)}.`, 2600); updateHUD();
   }
+  else if (a === 'hireNeed') { const sh = crewShort(); for (let i=0; i<sh.grounds; i++) hireStaff('grounds'); for (let i=0; i<sh.greens; i++) hireStaff('greens'); toast(`Hired ${sh.grounds + sh.greens} crew. Your course will start recovering tomorrow.`); updateHUD(); }
+  else if (a === 'gear') { const k = b.dataset.k, G0 = GEAR[k], lv = gearLv(k), nx = G0.tiers[lv]; if (!nx) return; if (S.money < nx[0]) return toast(`That costs ${fmt(nx[0])}.`); S.money -= nx[0]; book('build', -nx[0]); S.gear = { ...(S.gear || {}), [k]: lv + 1 }; toast(`${G0.icon} ${G0.name} ${lv ? 'upgraded' : 'bought'}! ${nx[1]}`, 3200); updateHUD(); }
   else if (a === 'hire') { const st = hireStaff(b.dataset.role); toast(`${st.name} joined as ${ROLES[st.role].name}.`); }
   else if (a === 'fire') { const id = +b.dataset.sid, st = S.staff.find(x => x.id === id); if (st && confirm(`Let ${st.name} go?`)) S.staff = S.staff.filter(x => x.id !== id); }
   else if (a === 'water') { S.water = b.dataset.v; }
@@ -2698,7 +2902,9 @@ function updateHint(){
 const TRAYS = {
   fac:   { icon:'🏛️', name:'Facilities', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
   build: { icon:'🏗️', name:'Build', tools:['hole','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge'] },
-  land:  { icon:'🌳', name:'Landscape', tools:['fcut','deep','fescue','trees','flowers','water','raise','lower','clear'] }
+  land:  { icon:'🌳', name:'Landscape', tools:['fcut','deep','fescue','trees','shrubs','flowers','river','water','raise','lower','clear'] },
+  trees: { icon:'🌲', name:'Trees', parent:'land', tools:['tree_round','tree_pine','tree_autumn','tree_blossom','tree_willow','tree_palm','tree_cypress'] },
+  marks: { icon:'🗼', name:'Landmarks', parent:'land', tools:['f_windmill','f_lighthouse','f_gazebo','f_fountain','f_statue'] }
 };
 function openTray(id){
   S.trayAnim = true;
@@ -2722,16 +2928,18 @@ function buildTools(){
     const add = (cls, html, fn, id) => { const b = document.createElement('button'); b.className = cls; if (id) b.id = id; b.innerHTML = html; b.addEventListener('click', fn); tray.appendChild(b); return b; };
     add('tool done', '<span class="ic">✓</span><span class="nm">Done</span><span class="pr">Close</span>', closeTray);
     if (S.tray === 'fac') add('tool', '<span class="ic">🏗️</span><span class="nm">‹ Build</span><span class="pr">Back</span>', () => openTray('build'));
+    if (T0.parent) add('tool', `<span class="ic">${TRAYS[T0.parent].icon}</span><span class="nm">‹ ${TRAYS[T0.parent].name}</span><span class="pr">Back</span>`, () => openTray(T0.parent));
+    if (S.tray === 'land') { add('tool', '<span class="ic">🌲</span><span class="nm">Trees ›</span><span class="pr">Pick a kind</span>', () => openTray('trees')); add('tool', '<span class="ic">🗼</span><span class="nm">Landmarks ›</span><span class="pr">Windmill, more</span>', () => openTray('marks')); }
     for (const id of T0.tools) { const t = TOOLS[id].fac ? { ...FACS[TOOLS[id].fac], sw:null } : TOOLS[id];
       add('tool' + (S.tool === id ? ' on' : ''), `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${t.req && S.course.stars < t.req ? '🔒 ' + t.req + '★' : fmt(t.cost)}</span>`,
         () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; buildTools(); updateHint(); }); }
     if (S.tray === 'build') add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac'));
-    if (!['hole','dogleg'].includes(S.tool) && !TOOLS[S.tool].fac) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
+    if (!['hole','dogleg'].includes(S.tool) && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
   }
   const dock = document.createElement('div'); dock.className = 'dock'; nav.appendChild(dock);
   const mk = (ic, nm, fn, on, extra) => { const b = document.createElement('button'); b.className = 'dockbtn' + (on ? ' on' : ''); b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>${extra || ''}`; b.addEventListener('click', fn); dock.appendChild(b); };
   mk(TRAYS.build.icon, TRAYS.build.name, () => S.tray === 'fac' ? closeTray() : openTray('build'), S.tray === 'build' || S.tray === 'fac');
-  mk(TRAYS.land.icon, TRAYS.land.name, () => openTray('land'), S.tray === 'land');
+  mk(TRAYS.land.icon, TRAYS.land.name, () => ['land','trees','marks'].includes(S.tray) ? closeTray() : openTray('land'), ['land','trees','marks'].includes(S.tray));
   mk('🏌️', 'Play', startRound);
   mk('🏆', 'Club', () => openClub(), false, `<span class="badge hidden" id="clubPr"></span>`);
   mk('📋', 'Golfers', () => openScores());
@@ -2755,7 +2963,8 @@ function updateHUD(){
   const m = $('money'); m.textContent = fmt(S.money); m.classList.toggle('neg', S.money < 0);
   $('stars').innerHTML = `<b>★</b> ${S.course.stars.toFixed(1)}`;
   $('coins').textContent = `🪙 ${S.coins}`;
-  $('dayLbl').textContent = `Day ${S.day}, ${S.golfers.length} on course`;
+  { const w = wx(); $('dayLbl').textContent = `Day ${S.day} ${WX[w.k].icon}${w.temp}°`; $('dayLbl').title = `${WX[w.k].name}, ${w.temp}°, wind ${w.mph} mph. ${S.golfers.length} golfers on the course.`; }
+  if (S.active && S.mode === 'build') { const short = crewShort().any || condScore() < 50; $('crewChip').classList.toggle('hidden', !short); }
   $('dayFill').style.width = (S.dayT/DAY*100) + '%';
   $('feeLbl').textContent = `Fee ${fmt(S.fee)}`;
   $('lvlName').textContent = S.clubName || LEVELS[S.level].name;
@@ -2793,7 +3002,7 @@ function preview(L, grid){
   const x = c.getContext('2d'), ns = NATIVE_STYLE[L.native || 'sandhills'];
   const col = { [T.ROUGH]: L.lush ? '#5aa743' : '#69ad4c', [T.FAIR]:'#93d36e', [T.GREEN]:'#b3e995', [T.TEE]:'#a4e07c', [T.SAND]:'#f0dea6', [T.WATER]:'#3e8fd8',
     [T.TREES]: { pine:'#22603a', palm:'#3f8f4a', cactus:'#4f8a4a', cypress:'#2a5a40', longleaf:'#2f6b34' }[L.tree] || '#2b6e30',
-    [T.HOUSE]:'#c0524a', [T.FLOWERS]:'#e85d9a', [T.ROCK]:'#8d877d', [T.NATIVE]: ns.fill, [T.PATH]:'#ddd5c2', [T.POT]:'#d9c58e', [T.GBUNK]:'#f3e7c4', [T.WASTE]:'#cdb98a', [T.FCUT]:'#7cb955', [T.DEEP]:'#3f7a2d', [T.FESCUE]:'#c4b664' };
+    [T.HOUSE]:'#c0524a', [T.FLOWERS]:'#e85d9a', [T.ROCK]:'#8d877d', [T.NATIVE]: ns.fill, [T.PATH]:'#ddd5c2', [T.POT]:'#d9c58e', [T.GBUNK]:'#f3e7c4', [T.WASTE]:'#cdb98a', [T.FCUT]:'#7cb955', [T.DEEP]:'#3f7a2d', [T.FESCUE]:'#c4b664', [T.SHRUB]:'#3f7f3a' };
   for (let y=0; y<ROWS; y++) for (let xx=0; xx<COLS; xx++) { x.fillStyle = col[grid[y*COLS+xx]] || '#69ad4c'; x.fillRect(xx*4, y*4, 4, 4); }
   return c;
 }
@@ -2844,14 +3053,14 @@ function showLevels(){
 function startLevel(i, cont){
   const L = LEVELS[i]; S.level = i; const sv = cont && store.saves[i];
   if (sv) {
-    G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
+    TS = sv.species && sv.species.length === COLS*ROWS ? Uint8Array.from(sv.species) : new Uint8Array(COLS*ROWS); G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
     S.money = sv.money; S.earned = sv.earned; S.day = sv.day; S.fee = sv.fee; S.recent = sv.recent || []; S.won = !!sv.won;
     S.clubName = sv.clubName || L.name + ' Golf Club'; S.trophy = sv.trophy || 'Founders Cup';
-    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
+    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
   } else {
-    G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.facilities = []; S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
+    TS = new Uint8Array(COLS*ROWS); G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.facilities = []; S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
     S.clubName = L.name + ' Golf Club'; S.trophy = 'Founders Cup';
-    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
+    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
     delete store.saves[i]; saveStore();
   }
   S.mode = 'build'; P.fl = null; P.drag = null; hist = []; future = []; curAct = null; S.event = null; S.setup = null; S.matches = []; S.matchSetup = null; S.follow = null; $('prof').classList.add('hidden'); scView = null; $('sc').classList.add('hidden'); $('round').classList.add('hidden'); $('club').classList.add('hidden'); $('evDone').classList.add('hidden');
