@@ -1,11 +1,13 @@
 // Bump VERSION every time you upload a new index.html so phones pick up the update.
-const VERSION = 'fairway-v23';
+const VERSION = 'fairway-v25';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './vendor/three.min.js'];
 const THREE_JS = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+// Firebase sign-in code, saved so a signed-in player can open the game offline.
+const FIREBASE = ['app','auth','firestore'].map(n => `https://www.gstatic.com/firebasejs/10.12.2/firebase-${n}-compat.js`);
 
 self.addEventListener('install', e => {
   // Cache each file on its own, so one missing file can't block the update.
-  e.waitUntil(caches.open(VERSION).then(c => Promise.all([...SHELL, THREE_JS].map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then(c => Promise.all([...SHELL, THREE_JS, ...FIREBASE].map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
@@ -20,7 +22,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // Everything else (icons, fonts): cached copy first, then the network.
-  if (url.origin === location.origin || url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com') || url.hostname === 'cdnjs.cloudflare.com') {
+  if (url.origin === location.origin || url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com') || url.hostname === 'cdnjs.cloudflare.com' || (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/'))) {
     e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => { const copy = r.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); return r; })));
   }
 });
