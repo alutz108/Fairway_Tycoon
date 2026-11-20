@@ -9,14 +9,26 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Build menus
+🏗️ Build → Holes (Hole, Edit hole, Dogleg, Clubhouse, 🚩 All pins) · Grass & paths (Fairway, Green, Cart path, Bridge) · Bunkers (4 styles) · Green shapes · Facilities · Upgrades (badge = affordable) · Buy land. 🌳 Landscape → Rough · Trees · Plants (Shrubs, Flowers) · Water (Creek, Pond) · Hills (Raise, Lower) · Landmarks, plus Clear. Opening a top-level menu selects the Move tool so nothing gets painted by accident.
+
+### Golfer happiness tips (📋 Golfers → 💬 Feedback, top; also a button in the Rating sheet)
+`happyTips()` checks the course and lists up to 7 prioritized fixes: fee too high for the rating (fair ≈ 12 + stars×10 + holes×2), condition/crew, no food/drink, no restroom, no benches, long walks between holes (named), holes without cart paths, plain holes and holes needing fairway (named), slow pace, bare scenery, the unhappiest golfer type and what it likes, and repeated complaints.
+
+### Kilbrae Old Links (LEVELS 11, `links:true`)
+Scotland/Ireland-style seaside links: few trees, fescue, many pot bunkers, rocks, hilly, olive-gold grass. Weather leans wet (≈16% sunny, 36% cloudy, 24% windy, 24% rain) and cool (46–64°). A flock of 12 sheep grazes the rough (`SHEEP_LV`, kind `sheep`: wander slowly, shuffle away from golfers); golfers say "Watch out for the sheep!" (Wildlife praise). $28,000 land + $22,000 build budget.
+
+### Upgrade visuals
+Each facility level adds real detail (`facModel`): range – extra bays and a ball dispenser, then a covered roof, floodlights and another target; pro shop – awning and displays, then a second floor; restaurant – more patio umbrellas, then an upper floor; snack/drinks – umbrella table and cooler, then more seating; putting green – extra flags, then benches and lights; cart barn – more parked carts, then an extension; bench – shade umbrella, then a pergola; restroom – planters, then a bigger roof and lamp.
+
 ### Tee boxes
-Each hole draws up to three tee sets (`teeSpots`): back = the hole's tee tile (blue markers), middle ~1–1.4 tiles toward the pin/bend (white markers on a tee pad), forward ~2–2.9 tiles (red markers); short holes get fewer, and a set is skipped if it would sit on water, trees, rocks, a building or a green. Golfers pick a set (`pickTeeSet`): tour/event players and your pro play the back tees, grinders and strong players (skill ≥ .78) the back, seniors and beginners (skill < .4) the forward tees, everyone else the middle (`setGolferTee` on arrival, each new hole, edits). Listed yardage is from the back tees.
+Each hole draws one long tee strip (from the back tee to the farthest forward set) with up to three marker sets (`teeSpots`): back = the hole's tee tile (blue), middle ~0.75–0.85 tiles toward the pin/bend (white), forward ~1.4–1.7 tiles (red); short holes get fewer, and a set is skipped if it would sit on water, trees, rocks, a building or a green. Golfers pick a set (`pickTeeSet`): tour/event players and your pro play the back tees, grinders and strong players (skill ≥ .78) the back, seniors and beginners (skill < .4) the forward tees, everyone else the middle (`setGolferTee` on arrival, each new hole, edits). Listed yardage is from the back tees.
 
 ### Pin positions
-Hole editor → **Pin position on the green**: Front / Middle / Back (relative to the tee) / 🎲 Random, free, using the connected green tiles around the pin (`greenTilesOf`, `setPin`). **Change every pin each morning** (`S.pinDaily`, saved) moves every pin to a random spot on its green at the start of each day (not during events or cups).
+Hole editor → **Pin position on the green**: Front / Middle / Back (relative to the tee) / 🎲 Random, free; 🏗️ Build → Holes → **🚩 All pins** does the same for every hole at once (`openPinsAll`), using the connected green tiles around the pin (`greenTilesOf`, `setPin`). **Change every pin each morning** (`S.pinDaily`, saved) moves every pin to a random spot on its green at the start of each day (not during events or cups).
 
-### Shaped greens (🏗️ Build → ⛳ Green shapes ›)
-Stamp tools `gs_oval`, `gs_round`, `gs_kidney`, `gs_peanut`, `gs_star`, `gs_heart`, `gs_lshape` (`GSHAPES`, ~10–23 tiles each within a 9×9 area), $60 a tile, owned land only, skipping water, rocks, buildings, tees and existing green. ↻ Rotate turns the stamp in 45° steps (`S.shapeRot`). One undo step per stamp. The smooth terrain shader rounds the tile edges.
+### Shaped greens (🏗️ Build → 🟢 Green shapes ›)
+Tool buttons show a picture of the actual shape (`shapeSVG`, follows the current rotation). Stamp tools `gs_oval`, `gs_round`, `gs_kidney`, `gs_peanut`, `gs_star`, `gs_heart`, `gs_lshape` (`GSHAPES`, ~10–23 tiles each within a 9×9 area), $60 a tile, owned land only, skipping water, rocks, buildings, tees and existing green. ↻ Rotate turns the stamp in 45° steps (`S.shapeRot`). One undo step per stamp. The smooth terrain shader rounds the tile edges.
 
 ### Golfers using facilities
 Visitors who warm up walk to the range and/or putting green first (`g.warm`), stand in a range bay or on the practice green (`practiceSpot`) for 5–8 s, then go to the first tee; members' practice visits do the same for longer. Range balls fly out from the bays toward the targets (`stepRangeBalls`, pooled meshes). Mid-round detours now take time (state `using`): golfers stand at the snack bar or drink stand facing it, sit on benches, and disappear into the restroom for a moment, then carry on.

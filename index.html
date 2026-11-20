@@ -319,6 +319,10 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .tool.maxed .pr{color:var(--brand);font-weight:700}
 .tool{position:relative}
 .tbadge{position:absolute;top:4px;right:6px;background:#e2483d;color:#fff;border-radius:999px;font-size:.66rem;font-weight:700;min-width:17px;height:17px;line-height:17px;padding:0 4px}
+.tool .ic.shape{width:38px;height:34px}
+.tool.cat .nm{font-weight:700}
+.tiprow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.tipic{font-size:1.2rem;line-height:1.2;flex:0 0 auto}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
@@ -445,6 +449,12 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <div class="btns"><button class="btn" id="holeEdClose">Done</button></div>
 </div></div>
 
+<div id="pinsAll" class="overlay hidden"><div class="card">
+  <h2>🚩 Pins on every green</h2>
+  <div id="pinsBody"></div>
+  <div class="btns"><button class="btn" id="pinsClose">Done</button></div>
+</div></div>
+
 <div id="facEd" class="overlay hidden"><div class="card">
   <h2 id="facEdTitle">Facility</h2>
   <div id="facEdBody"></div>
@@ -568,7 +578,9 @@ const LEVELS = [
   { name:'Oak Hollow Par 3', style:'Par 3 course · parkland', par3:true, blurb:'A cozy short course in a leafy hollow. Every hole is a par 3, so rounds are quick and beginners love it. Cheap to buy and run, but it can’t host pro tours.',
     seed:101, cash:9000, fee:20, tree:'round', trees:.3, ponds:2, sand:3, flowers:4, goals:{ holes:9, stars:3, earned:4000 } },
   { name:'Sea Breeze Par 3', style:'Par 3 course · seaside', par3:true, blurb:'A breezy little par 3 course by the bay, with sandy dunes and pot bunkers. Short, fun and affordable, but not a tour venue.',
-    seed:117, cash:10000, fee:22, tree:'palm', trees:.1, ponds:1, sand:8, potBunkers:true, waste:2, native:'fescue', coast:{ side:'left', type:'beach' }, goals:{ holes:9, stars:3, earned:4500 } }
+    seed:117, cash:10000, fee:22, tree:'palm', trees:.1, ponds:1, sand:8, potBunkers:true, waste:2, native:'fescue', coast:{ side:'left', type:'beach' }, goals:{ holes:9, stars:3, earned:4500 } },
+  { name:'Kilbrae Old Links', style:'Old links · Scotland & Ireland', links:true, blurb:'Wild, windswept links land by the sea in the spirit of the old Scottish and Irish courses. Expect rain, cloud and wind, deep pot bunkers, golden fescue and sheep grazing between the holes.',
+    seed:131, cash:22000, fee:45, tree:'round', trees:.04, ponds:1, sand:14, potBunkers:true, waste:2, native:'fescue', rocks:3, coast:{ side:'left', type:'beach' }, goals:{ holes:9, stars:4, earned:9000 } }
 ];
 const isPar3 = (i = S.level) => !!(LEVELS[i] && LEVELS[i].par3);
 const PAR3_MAX = 250, PAR3_FAC = ['snack','drinks','bench','restroom','putting','proshop'];
@@ -641,7 +653,7 @@ let TS = new Uint8Array(COLS*ROWS);
 let G = new Uint8Array(COLS*ROWS), E = new Int8Array(COLS*ROWS), BR = new Uint8Array(COLS*ROWS), FR = new Uint8Array(COLS*ROWS), FO = new Int16Array(COLS*ROWS).fill(-1);
 const ELH = .22, EMAX = 8; // one elevation level = 0.22 tiles = about 5.5 yards
 const elevAt = (x, y) => { const xx = Math.floor(x), yy = Math.floor(y); return xx < 0 || yy < 0 || xx >= COLS || yy >= ROWS || G[yy*COLS+xx] === T.WATER ? 0 : E[yy*COLS+xx]; };
-const HILLS = [3, 2, 2, 4, 2, 3, 0, 3, 4, 3, 2];
+const HILLS = [3, 2, 2, 4, 2, 3, 0, 3, 4, 3, 2, 5];
 function genElev(L, g){
   const r = rng(L.seed + 99), e = new Int8Array(COLS*ROWS), n = Math.round((HILLS[LEVELS.indexOf(L)] ?? 2)*AF);
   for (let i=0; i<n; i++) {
@@ -989,7 +1001,7 @@ function heightAt(x, y){
 }
 function rebuildTerrain(){
   const LV = LEVELS[S.level], NS = nativeOf();
-  const grass = LV.lush ? '#3f8530' : '#4c8a33';
+  const grass = LV.lush ? '#3f8530' : LV.links ? '#6a8a3e' : '#4c8a33';
   const TC = { [T.ROUGH]:grass, [T.FAIR]:'#86ca46', [T.GREEN]:'#a3e05a', [T.TEE]:'#93d452', [T.SAND]:'#f3e9cf', [T.WATER]:'#2c5878',
     [T.TREES]: LV.desert ? NS.fill : '#5a4330', [T.HOUSE]:'#cbc3b0', [T.FLOWERS]:'#6b4a33', [T.ROCK]:'#8d877d', [T.NATIVE]:NS.fill, [T.PATH]:'#c9bfa8',
     [T.POT]:'#eadcb2', [T.GBUNK]:'#f6eed8', [T.WASTE]:'#d6c398', [T.FCUT]:LV.lush ? '#5f9e38' : '#6aa83d', [T.DEEP]:LV.lush ? '#336723' : '#3a6f26', [T.FESCUE]:'#c4b664', [T.SHRUB]:'#5b4532' };
@@ -1058,7 +1070,8 @@ const FOREST = [
   { cactus:1 },
   { round:.4, pine:.4, autumn:.2 },
   { round:.5, autumn:.25, blossom:.15, willow:.1 },
-  { palm:.6, round:.4 }
+  { palm:.6, round:.4 },
+  { round:.6, pine:.4 }
 ];
 function pickStyle(mix, h){ let acc = 0; const keys = Object.keys(mix), tot = keys.reduce((a,k) => a + mix[k], 0); for (const k of keys) { acc += mix[k]/tot; if (h <= acc) return k; } return keys[keys.length-1]; }
 const STYLE = {
@@ -1202,8 +1215,10 @@ function syncHoles(now){
         board.position.set(W2(sx), gy2 + .5, Z2(sy)); board.rotation.y = Math.PI/4; board.castShadow = true; holeGroup.add(board);
         const post = new TH.Mesh(GEO.cyl, mat('#6b4a2f')); post.scale.set(.018, .4, .018); post.position.set(W2(sx), gy2 + .2, Z2(sy)); holeGroup.add(post); }
       { const sp = teeSpots(h), ang = Math.atan2(h.pin.y - h.tee.y, h.pin.x - h.tee.x), px = -Math.sin(ang), py = Math.cos(ang);
+        const far = sp.fwd || sp.mid;
+        if (far) { const b = sp.back, len = Math.hypot(far.x - b.x, far.y - b.y) + .75, cx = (b.x + far.x)/2, cy = (b.y + far.y)/2, strip = new TH.Mesh(GEO.box, mat('#a0dc74'));
+          strip.scale.set(len, .045, .5); strip.rotation.y = -ang; strip.position.set(W2(cx), Math.max(heightAt(b.x, b.y), heightAt(far.x, far.y)) + .015, Z2(cy)); strip.receiveShadow = true; holeGroup.add(strip); }
         for (const [k, t] of Object.entries(sp)) {
-          if (k !== 'back') { const pad = new TH.Mesh(GEO.box, mat('#a0dc74')); pad.scale.set(.62, .05, .46); pad.rotation.y = -ang; pad.position.set(W2(t.x), heightAt(t.x, t.y) + .02, Z2(t.y)); pad.receiveShadow = true; holeGroup.add(pad); }
           for (const sgn of [-1, 1]) { const tm = new TH.Mesh(GEO.sphere, mat(TEE_COL[k])); tm.scale.setScalar(.035); const mx = t.x + px*.22*sgn, my = t.y + py*.22*sgn; tm.position.set(W2(mx), heightAt(mx, my) + .055, Z2(my)); tm.castShadow = true; holeGroup.add(tm); }
         } }
     });
@@ -1314,7 +1329,8 @@ function syncGolfers(){
 }
 
 // --- wildlife: ducks on ponds, alligators in warm-climate water, deer near the trees ---
-const WARM_LV = [2, 3, 5, 6, 10], DEER_LV = [0, 1, 3, 4, 5, 8, 9];
+const WARM_LV = [2, 3, 5, 6, 10], DEER_LV = [0, 1, 3, 4, 5, 8, 9], SHEEP_LV = [11];
+const onLand = a => a.kind === 'deer' || a.kind === 'sheep';
 let animals = [];
 function makeAnimal(kind){
   const g = new TH.Group();
@@ -1324,6 +1340,11 @@ function makeAnimal(kind){
     add('box','#3d4a2c',[0,.01,0],[.13,.05,.42]); add('box','#46552f',[0,.01,.3],[.09,.04,.2]); add('cone','#3d4a2c',[0,0,-.33],[.05,.3,.04],[-Math.PI/2,0,0]);
     for (const x of [-.03,.03]) add('sphere','#c9c25a',[x,.045,.22],[.013,.013,.013]);
     for (const [x,z] of [[-.08,.12],[.08,.12],[-.08,-.12],[.08,-.12]]) add('box','#3d4a2c',[x,-.01,z],[.05,.02,.05]);
+  } else if (kind === 'sheep') {
+    const face = Math.random() < .7 ? '#2a2420' : '#f4f1ea';
+    add('ico1','#f4f1ea',[0,.17,0],[.1,.08,.14]); add('ico1','#ebe6db',[0,.2,-.02],[.08,.06,.1]);
+    for (const [x,z] of [[-.05,.08],[.05,.08],[-.05,-.08],[.05,-.08]]) add('cyl','#2a2420',[x,.06,z],[.012,.12,.012]);
+    add('sphere',face,[0,.21,.15],[.035,.04,.05]); for (const x of [-.035,.035]) add('sphere',face,[x,.23,.13],[.02,.008,.012]);
   } else {
     const buck = Math.random() < .35;
     add('cyl','#9a6a42',[0,.2,0],[.06,.26,.06],[Math.PI/2,0,0]);
@@ -1344,33 +1365,33 @@ function clearAnimals(){ for (const a of animals) scene.remove(a.mesh); animals 
 function ensureAnimals(){
   if (!S.active) return;
   let water = 0, trees = 0; for (const t of G) { if (t === T.WATER) water++; else if (t === T.TREES) trees++; }
-  const want = { duck: Math.min(10, Math.floor(water/14)), gator: WARM_LV.includes(S.level) ? Math.min(4, Math.floor(water/40)) : 0, deer: DEER_LV.includes(S.level) && trees > 30 ? Math.min(6, 2 + Math.floor(trees/250)) : 0 };
-  animals = animals.filter(a => { const ok = a.kind === 'deer' ? landOk(a.x, a.y) : waterAt(a.x, a.y) || (a.kind === 'gator' && a.bask && landOk(a.x, a.y)); if (!ok) scene.remove(a.mesh); return ok; });
+  const want = { duck: Math.min(10, Math.floor(water/14)), gator: WARM_LV.includes(S.level) ? Math.min(4, Math.floor(water/40)) : 0, deer: DEER_LV.includes(S.level) && trees > 30 ? Math.min(6, 2 + Math.floor(trees/250)) : 0, sheep: SHEEP_LV.includes(S.level) ? 12 : 0 };
+  animals = animals.filter(a => { const ok = onLand(a) ? landOk(a.x, a.y) : waterAt(a.x, a.y) || (a.kind === 'gator' && a.bask && landOk(a.x, a.y)); if (!ok) scene.remove(a.mesh); return ok; });
   for (const k of Object.keys(want)) {
     const have = animals.filter(a => a.kind === k);
     while (have.length > want[k]) { const a = have.pop(); scene.remove(a.mesh); animals.splice(animals.indexOf(a), 1); }
-    for (let i = have.length; i < want[k]; i++) { const p = randSpot(k === 'deer' ? (x,y) => landOk(x,y) && nearTrees(x,y) : waterAt); if (!p) break; animals.push({ kind:k, x:p.x, y:p.y, tx:p.x, ty:p.y, t:Math.random()*5, head:Math.random()*6.28, mesh:makeAnimal(k) }); }
+    for (let i = have.length; i < want[k]; i++) { const p = randSpot(k === 'deer' ? (x,y) => landOk(x,y) && nearTrees(x,y) : k === 'sheep' ? (x,y) => landOk(x,y) && at(x,y) !== T.FAIR && at(x,y) !== T.SAND : waterAt); if (!p) break; animals.push({ kind:k, x:p.x, y:p.y, tx:p.x, ty:p.y, t:Math.random()*5, head:Math.random()*6.28, mesh:makeAnimal(k) }); }
   }
 }
 function stepAnimals(dt, now){
   for (const a of animals) {
     a.t -= dt; if (a.flee > 0) a.flee -= dt;
-    if (a.kind === 'deer' && !(a.flee > 0)) {
-      const g = S.golfers.find(g => Math.hypot(g.x - a.x, g.y - a.y) < 2.4);
-      if (g) { const an = Math.atan2(a.y - g.y, a.x - g.x), nx = a.x + Math.cos(an)*4, ny = a.y + Math.sin(an)*4; if (landOk(nx, ny)) { a.tx = nx; a.ty = ny; a.flee = 2; } }
+    if (onLand(a) && !(a.flee > 0)) {
+      const g = S.golfers.find(g => Math.hypot(g.x - a.x, g.y - a.y) < (a.kind === 'sheep' ? 1.3 : 2.4));
+      if (g) { const fd = a.kind === 'sheep' ? 1.8 : 4, an = Math.atan2(a.y - g.y, a.x - g.x), nx = a.x + Math.cos(an)*fd, ny = a.y + Math.sin(an)*fd; if (landOk(nx, ny)) { a.tx = nx; a.ty = ny; a.flee = 2; } }
     }
-    const d = Math.hypot(a.tx - a.x, a.ty - a.y), sp = a.kind === 'duck' ? .35 : a.kind === 'gator' ? .22 : a.flee > 0 ? 2.4 : .55;
+    const d = Math.hypot(a.tx - a.x, a.ty - a.y), sp = a.kind === 'duck' ? .35 : a.kind === 'gator' ? .22 : a.kind === 'sheep' ? (a.flee > 0 ? 1 : .25) : a.flee > 0 ? 2.4 : .55;
     if (d > .05) {
       const st = Math.min(d, sp*dt), nx = a.x + (a.tx - a.x)/d*st, ny = a.y + (a.ty - a.y)/d*st;
-      const ok = a.kind === 'deer' ? landOk(nx, ny) : a.kind === 'duck' ? waterAt(nx, ny) : waterAt(nx, ny) || (a.bask && landOk(nx, ny));
+      const ok = onLand(a) ? landOk(nx, ny) : a.kind === 'duck' ? waterAt(nx, ny) : waterAt(nx, ny) || (a.bask && landOk(nx, ny));
       if (ok) { a.x = nx; a.y = ny; a.head = Math.atan2(a.tx - a.x, a.ty - a.y); } else { a.tx = a.x; a.ty = a.y; }
     } else if (a.t <= 0) {
-      const r = a.kind === 'duck' ? 1.5 : a.kind === 'gator' ? 2.5 : 4;
+      const r = a.kind === 'duck' ? 1.5 : a.kind === 'gator' ? 2.5 : a.kind === 'sheep' ? 1.5 : 4;
       a.t = a.kind === 'duck' ? 2 + Math.random()*4 : a.kind === 'gator' ? 6 + Math.random()*12 : 3 + Math.random()*7;
       if (a.kind === 'gator' && !a.bask && Math.random() < .3) { for (let i=0; i<20; i++) { const x = a.x + (Math.random()-.5)*3, y = a.y + (Math.random()-.5)*3; if (shoreAt(x, y)) { a.tx = x; a.ty = y; a.bask = true; break; } } }
-      else { if (a.bask) a.bask = false; for (let i=0; i<12; i++) { const x = a.x + (Math.random()-.5)*2*r, y = a.y + (Math.random()-.5)*2*r; if (a.kind === 'deer' ? landOk(x, y) : waterAt(x, y)) { a.tx = x; a.ty = y; break; } } }
+      else { if (a.bask) a.bask = false; for (let i=0; i<12; i++) { const x = a.x + (Math.random()-.5)*2*r, y = a.y + (Math.random()-.5)*2*r; if (onLand(a) ? landOk(x, y) : waterAt(x, y)) { a.tx = x; a.ty = y; break; } } }
     }
-    const wet = a.kind !== 'deer' && waterAt(a.x, a.y), y = wet ? (a.kind === 'duck' ? -.1 + Math.sin(now/480 + a.x*3)*.008 : -.125) : heightAt(a.x, a.y);
+    const wet = !onLand(a) && waterAt(a.x, a.y), y = wet ? (a.kind === 'duck' ? -.1 + Math.sin(now/480 + a.x*3)*.008 : -.125) : heightAt(a.x, a.y);
     a.mesh.position.set(W2(a.x), y, Z2(a.y)); a.mesh.rotation.y = a.head;
   }
 }
@@ -1697,6 +1718,7 @@ function holeOut(g){
   if (w.mph >= 14 && diff >= 1 && !text && Math.random() < .35) text = pick(LINES.windy);
   if (!text && landmarksNear(h) && Math.random() < .3) { text = pick(LINES.view); g.sat += 1; }
   if (!text && !g.sawDeer && Math.random() < .5 && animals.some(a => a.kind === 'deer' && Math.hypot(a.x - g.x, a.y - g.y) < 5)) { g.sawDeer = true; text = 'Look, deer!'; g.sat += 1.5; }
+  else if (!text && !g.sawSheep && Math.random() < .35 && animals.some(a => a.kind === 'sheep' && Math.hypot(a.x - g.x, a.y - g.y) < 4)) { g.sawSheep = true; text = pick(['Watch out for the sheep!', 'Baa!', 'Sheep on the fairway again.']); g.sat += 1; }
   else if (!text && !g.sawDuck && Math.random() < .15 && animals.some(a => a.kind === 'duck' && Math.hypot(a.x - g.x, a.y - g.y) < 4)) { g.sawDuck = true; text = 'Aww, ducks!'; g.sat += .5; }
   if (h.info.notes.includes('Needs more fairway') && Math.random() < .5) text = 'Where’s the fairway?';
   g.energy = Math.max(0, (g.energy ?? 100) - (g.cart ? 2 : 5)); g.hunger = Math.min(100, (g.hunger || 0) + 6); g.thirst = Math.min(100, (g.thirst || 0) + 7);
@@ -1750,10 +1772,10 @@ const WX = {
 };
 function rollWeather(){
   const L = LEVELS[S.level] || {}, links = !!L.coast || /Links|Dunes/.test(L.name || '');
-  const w = L.desert ? { sunny:.66, cloudy:.16, windy:.15, rain:.03 } : links ? { sunny:.34, cloudy:.24, windy:.3, rain:.12 } : { sunny:.44, cloudy:.26, windy:.17, rain:.13 };
+  const w = L.links ? { sunny:.16, cloudy:.36, windy:.24, rain:.24 } : L.desert ? { sunny:.66, cloudy:.16, windy:.15, rain:.03 } : links ? { sunny:.34, cloudy:.24, windy:.3, rain:.12 } : { sunny:.44, cloudy:.26, windy:.17, rain:.13 };
   let r = Math.random(), k = 'sunny'; for (const [kk, p] of Object.entries(w)) { if (r < p) { k = kk; break; } r -= p; }
   const mph = Math.round(k === 'windy' ? 14 + Math.random()*12 : k === 'rain' ? 5 + Math.random()*10 : k === 'cloudy' ? 3 + Math.random()*8 : Math.random()*8);
-  const temp = Math.round(L.desert ? 78 + Math.random()*22 : k === 'rain' ? 56 + Math.random()*14 : 62 + Math.random()*24);
+  const temp = Math.round(L.links ? 46 + Math.random()*18 : L.desert ? 78 + Math.random()*22 : k === 'rain' ? 56 + Math.random()*14 : 62 + Math.random()*24);
   return { k, mph, dir: Math.random()*Math.PI*2, temp };
 }
 const wx = () => S.weather || (S.weather = rollWeather());
@@ -1820,7 +1842,7 @@ fbk(1, 'Beautiful scenery', '', [...LINES.view]);
 fbk(1, 'Great hole design', '', [...LINES.parGreat, 'Love a risk-reward hole.', 'Driver, baby!']);
 fbk(1, 'Course in great shape', '', ['Course is in perfect shape!']);
 fbk(1, 'Handy facilities', '', ['Just what I needed.', 'Ahh, a cold drink!', 'Nice spot to rest.', 'Picked up a new glove.']);
-fbk(1, 'Wildlife', '', ['Look, deer!', 'Not going in after that one. Gator!', 'Aww, ducks!']);
+fbk(1, 'Wildlife', '', ['Look, deer!', 'Not going in after that one. Gator!', 'Aww, ducks!', 'Watch out for the sheep!', 'Baa!']);
 fbk(1, 'Loved their round', '', [...LINES.goodEnd]);
 function noteFeedback(text){ const f = FBK[text]; if (!f || !S.active) return; S.fb = S.fb || {}; S.fb[f.label] = (S.fb[f.label] || 0) + 1; }
 function leaveReview(g, sat){
@@ -1837,7 +1859,7 @@ function feedbackHtml(){
   const neg = fb.filter(([l]) => byLabel(l).sent < 0).sort((a,b) => b[1]-a[1]).slice(0, 5), pos = fb.filter(([l]) => byLabel(l).sent > 0).sort((a,b) => b[1]-a[1]).slice(0, 5);
   const mx = Math.max(1, ...fb.map(([,v]) => v));
   const row = ([l, v], c) => `<div class="fbrow"><div class="spread" style="margin:0"><span>${esc(l)}</span><b>${Math.round(v)}</b></div><div class="rbar"><i style="width:${Math.round(v/mx*100)}%;background:${c}"></i></div>${byLabel(l).tip ? `<span class="small muted">💡 ${esc(byLabel(l).tip)}</span>` : ''}</div>`;
-  let h = '';
+  let h = happyHtml();
   if (R.length) { const avg = R.reduce((a,r) => a + r.stars, 0)/R.length; h += `<div class="recbox"><span class="small muted">Average review</span><b>${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))} ${avg.toFixed(1)}</b><span class="small">from the last ${R.length} golfers</span></div>`; }
   h += `<h3 class="sec">👎 Top complaints this week</h3>` + (neg.length ? neg.map(r => row(r, '#e2483d')).join('') : '<p class="small muted">No complaints lately.</p>');
   h += `<h3 class="sec">👍 What they love</h3>` + (pos.length ? pos.map(r => row(r, '#4fbf5a')).join('') : '<p class="small muted">Nothing yet. Scenery, great holes and good facilities get noticed.</p>');
@@ -2055,9 +2077,10 @@ function openRating(){
   else h += RATING_CATS.map(([k, label]) => { const v = r[k];
     const note = k === 'challenge' ? `${r.challengeLabel}, ${r.overPar >= 0 ? '+' : ''}${r.overPar.toFixed(1)} a hole` : k === 'pace' ? `about ${Math.floor(r.paceMin/60)}h ${r.paceMin % 60}m for 18` : k === 'condition' ? `${Math.round(condScore())}%` : '';
     return `<div class="rrow"><div class="spread" style="margin:0"><span><b>${label}</b>${note ? ` <span class="small muted">${note}</span>` : ''}</span><b>${v.toFixed(1)}</b></div><div class="rbar"><i style="width:${v*10}%;background:${v >= 7 ? '#4fbf5a' : v >= 4.5 ? '#e8b93a' : '#e2483d'}"></i></div></div>`; }).join('') +
-    `<h3 class="sec">How to improve</h3>` + weakest.map(([k, label]) => `<p class="small"><b>${label}:</b> ${tip(k)}</p>`).join('') +
+    `<div class="btns" style="margin:8px 0"><button class="btn alt" id="happyBtn">😊 Tips to make golfers happier</button></div>` + `<h3 class="sec">How to improve</h3>` + weakest.map(([k, label]) => `<p class="small"><b>${label}:</b> ${tip(k)}</p>`).join('') +
     (S.facilities.length ? `<p class="small muted">Facilities add ${Math.min(.3, new Set(S.facilities.map(f => f.type)).size*.05).toFixed(2)} stars on top.</p>` : '');
   $('ratingBody').innerHTML = h; $('rating').classList.remove('hidden');
+  const hb = $('happyBtn'); if (hb) hb.onclick = () => { $('rating').classList.add('hidden'); openScores(); scView = { mode:'fb' }; renderScores(); };
 }
 $('ratingClose').addEventListener('click', () => $('rating').classList.add('hidden'));
 $('stars').addEventListener('click', openRating);
@@ -2097,8 +2120,8 @@ function recordBook(){
 }
 
 // ---------- golf empire ----------
-const LAND   = [0, 15000, 40000, 30000, 45000, 15000, 25000, 30000, 35000, 3000, 5000];
-const UNLOCK = [0, 15000, 50000, 35000, 70000, 20000, 30000, 40000, 60000, 0, 0];
+const LAND   = [0, 15000, 40000, 30000, 45000, 15000, 25000, 30000, 35000, 3000, 5000, 28000];
+const UNLOCK = [0, 15000, 50000, 35000, 70000, 20000, 30000, 40000, 60000, 0, 0, 0];
 const priceOf = i => (LAND[i] ?? 30000) + LEVELS[i].cash;
 const LOAN_RATE = .15, LOAN_DAYS = 60;
 function parseNameLine(line){
@@ -2308,7 +2331,48 @@ function facModel(f){
     case 'carts': add('box','#a33b2f',[0,.3,-.15],[1.6,.6,1.2]); add('pyr','#6b7a88',[0,.82,-.15],[1.35,.44,1.05]); add('box','#f4f4ef',[0,.25,.452],[.8,.42,.01]);
       for (const x of [-.45,.45]) { add('box','#f4f4ef',[x,.12,.75],[.24,.12,.4]); add('box','#1f5c35',[x,.42,.75],[.27,.02,.42]); } break;
   }
-  const lv = facLvOf(f); if (lv > 1 && FACS[f.type].kind !== 'scenery') { g.scale.setScalar(1 + .1*(lv - 1)); const F = FACS[f.type]; for (let i=0; i<lv-1; i++) { const px = F.w/2 - .1 - i*.18, pz = -F.h/2 + .12; add('cyl', '#d8d8d2', [px, .55, pz], [.012, 1.1, .012]); const fl = new TH.Mesh(flagGeo, new TH.MeshLambertMaterial({ color:0xf2bd44, side:TH.DoubleSide })); fl.position.set(px, 1.02, pz); fl.scale.setScalar(.8); g.add(fl); } }
+  const lv = facLvOf(f);
+  if (lv > 1 && FACS[f.type].kind !== 'scenery') {
+    const L3 = lv >= 3;
+    switch (f.type) {
+      case 'range':
+        for (const x of [-.95, .95]) { add('box','#5a9a3a',[x,.08,1.95],[.25,.02,.3]); add('sphere','#ffffff',[x,.11,1.85],[.025,.025,.025]); }
+        add('box','#7a6a52',[0,.035,1.95],[2.2,.05,.52]); add('box','#2f6fd6',[1.05,.2,2.3],[.16,.36,.16]);
+        if (L3) { for (const x of [-1.05, 1.05]) add('cyl','#d8d8d2',[x,.32,1.75],[.02,.62,.02]); add('box','#f4f4ef',[0,.64,1.95],[2.3,.04,.62]); add('box','#1f5c35',[0,.68,1.95],[2.3,.03,.5]);
+          for (const x of [-1.1, 1.1]) { add('cyl','#9aa3ad',[x,.9,-2.2],[.02,1.8,.02]); add('box','#fff7c2',[x,1.82,-2.16],[.14,.08,.08]); } add('cyl','#e84393',[.5,.05,-.8],[.22,.02,.22]); }
+        break;
+      case 'proshop':
+        add('box','#2e6b3e',[.86,.48,0],[.22,.03,1.25],[0,0,-.35]); add('box','#ffffff',[.92,.08,.45],[.12,.12,.18]); add('box','#e2483d',[.92,.08,-.45],[.12,.12,.18]);
+        if (L3) { add('box','#f6f1e4',[-.15,1.05,0],[1.0,.42,1.0]); add('pyr','#2e6b3e',[-.15,1.42,0],[.85,.32,.85]); for (const z of [-.25,.25]) add('box','#9fd3f0',[.352,1.05,z],[.01,.2,.22]); }
+        break;
+      case 'restaurant':
+        for (const z of [-.85, .85]) { add('cyl','#6b4a2f',[.72,.2,z],[.01,.36,.01]); add('cone','#e2483d',[.72,.4,z],[.22,.08,.22]); add('cyl','#8a5a34',[.72,.12,z],[.12,.02,.12]); }
+        if (L3) { add('box','#c98a5e',[-.25,1.0,0],[.9,.4,1.2]); add('pyr','#5a3a2e',[-.25,1.38,0],[.8,.32,1.05]); add('box','#f4f4ef',[.25,.82,0],[.1,.12,1.2]); for (const z of [-.3,.3]) add('box','#ffd28a',[.202,1.0,z],[.01,.18,.26]); }
+        break;
+      case 'snack': case 'drinks':
+        add('cyl','#8a5a34',[.36,.12,.36],[.1,.02,.1]); add('cyl','#d8d8d2',[.36,.25,.36],[.008,.4,.008]); add('cone', f.type === 'snack' ? '#f2bd44' : '#2f6fd6',[.36,.46,.36],[.24,.08,.24]);
+        if (f.type === 'drinks') add('box','#e2483d',[-.28,.13,.3],[.2,.22,.18]);
+        if (L3) { add('cyl','#8a5a34',[-.36,.12,-.36],[.1,.02,.1]); add('cyl','#d8d8d2',[-.36,.25,-.36],[.008,.4,.008]); add('cone','#e2483d',[-.36,.46,-.36],[.24,.08,.24]); add('box','#ffffff',[0,.62,0],[.5,.06,.06]); }
+        break;
+      case 'putting':
+        for (const [x,z,c] of [[.6,.55,'#1abc9c'],[-.65,-.6,'#e84393']]) { add('cyl','#141c16',[x,.06,z],[.05,.01,.05]); add('cyl','#f4f4ef',[x,.2,z],[.006,.28,.006]); add('box',c,[x+.06,.3,z],[.1,.06,.01]); }
+        if (L3) { for (const [x,z] of [[-.95,0],[.95,0]]) { add('box','#8a5a34',[x,.12,z],[.12,.04,.4]); } for (const [x,z] of [[-.95,-.95],[.95,.95]]) { add('cyl','#9aa3ad',[x,.5,z],[.015,1,.015]); add('box','#fff7c2',[x,1.0,z],[.1,.06,.06]); } }
+        break;
+      case 'carts':
+        for (const x of [-.85, .85]) { add('box','#f4f4ef',[x,.12,.8],[.24,.12,.4]); add('box','#1f5c35',[x,.42,.8],[.27,.02,.42]); }
+        if (L3) { add('box','#a33b2f',[0,.3,-.95],[1.8,.6,.3]); add('box','#f4f4ef',[.55,.25,.452],[.5,.42,.01]); add('box','#f2bd44',[0,.72,-.05],[.5,.1,.02]); }
+        break;
+      case 'bench':
+        add('cyl','#d8d8d2',[.2,.3,-.12],[.008,.6,.008]); add('cone','#2e7d4f',[.2,.6,-.12],[.32,.1,.32]);
+        if (L3) { for (const [x,z] of [[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]) add('cyl','#ffffff',[x,.35,z],[.02,.7,.02]); for (const z of [-.2,0,.2]) add('box','#ffffff',[0,.72,z],[.7,.03,.05]); add('ico1','#e84393',[.35,.08,.35],[.1,.08,.1]); }
+        break;
+      case 'restroom':
+        for (const z of [-.3, .3]) { add('box','#8a5a34',[.36,.06,z],[.12,.12,.12]); add('ico1','#e84393',[.36,.16,z],[.08,.06,.08]); }
+        if (L3) { add('box','#dfe7ee',[-.22,.2,0],[.3,.4,.5]); add('pyr','#2e6b3e',[0,.66,0],[.62,.24,.52]); add('cyl','#2a2a2a',[.33,.35,0],[.01,.2,.01]); add('box','#fff7c2',[.33,.47,0],[.05,.05,.05]); }
+        break;
+    }
+    g.scale.setScalar(1 + .04*(lv - 1));
+  }
   const c = facCenter(f); g.position.set(W2(c.x), heightAt(c.x, c.y), Z2(c.y)); return g;
 }
 
@@ -2937,7 +3001,7 @@ function teeSpots(h){
   const d = Math.hypot(aim.x - tx, aim.y - ty) || 1, ux = (aim.x - tx)/d, uy = (aim.y - ty)/d, yds = h.info ? h.info.yards : 300;
   const out = { back:{ x:tx, y:ty } };
   const ok = (x, y) => { const t = at(x, y); return t >= 0 && t !== T.WATER && t !== T.HOUSE && t !== T.ROCK && t !== T.GREEN && t !== T.TREES; };
-  const steps = yds < 180 ? [['mid', .9]] : yds < 260 ? [['mid', 1.1], ['fwd', 2]] : [['mid', 1.4], ['fwd', 2.9]];
+  const steps = yds < 180 ? [['mid', .75]] : yds < 260 ? [['mid', .75], ['fwd', 1.4]] : [['mid', .85], ['fwd', 1.7]];
   for (const [k, s] of steps) { const x = tx + ux*s, y = ty + uy*s; if (ok(x, y)) out[k] = { x, y }; }
   return out;
 }
@@ -3020,6 +3084,63 @@ function practiceSpot(g, f){
   if (f.type === 'range') return { x: f.x + 1 + [-.6, -.2, .2, .6][i], y: f.y + 4.3, face: Math.PI };
   if (f.type === 'putting') return { x: f.x + .5 + (i % 2), y: f.y + .55 + Math.floor(i/2)*.9, face: Math.random()*6.28 };
   return null;
+}
+
+// ---------- happiness tips ----------
+function happyTips(){
+  const tips = [], n = S.holes.length, avg = S.recent.length ? S.recent.reduce((a, b) => a + b, 0)/S.recent.length : null;
+  const push = (icon, text, pri) => tips.push({ icon, text, pri });
+  if (!n) return { avg, tips:[{ icon:'⛳', text:'Build a few holes and open the course to start hearing from golfers.' }] };
+  const fair = Math.round(12 + S.course.stars*10 + n*2);
+  if (S.fee > fair*1.15) push('💲', `Your ${fmt(S.fee)} green fee feels steep for a ${S.course.stars.toFixed(1)}★ course. Golfers expect about ${fmt(fair)}. Lower it, or raise your rating first.`, 9);
+  const sh = crewShort();
+  if (sh.any || condScore() < 70) push('🚜', `The course is in ${Math.round(condScore())}% condition. ${sh.any ? 'Your crew is short-handed: hire more in Club → Staff.' : 'Water more, add fertilizer or repair equipment.'}`, 9);
+  if (n >= 3 && !hasFac('snack') && !hasFac('drinks')) push('🌭', 'There’s nowhere to eat or drink on the course. Add a snack bar or drink stand near the middle holes.', 7);
+  if (n >= 4 && !hasFac('restroom')) push('🚻', 'There’s no restroom out on the course. Golfers notice.', 6);
+  if (n >= 6 && !hasFac('bench')) push('🪑', 'Add a few benches so tired golfers can rest between holes.', 4);
+  const far = []; for (let i=1; i<n; i++) if (Math.hypot(S.holes[i].tee.x - S.holes[i-1].pin.x, S.holes[i].tee.y - S.holes[i-1].pin.y) > 9) far.push(i + 1);
+  if (far.length) push('🚶', `Long walk to ${far.length === 1 ? 'hole' : 'holes'} ${far.slice(0, 5).join(', ')}. Start each hole near the last green, or connect them with cart paths.`, 6);
+  const noCart = S.holes.filter(h => !h.info.cart).length;
+  if ((S.members.length || hasFac('carts')) && noCart > n/2) push('🛣️', `${noCart} of ${n} holes have no cart path. Members and seniors love riding.`, 5);
+  const dull = S.holes.map((h, i) => [h, i]).filter(([h]) => h.info.q < 5).map(([, i]) => i + 1);
+  if (dull.length) push('😴', `${dull.length === 1 ? 'Hole ' + dull[0] + ' feels' : 'Holes ' + dull.slice(0, 6).join(', ') + ' feel'} plain. Add bunkers, water or trees near the landing area and green.`, 6);
+  const narrow = S.holes.map((h, i) => [h, i]).filter(([h]) => h.info.notes.includes('Needs more fairway')).map(([, i]) => i + 1);
+  if (narrow.length) push('🟩', `${narrow.length === 1 ? 'Hole ' + narrow[0] + ' needs' : 'Holes ' + narrow.slice(0, 6).join(', ') + ' need'} more fairway to land on.`, 7);
+  const r = courseRatings(); if (r.pace < 6) push('⏱️', `Rounds are slow (about ${Math.floor(r.paceMin/60)}h ${r.paceMin % 60}m for 18). Hire a marshal and add cart paths.`, 5);
+  if (r.beauty < 4) push('🌸', 'The course looks a bit bare. Plant flowers, shrubs and trees, or add a landmark near tees and greens.', 4);
+  let worst = null; for (const [t, a] of Object.entries(S.typeSat || {})) { if (a.length < 3) continue; const v = a.reduce((x, y) => x + y, 0)/a.length; if (v < 50 && (!worst || v < worst.v)) worst = { t, v }; }
+  if (worst && TYPES[worst.t]) push(TYPES[worst.t].icon, `${TYPES[worst.t].name}s are unhappy (${Math.round(worst.v)}/100). They like ${TYPES[worst.t].likes}.`, 8);
+  for (const [l, v] of Object.entries(S.fb || {})) { const f = Object.values(FBK).find(x => x.label === l); if (f && f.sent < 0 && v >= 3 && f.tip && !tips.some(t => t.text.includes(f.tip))) push('💬', `Golfers keep mentioning “${l.toLowerCase()}”. ${f.tip}`, 3 + Math.min(4, v/5)); }
+  tips.sort((a, b) => b.pri - a.pri);
+  return { avg, tips: tips.slice(0, 7) };
+}
+function happyHtml(){
+  const { avg, tips } = happyTips();
+  let h = `<h3 class="sec" style="margin-top:4px">😊 How to make golfers happier</h3>`;
+  if (avg != null) h += `<div class="rrow"><div class="spread" style="margin:0"><span>Golfer happiness</span><b>${Math.round(avg)}/100</b></div><div class="rbar"><i style="width:${Math.round(avg)}%;background:${avg >= 65 ? '#4fbf5a' : avg >= 45 ? '#e8b93a' : '#e2483d'}"></i></div></div>`;
+  h += tips.length ? tips.map(t => `<div class="tiprow"><span class="tipic">${t.icon}</span><span class="small">${esc(t.text)}</span></div>`).join('') : '<p class="small muted">Golfers are happy with things right now. Keep the course in shape and keep adding variety.</p>';
+  return h;
+}
+
+// ---------- all pins at once ----------
+function openPinsAll(){
+  $('pinsBody').innerHTML = `<p class="small muted">Move the pin on every green at once. Bigger greens give more spots.</p>
+    <div class="chips"><button class="chip" data-pa="front">Front</button><button class="chip" data-pa="middle">Middle</button><button class="chip" data-pa="back">Back</button><button class="chip" data-pa="random">🎲 Random</button></div>
+    <div class="spread" style="margin:14px 0 4px"><span class="small">Change every pin each morning</span><div class="chips"><button class="chip${S.pinDaily ? '' : ' on'}" data-pd="0">Off</button><button class="chip${S.pinDaily ? ' on' : ''}" data-pd="1">On</button></div></div>`;
+  $('pinsAll').classList.remove('hidden');
+}
+$('pinsBody').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.pa) { let n = 0; for (const h of S.holes) if (setPin(h, b.dataset.pa)) n++; recompute(); toast(n ? `Moved ${n} pin${n === 1 ? '' : 's'} to the ${b.dataset.pa === 'random' ? 'new spots' : b.dataset.pa} of the greens.` : 'Paint bigger greens first, then you can move the pins around on them.'); }
+  else if (b.dataset.pd) { S.pinDaily = b.dataset.pd === '1'; toast(S.pinDaily ? 'Pins will move to a new spot on every green each morning.' : 'Pins stay where you put them.'); openPinsAll(); }
+});
+$('pinsClose').addEventListener('click', () => $('pinsAll').classList.add('hidden'));
+
+// ---------- green shape pictures for the tray ----------
+function shapeSVG(k){
+  const a = (S.shapeRot || 0)*Math.PI/4, c = Math.cos(a), s = Math.sin(a); let dots = '';
+  for (let dy=-4; dy<=4; dy++) for (let dx=-4; dx<=4; dx++) { const u = dx*c + dy*s, v = -dx*s + dy*c; if (GSHAPES[k].f(u, v)) dots += `<circle cx="${dx + 4.5}" cy="${dy + 4.5}" r=".72"/>`; }
+  return `<svg viewBox="0 0 9 9" width="36" height="36" aria-hidden="true"><g fill="#86cc5c">${dots}</g><line x1="4.5" y1="4.6" x2="4.5" y2="2.2" stroke="#fff" stroke-width=".22"/><path d="M4.5 2.2 L6 2.7 L4.5 3.2z" fill="#e2483d"/></svg>`;
 }
 
 // ---------- clubhouse location ----------
@@ -3709,18 +3830,26 @@ function updateHint(){
   $('hint').textContent = h;
 }
 const TRAYS = {
-  upg:   { icon:'⬆️', name:'Upgrades', parent:'build', tools:[] },
-  greens:{ icon:'⛳', name:'Green shapes', parent:'build', tools:['gs_oval','gs_round','gs_kidney','gs_peanut','gs_star','gs_heart','gs_lshape'] },
-  fac:   { icon:'🏛️', name:'Facilities', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
-  build: { icon:'🏗️', name:'Build', tools:['hole','edit','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge','house'] },
-  land:  { icon:'🌳', name:'Landscape', tools:['fcut','deep','fescue','trees','shrubs','flowers','river','water','raise','lower','clear'] },
-  trees: { icon:'🌲', name:'Trees', parent:'land', tools:['tree_round','tree_pine','tree_autumn','tree_blossom','tree_willow','tree_palm','tree_cypress'] },
-  marks: { icon:'🗼', name:'Landmarks', parent:'land', tools:['f_windmill','f_lighthouse','f_gazebo','f_fountain','f_statue'] }
+  build:   { icon:'🏗️', name:'Build', cats:['holes','turf','bunkers','greens','fac','upg','buyland'], tools:[] },
+  holes:   { icon:'⛳', name:'Holes', parent:'build', sub:'Hole, edit, pins', tools:['hole','edit','dogleg','house'] },
+  turf:    { icon:'🟩', name:'Grass & paths', parent:'build', sub:'Fairway, green', tools:['fairway','green','path','bridge'] },
+  bunkers: { icon:'🏖️', name:'Bunkers', parent:'build', sub:'4 styles', tools:['sand','pot','gbunk','waste'] },
+  greens:  { icon:'🟢', name:'Green shapes', parent:'build', sub:'Kidney, oval…', tools:['gs_oval','gs_round','gs_kidney','gs_peanut','gs_star','gs_heart','gs_lshape'] },
+  fac:     { icon:'🏛️', name:'Facilities', parent:'build', sub:'Shops, range', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
+  upg:     { icon:'⬆️', name:'Upgrades', parent:'build', sub:'Facilities, gear', tools:[] },
+  land:    { icon:'🌳', name:'Landscape', cats:['rough','trees','plants','waterT','terrain','marks'], tools:['clear'] },
+  rough:   { icon:'🌾', name:'Rough', parent:'land', sub:'First cut, fescue', tools:['fcut','deep','fescue'] },
+  trees:   { icon:'🌲', name:'Trees', parent:'land', sub:'Pick a kind', tools:['trees','tree_round','tree_pine','tree_autumn','tree_blossom','tree_willow','tree_palm','tree_cypress'] },
+  plants:  { icon:'🌸', name:'Plants', parent:'land', sub:'Shrubs, flowers', tools:['shrubs','flowers'] },
+  waterT:  { icon:'💧', name:'Water', parent:'land', sub:'Creek, pond', tools:['river','water'] },
+  terrain: { icon:'⛰️', name:'Hills', parent:'land', sub:'Raise, lower', tools:['raise','lower'] },
+  marks:   { icon:'🗼', name:'Landmarks', parent:'land', sub:'Windmill, more', tools:['f_windmill','f_lighthouse','f_gazebo','f_fountain','f_statue'] }
 };
+const trayRoot = id => id && TRAYS[id] ? (TRAYS[id].parent || id) : null;
 function openTray(id){
   S.trayAnim = true;
   if (S.tray === id) return closeTray();
-  S.tray = id; if (!TRAYS[id].tools.includes(S.tool)) S.tool = TRAYS[id].tools[0] || 'move';
+  S.tray = id; if (TRAYS[id].cats) S.tool = 'move'; else if (!TRAYS[id].tools.includes(S.tool)) S.tool = TRAYS[id].tools[0] || 'move';
   if (S.tool !== 'hole') S.pendingTee = null; buildTools(); updateHint();
 }
 $('undoBtn').addEventListener('click', () => { undo(); updateUndo(); });
@@ -3738,23 +3867,24 @@ function buildTools(){
     const T0 = TRAYS[S.tray], tray = document.createElement('div'); tray.className = 'tray' + (S.trayAnim ? ' enter' : ''); S.trayAnim = false; nav.appendChild(tray);
     const add = (cls, html, fn, id) => { const b = document.createElement('button'); b.className = cls; if (id) b.id = id; b.innerHTML = html; b.addEventListener('click', fn); tray.appendChild(b); return b; };
     add('tool done', '<span class="ic">✓</span><span class="nm">Done</span><span class="pr">Close</span>', closeTray);
-    if (S.tray === 'fac') add('tool', '<span class="ic">🏗️</span><span class="nm">‹ Build</span><span class="pr">Back</span>', () => openTray('build'));
     if (T0.parent) add('tool', `<span class="ic">${TRAYS[T0.parent].icon}</span><span class="nm">‹ ${TRAYS[T0.parent].name}</span><span class="pr">Back</span>`, () => openTray(T0.parent));
-    if (S.tray === 'land') { add('tool', '<span class="ic">🌲</span><span class="nm">Trees ›</span><span class="pr">Pick a kind</span>', () => openTray('trees')); add('tool', '<span class="ic">🗼</span><span class="nm">Landmarks ›</span><span class="pr">Windmill, more</span>', () => openTray('marks')); }
+    if (T0.cats) for (const c of T0.cats) {
+      if (c === 'buyland') { add('tool cat', '<span class="ic">🗺️</span><span class="nm">Buy land</span><span class="pr">Expand</span>', openLand); continue; }
+      const C = TRAYS[c], nUp = c === 'upg' ? upgradesReady() : 0;
+      add('tool cat', `<span class="ic">${C.icon}</span><span class="nm">${C.name} ›</span><span class="pr">${nUp ? nUp + ' ready' : C.sub}</span>${nUp ? `<span class="tbadge">${nUp}</span>` : ''}`, () => openTray(c));
+    }
+    if (S.tray === 'holes') add('tool', '<span class="ic">🚩</span><span class="nm">All pins</span><span class="pr">Every green</span>', openPinsAll);
     for (const id of T0.tools) { if (isPar3() && (id === 'dogleg' || (TOOLS[id].fac && !PAR3_FAC.includes(TOOLS[id].fac) && FACS[TOOLS[id].fac].kind !== 'scenery'))) continue; const t = TOOLS[id].fac ? { ...FACS[TOOLS[id].fac], sw:null } : TOOLS[id];
-      add('tool' + (S.tool === id ? ' on' : ''), `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${t.req && S.course.stars < t.req ? '🔒 ' + t.req + '★' : fmt(t.cost)}</span>`,
+      add('tool' + (S.tool === id ? ' on' : ''), (t.gshape ? `<span class="ic shape">${shapeSVG(t.gshape)}</span>` : `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span>`) + `<span class="nm">${t.name}</span><span class="pr">${t.gshape ? fmt(t.cost) + ' a tile' : t.req && S.course.stars < t.req ? '🔒 ' + t.req + '★' : fmt(t.cost)}</span>`,
         () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; if (id !== 'edit') { S.editMove = null; editSel = -1; } buildTools(); updateHint(); }); }
     if (S.tray === 'greens') add('tool', `<span class="ic">↻</span><span class="nm">Rotate</span><span class="pr">${(S.shapeRot || 0)*45}°</span>`, () => { S.shapeRot = ((S.shapeRot || 0) + 1) % 8; buildTools(); });
     if (S.tray === 'upg') { const cards = upgradeCards(); for (const c of cards) { const b = add('tool' + (c.can ? '' : ' dim') + (c.max ? ' maxed' : ''), `<span class="ic">${c.ic}</span><span class="nm">${esc(c.nm)}</span><span class="pr">${c.pr}</span>`, () => useUpgradeCard(c)); } if (!cards.some(c => c.fi != null)) add('tool dim', '<span class="ic">🏛️</span><span class="nm">No facilities yet</span><span class="pr">Build some first</span>', () => openTray('fac')); }
-    if (S.tray === 'build') { const nUp = upgradesReady(); add('tool', `<span class="ic">⬆️</span><span class="nm">Upgrades ›</span><span class="pr">${nUp ? nUp + ' ready' : 'Facilities, gear'}</span>${nUp ? `<span class="tbadge">${nUp}</span>` : ''}`, () => openTray('upg'));
-      add('tool', '<span class="ic">⛳</span><span class="nm">Green shapes ›</span><span class="pr">Kidney, oval…</span>', () => openTray('greens'));
-      add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac')); add('tool', '<span class="ic">🗺️</span><span class="nm">Buy land</span><span class="pr">Expand</span>', openLand); }
     if (!['move','hole','dogleg','edit','house','upgrade'].includes(S.tool) && !TOOLS[S.tool].gshape && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
   }
   const dock = document.createElement('div'); dock.className = 'dock'; nav.appendChild(dock);
   const mk = (ic, nm, fn, on, extra) => { const b = document.createElement('button'); b.className = 'dockbtn' + (on ? ' on' : ''); b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>${extra || ''}`; b.addEventListener('click', fn); dock.appendChild(b); };
-  mk(TRAYS.build.icon, TRAYS.build.name, () => ['fac','upg','greens'].includes(S.tray) ? closeTray() : openTray('build'), ['build','fac','upg','greens'].includes(S.tray));
-  mk(TRAYS.land.icon, TRAYS.land.name, () => ['land','trees','marks'].includes(S.tray) ? closeTray() : openTray('land'), ['land','trees','marks'].includes(S.tray));
+  mk(TRAYS.build.icon, TRAYS.build.name, () => trayRoot(S.tray) === 'build' && S.tray !== 'build' ? openTray('build') : openTray('build'), trayRoot(S.tray) === 'build');
+  mk(TRAYS.land.icon, TRAYS.land.name, () => openTray('land'), trayRoot(S.tray) === 'land');
   mk('🏌️', 'Play', startRound);
   mk('🏆', 'Club', () => openClub(), false, `<span class="badge hidden" id="clubPr"></span>`);
   mk('📋', 'Golfers', () => openScores());
