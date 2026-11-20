@@ -303,6 +303,12 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .cupteams ol{padding-left:18px;margin:4px 0}
 .cupscore{display:flex;justify-content:space-between;font-size:1.15rem;font-weight:600;background:var(--chip);border-radius:12px;padding:10px 12px;margin:8px 0}
 .ev.tourev{border:2px solid var(--gold)}
+.landbar{position:absolute;left:8px;right:8px;bottom:8px;z-index:5;background:var(--panel);color:var(--ink);border-radius:14px;padding:12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.3);font-size:.9rem;line-height:1.35}
+#stage.landing .zoom{bottom:118px}
+.tool.dim{opacity:.55}
+.tool.maxed .pr{color:var(--brand);font-weight:700}
+.tool{position:relative}
+.tbadge{position:absolute;top:4px;right:6px;background:#e2483d;color:#fff;border-radius:999px;font-size:.66rem;font-weight:700;min-width:17px;height:17px;line-height:17px;padding:0 4px}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
@@ -325,7 +331,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <div class="windlbl" id="windLbl"></div>
   <button class="pbtn view" id="viewBtn" aria-label="Switch view">🗺️</button>
   <div class="pbar"><button class="pbtn" id="aimL" aria-label="Aim left">◀</button><div class="pclub"><button id="clubPrev" aria-label="Longer club">‹</button><span id="clubName">Driver</span><button id="clubNext" aria-label="Shorter club">›</button></div><button class="pbtn" id="aimR" aria-label="Aim right">▶</button><button class="pbtn swing" id="swingBtn">Swing</button></div>
-</div><button id="eventChip" class="hidden"></button><div id="toast" role="status" aria-live="polite"></div></main>
+</div><button id="eventChip" class="hidden"></button><div id="landBar" class="landbar hidden"><div id="landBarTxt"></div><div class="btns" style="margin-top:8px"><button class="btn" id="landBuy" disabled>Buy</button><button class="btn alt" id="landDone">Done</button></div></div><div id="toast" role="status" aria-live="polite"></div></main>
   <p id="hint"></p>
   <nav id="tools" aria-label="Build tools"></nav>
 </div>
@@ -477,7 +483,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
-const COLS = 50, ROWS = 62, BX0 = 8, BY0 = 8, BW = 34, BH = 46, YD = 25, DAY = 240, MAXG = 60;
+const COLS = 50, ROWS = 62, BX0 = 8, BY0 = 8, BW = 34, BH = 46, YD = 25, DAY = 400, MAXG = 60;
 const T = { ROUGH:0, FAIR:1, GREEN:2, TEE:3, SAND:4, WATER:5, TREES:6, HOUSE:7, FLOWERS:8, ROCK:9, NATIVE:10, PATH:11, POT:12, WASTE:13, GBUNK:14, FCUT:15, DEEP:16, FESCUE:17, SHRUB:18 };
 const SPEC = ['', 'round', 'pine', 'palm', 'blossom', 'willow', 'autumn', 'cypress'];
 const isBunker = t => t === T.SAND || t === T.POT || t === T.GBUNK || t === T.WASTE;
@@ -743,24 +749,6 @@ function drawOwnEdges(){
 }
 let warnedLand = false;
 function notOwned(){ if (!warnedLand) { warnedLand = true; toast('You don’t own that land yet. Buy it with 🏗️ Build → Buy land.'); setTimeout(() => { warnedLand = false; }, 3000); } }
-function openLand(){
-  let h = `<p class="small muted">Your property is the bright area inside the dashed gold line. Buy the land around it to build more holes. The land comes as it is, trees, ponds and all.</p>`;
-  for (const [k, p] of Object.entries(PARCELS)) {
-    const own = (S.parcels || []).includes(k), ocean = parcelOcean(k), price = parcelPrice(k);
-    h += `<div class="ev${own || ocean ? ' owned' : ''}"><div class="spread" style="margin:0"><h3>${p.name}</h3>` +
-      (own ? `<span class="small" style="color:var(--brand);font-weight:700">Owned ✓</span>` : ocean ? `<span class="small muted">Open water</span>` : `<button class="btn sm" data-land="${k}" ${S.money < price ? 'disabled' : ''}>Buy, ${fmt(price)}</button>`) +
-      `</div><p class="small muted" style="margin:4px 0 0">${p.w}×${p.h} tiles, about ${Math.round(p.w*YD)}×${Math.round(p.h*YD)} yards.</p></div>`;
-  }
-  $('landBody').innerHTML = h; $('land').classList.remove('hidden');
-}
-$('landBody').addEventListener('click', e => {
-  const b = e.target.closest('[data-land]'); if (!b || b.disabled) return; const k = b.dataset.land, price = parcelPrice(k);
-  if (S.money < price) return toast(`That land costs ${fmt(price)}.`);
-  if (!confirm(`Buy the ${PARCELS[k].name} for ${fmt(price)}?`)) return;
-  S.money -= price; book('land', -price); S.parcels = [...(S.parcels || []), k]; computeOwn(); terrainDirty = true; recompute(); saveGame();
-  toast(`You bought the ${PARCELS[k].name}! It’s ready to build on.`, 3500); openLand(); updateHUD();
-});
-$('landClose').addEventListener('click', () => $('land').classList.add('hidden'));
 
 // --- facility upgrades (levels 1-3) ---
 const FAC_EARN = [1, 1.6, 2.3], FAC_UPK = [1, 1.5, 2.2];
@@ -794,7 +782,7 @@ $('facEdBody').addEventListener('click', e => {
   if (!e.target.closest('[data-fu]')) return; const f = S.facilities[facSel]; if (!f) return; const cost = upCost(f);
   if (!cost || S.money < cost) return toast(`That upgrade costs ${fmt(cost)}.`);
   S.money -= cost; book('build', -cost); spend(cost); f.lv = facLvOf(f) + 1; terrainDirty = true; recompute(); saveGame();
-  toast(`${FACS[f.type].icon} ${FACS[f.type].name} upgraded to level ${f.lv}!`, 3000); openFacEd(facSel); updateHUD();
+  toast(`${FACS[f.type].icon} ${FACS[f.type].name} upgraded to level ${f.lv}!`, 3000); openFacEd(facSel); updateHUD(); if (S.tray === 'upg') buildTools();
 });
 $('facEdClose').addEventListener('click', () => { $('facEd').classList.add('hidden'); facSel = -1; });
 function facTapUpgrade(x, y){ const fi = FO[y*COLS+x]; if (fi >= 0 && S.facilities[fi]) openFacEd(fi); else toast('Tap one of your facilities to upgrade it.'); }
@@ -1239,13 +1227,15 @@ function makePerson(shirt, skin, hat, pants, look = {}){
   part(cart, 'box', '#f4f4ef', [0,.13,0], [.24,.12,.4]);
   part(cart, 'box', '#1f5c35', [0,.44,0], [.27,.02,.42]);
   for (const [x,z] of [[-.11,-.17],[.11,-.17],[-.11,.17],[.11,.17]]) { part(cart, 'cyl', '#2a2a2a', [x,.05,z], [.05,.03,.05], [0,0,Math.PI/2]); part(cart, 'cyl', '#d8d8d2', [x,.28,z], [.008,.3,.008]); }
-  part(cart, 'cyl', shirt, [0,.25,.02], [.055,.12,.045]);
-  part(cart, 'sphere', skin, [0,.35,.02], [.05,.054,.05]);
-  addHat(part, cart, look.hat || 'cap', hat, .35, .02);
+  const rider = new TH.Group(); rider.position.x = -.055; cart.add(rider);
+  part(rider, 'cyl', shirt, [0,.25,.02], [.05,.12,.042]);
+  part(rider, 'sphere', skin, [0,.35,.02], [.046,.05,.046]);
+  addHat(part, rider, look.hat || 'cap', hat, .35, .02);
+  const seat2 = new TH.Group(); seat2.position.x = .055; seat2.visible = false; cart.add(seat2);
   root.add(walker); root.add(cart); cart.visible = false; root.scale.setScalar(1.3);
   const ball = new TH.Mesh(GEO.sphere, mat('#ffffff')); ball.scale.setScalar(.032); ball.castShadow = true; ball.visible = false; scene.add(ball);
   scene.add(root);
-  return { root, walker, cart, legL, legR, club, ball, px:null, py:null, phase:0, head:0 };
+  return { root, walker, cart, seat2, seatFor:null, legL, legR, club, ball, px:null, py:null, phase:0, head:0 };
 }
 function placePerson(rec, x, y, opt){
   const gy = heightAt(x, y);
@@ -1258,6 +1248,14 @@ function placePerson(rec, x, y, opt){
   rec.club.visible = !!opt.swing; rec.club.rotation.z = opt.swingA || 0;
   rec.root.visible = true;
 }
+// Puts a group mate in the passenger seat of this golfer's cart.
+function setPassenger(rec, p){
+  const id = p ? p.id : null; rec.seat2.visible = !!p; if (rec.seatFor === id) return; rec.seatFor = id;
+  while (rec.seat2.children.length) rec.seat2.remove(rec.seat2.children[0]); if (!p) return;
+  const part = (grp, g, c, pos, sc) => { const m = new TH.Mesh(GEO[g], mat(c)); m.position.set(...pos); m.scale.set(...sc); m.castShadow = true; grp.add(m); return m; };
+  part(rec.seat2, 'cyl', p.color, [0,.25,.02], [.05,.12,.042]); part(rec.seat2, 'sphere', p.skin || SKIN[0], [0,.35,.02], [.046,.05,.046]);
+  addHat(part, rec.seat2, p.hatStyle || 'cap', p.hat || '#ffffff', .35, .02);
+}
 function placeBall(rec, show, x, y, z){
   rec.ball.visible = show; if (!show) return;
   rec.ball.position.set(W2(x), heightAt(x, y) + .032 + z, Z2(y));
@@ -1269,6 +1267,8 @@ function syncGolfers(){
     seen.add(g.id);
     let rec = people.get(g.id); if (!rec) { rec = makePerson(g.color, g.skin || SKIN[0], g.hat || '#ffffff', g.pants, { hat:g.hatStyle || 'cap', bottoms:g.bottoms || 'pants' }); people.set(g.id, rec); }
     if (!show) { rec.root.visible = false; rec.ball.visible = false; continue; }
+    if (g.inCart) { rec.root.visible = false; placeBall(rec, !g.leaving && !g.toTee, g.bx, g.by, 0); continue; }
+    setPassenger(rec, g.cart && g.passenger && g.passenger.inCart === g ? g.passenger : null);
     const h = S.holes[g.hole], face = g.state === 'address' && h ? Math.atan2(h.pin.x+.5 - g.bx, h.pin.y+.5 - g.by) : null;
     const follow = g.state === 'flight' && g.fl && g.fl.t < .45 && g.fl.apex > 0;
     let swingA = 0; if (g.state === 'practice') swingA = g.pf && (g.pf.type === 'range' || g.pf.type === 'putting') ? Math.sin(performance.now()/260 + g.id)*1.8 : 0; else if (g.state === 'address') { const k = 1 - clamp(g.t/.5, 0, 1); swingA = k < .6 ? lerp(0, -2.1, k/.6) : lerp(-2.1, 1.7, (k-.6)/.4); } else if (follow) swingA = 1.7;
@@ -1444,7 +1444,8 @@ function draw(now){
     ctx.setLineDash([]); for (const h of S.holes) if (h.bend) { ringWorld(h.bend.x+.5, h.bend.y+.5, .22); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fill(); }
     ctx.setLineDash([]);
   }
-  if (S.mode === 'build' && (S.tray || !$('land').classList.contains('hidden'))) drawOwnEdges();
+  if (S.mode === 'build' && (S.tray || S.landMode)) drawOwnEdges();
+  if (S.mode === 'build' && S.landMode) drawLand(now);
   if (S.mode === 'build' && S.tool === 'edit') S.holes.forEach((h, i) => { const sel = i === editSel || (S.editMove && S.editMove.hole === i); if (!sel) return; for (const p of [h.tee, h.pin]) { ringWorld(p.x+.5, p.y+.5, .7); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.stroke(); } });
   if (S.pendingTee) {
     const t = S.pendingTee, pulse = (Math.sin(now/180)+1)/2;
@@ -1527,17 +1528,24 @@ function stepGolfer(g, dt){
   if (g.thought) { g.thought.t -= dt; if (g.thought.t <= 0) g.thought = null; }
   g.quiet -= dt;
   if (g.cel > 0) g.cel -= dt;
+  if (g.state !== 'walk') g.inCart = null;
   if (g.pendingSay) { g.pendingSay.t -= dt; if (g.pendingSay.t <= 0) { say(g, g.pendingSay.text, true); g.pendingSay = null; } }
   if (!g.leaving && !g.practice && !S.holes[g.hole]) goHome(g);
   if (g.state === 'walk') {
     const sl = g.toTee ? (g.slot || 0) : 0, dtr = !g.leaving && g.detour, tx = g.leaving ? DOOR.x : dtr ? dtr.x : g.bx - .3 - sl*.24, ty = g.leaving ? DOOR.y : dtr ? dtr.y : g.by + .14 + sl*.12;
-    const riding = !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
-    const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 5.5 : 3.2)*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
+    const drv = g.grp && g.slot % 2 === 1 ? S.golfers.find(o => o.grp === g.grp && o.slot === g.slot - 1 && !o.done) : null;
+    g.inCart = null;
+    if (drv && (g.mid || g.rented) && drv.cart && drv.state === 'walk' && !!drv.leaving === !!g.leaving && Math.hypot(drv.x - g.x, drv.y - g.y) < 2) {
+      g.x = drv.x; g.y = drv.y; g.cart = false; g.inCart = drv; drv.passenger = g; return;
+    }
+    if (g.passenger && g.passenger.inCart !== g) g.passenger = null;
+    const riding = !drv && !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
+    const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 4.6 : 2.6)*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
     if (d <= step) { g.x = tx; g.y = ty;
       if (g.leaving) { g.done = true; finishRound(g); }
       else if (dtr && g.practice) { g.state = 'practice'; g.t = 7 + Math.random()*6; g.pf = dtr.f; g.detour = null; }
       else if (dtr) { g.detour = null; useFacility(g, dtr.f); }
-      else { g.state = 'address'; g.t = .9; g.atTee = g.toTee; g.toTee = false; }
+      else { g.state = 'address'; g.t = 1.2; g.atTee = g.toTee; g.toTee = false; }
     } else { g.x += dx/d*step; g.y += dy/d*step; }
   } else if (g.state === 'practice') {
     g.t -= dt; if (g.t <= 0) { practiceUse(g, g.pf); const nx = g.practice.shift(); if (nx) { const c = facCenter(nx); g.detour = { x:c.x + .1, y:c.y + FACS[nx.type].h/2 + .3, f:nx }; g.state = 'walk'; } else goHome(g); }
@@ -1553,7 +1561,7 @@ function swing(g){
   const px = h.pin.x+.5, py = h.pin.y+.5, lie = lieAt(g.bx, g.by), d = Math.hypot(px-g.bx, py-g.by);
   const putting = lie === T.GREEN || (d < 1.1 && !isBunker(lie) && lie !== T.WATER && lie !== T.TREES && lie !== T.DEEP && lie !== T.FESCUE);
   const res = putting ? putt(g, px, py, d) : fullShot(g, px, py, d, lie);
-  g.fl = { fx:g.bx, fy:g.by, tx:res.x, ty:res.y, t:0, T: putting ? .7 + Math.min(d,2)*.3 : .9 + res.len*.07, apex: putting ? 0 : Math.min(2.4, .4 + res.len*.13), res };
+  g.fl = { fx:g.bx, fy:g.by, tx:res.x, ty:res.y, t:0, T: putting ? .85 + Math.min(d,2)*.35 : 1.1 + res.len*.08, apex: putting ? 0 : Math.min(2.4, .4 + res.len*.13), res };
   g.state = 'flight'; g.strokes++;
 }
 // Golfer attributes: dr driving, ac accuracy, ch chipping, sd sand, rc recovery, pt putting (0.1-1.1)
@@ -1649,7 +1657,7 @@ function holeOut(g){
   const sc0 = (-diff)*(g.type === 'social' ? 4 : 7);
   g.sat += (sc0 < 0 ? sc0*(1.4 - .8*(g.patience ?? .5)) : sc0) + (h.info.q - 5.5)*1.6 + tz.d;
   const hd = (S.clock || 0) - (g.ht0 ?? 0); g.ht0 = S.clock || 0;
-  if (hd > 32 && (g.patience ?? .5) < .4) { g.sat -= 2; if (!tz.say) tz.say = 'This is taking forever.'; }
+  if (hd > 40 && (g.patience ?? .5) < .4) { g.sat -= 2; if (!tz.say) tz.say = 'This is taking forever.'; }
   if (g.mp) { (g.side === 'a' ? g.mp.ca : g.mp.cb).push(sc); if (g.mp.cup) cupCheckDecided(g.mp); }
   let text = sc === 1 ? pick(LINES.ace) : diff <= -2 ? pick(LINES.eagle) : diff === -1 ? pick(LINES.birdie) :
     diff === 0 ? (h.info.q >= 7.5 ? pick(LINES.parGreat) : Math.random() < .45 ? pick(LINES.par) : null) : diff === 1 ? (Math.random() < .45 ? pick(LINES.bogey) : null) : diff === 2 ? pick(LINES.double) : pick(LINES.worse);
@@ -1943,6 +1951,35 @@ function gearSection(){
   return h;
 }
 
+// --- Upgrades tray: every facility and equipment upgrade you can buy, as cards in Build ---
+function buyGear(k){
+  const G0 = GEAR[k], lv = gearLv(k), nx = G0.tiers[lv]; if (!nx) return false;
+  if (S.money < nx[0]) { toast(`That costs ${fmt(nx[0])}.`); return false; }
+  S.money -= nx[0]; book('build', -nx[0]); S.gear = { ...(S.gear || {}), [k]: lv + 1 };
+  toast(`${G0.icon} ${G0.name} ${lv ? 'upgraded' : 'bought'}! ${nx[1]}`, 3200); updateHUD(); return true;
+}
+function upgradeCards(){
+  const out = [], seen = {};
+  S.facilities.forEach((f, fi) => {
+    const F = FACS[f.type]; if (F.kind === 'scenery') return;
+    seen[f.type] = (seen[f.type] || 0) + 1;
+    const n = S.facilities.filter(x => x.type === f.type).length, lv = facLvOf(f), cost = upCost(f);
+    out.push({ ic:F.icon, nm: F.name + (n > 1 ? ` #${seen[f.type]}` : ''), pr: lv >= 3 ? 'Max level ✓' : `Lv ${lv}→${lv+1} · ${fmt(cost)}`, can: lv < 3 && S.money >= cost, max: lv >= 3, fi });
+  });
+  for (const [k, G0] of Object.entries(GEAR)) {
+    const lv = gearLv(k), nx = G0.tiers[lv];
+    out.push({ ic:G0.icon, nm:G0.name, pr: nx ? `${lv ? `Lv ${lv}→${lv+1}` : 'Buy'} · ${fmt(nx[0])}` : 'Owned ✓', can: !!nx && S.money >= nx[0], max: !nx, gear:k });
+  }
+  return out;
+}
+const upgradesReady = () => upgradeCards().filter(c => c.can).length;
+function useUpgradeCard(c){
+  if (c.fi != null) { const f = S.facilities[c.fi], ctr = facCenter(f); view.tx = W2(ctr.x); view.tz = Z2(ctr.y); clampCam(); openFacEd(c.fi); return; }
+  const G0 = GEAR[c.gear], lv = gearLv(c.gear), nx = G0.tiers[lv]; if (!nx) return toast(`${G0.icon} ${G0.name}: fully upgraded.`);
+  if (!confirm(`${G0.name}${lv ? ` level ${lv + 1}` : ''} for ${fmt(nx[0])}?\n\n${nx[1]}`)) return;
+  if (buyGear(c.gear)) buildTools();
+}
+
 // ---------- course rating breakdown ----------
 const RATING_CATS = [
   ['design','Hole design','Improve individual holes: fairway to land on, hazards near landing areas, a real green.'],
@@ -1974,8 +2011,8 @@ function courseRatings(){
   r.fairness = clamp(10 - avg(h => h.info.notes.reduce((a,t) => a + (PEN[t] || 0), 0))*1.5, 0, 10);
   r.greens = clamp(avg(h => Math.min(1, (h.info.gs || 0)/9))*4 + S.cond.greens/100*6, 0, 10);
   r.condition = condScore()/10;
-  const spH = S.paceLog && S.paceLog.length ? S.paceLog.reduce((a,b) => a+b, 0)/S.paceLog.length : 16;
-  r.paceMin = Math.round(spH*18*.86); r.pace = clamp(10 - (spH - 15)*.45, 0, 10);
+  const spH = S.paceLog && S.paceLog.length ? S.paceLog.reduce((a,b) => a+b, 0)/S.paceLog.length : 19.5;
+  r.paceMin = Math.round(spH*18*.72); r.pace = clamp(10 - (spH - 19)*.37, 0, 10);
   r.satisfaction = (S.recent.length ? S.recent.reduce((a,b) => a+b, 0)/S.recent.length : 50)/10;
   return r;
 }
@@ -2164,7 +2201,9 @@ function removeFacility(fi){
 function arriveExtras(g){
   if (!g || g.ep) return;
   const sp = g.spend ?? .5;
-  if (hasFac('carts') && S.hasPath && !g.mid && Math.random() < (g.type === 'senior' ? .85 : .2 + .35*sp + (staffN('cartie') ? .15 : 0) + .1*(typeLv('carts') - 1))) { g.rented = true; earnFac('carts', Math.round(15*earnMul('carts')), g); }
+  const pairDrv = g.grp && g.slot % 2 === 1 ? S.golfers.find(o => o.grp === g.grp && o.slot === g.slot - 1) : null;
+  if (pairDrv) { if (pairDrv.rented) g.rented = true; }
+  else if (hasFac('carts') && S.hasPath && !g.mid && Math.random() < (g.type === 'senior' ? .85 : .2 + .35*sp + (staffN('cartie') ? .15 : 0) + .1*(typeLv('carts') - 1))) { g.rented = true; earnFac('carts', Math.round(15*earnMul('carts')), g); }
   if (hasFac('range') && Math.random() < .3 + .35*sp + .1*(typeLv('range') - 1)) { const lv = typeLv('range'); earnFac('range', Math.round(8*earnMul('range')), g); g.bonus = { ...(g.bonus || {}), dr:.02*lv, ac:.03*lv }; g.sat += 1 + lv; }
   if (hasFac('putting') && Math.random() < .5 + .1*(typeLv('putting') - 1)) { const lv = typeLv('putting'); g.bonus = { ...(g.bonus || {}), pt:.04*lv, ch:.02*lv }; g.sat += lv; }
   if (hasFac('proshop') && Math.random() < .25 + .45*sp + .08*(typeLv('proshop') - 1)) { earnFac('shop', Math.round((10 + sp*50)*earnMul('proshop')), g); g.sat += 2; if (Math.random() < .3) say(g, 'Picked up a new glove.'); }
@@ -3140,7 +3179,7 @@ $('clubBody').addEventListener('click', e => {
     toast(`${S.pro.name} gave ${m.name} a ${name.toLowerCase()} lesson. +${LESSON_COINS} 🪙, +${fmt(LESSON_FEE)}.`, 2600); updateHUD();
   }
   else if (a === 'hireNeed') { const sh = crewShort(); for (let i=0; i<sh.grounds; i++) hireStaff('grounds'); for (let i=0; i<sh.greens; i++) hireStaff('greens'); toast(`Hired ${sh.grounds + sh.greens} crew. Your course will start recovering tomorrow.`); updateHUD(); }
-  else if (a === 'gear') { const k = b.dataset.k, G0 = GEAR[k], lv = gearLv(k), nx = G0.tiers[lv]; if (!nx) return; if (S.money < nx[0]) return toast(`That costs ${fmt(nx[0])}.`); S.money -= nx[0]; book('build', -nx[0]); S.gear = { ...(S.gear || {}), [k]: lv + 1 }; toast(`${G0.icon} ${G0.name} ${lv ? 'upgraded' : 'bought'}! ${nx[1]}`, 3200); updateHUD(); }
+  else if (a === 'gear') buyGear(b.dataset.k);
   else if (a === 'hire') { const st = hireStaff(b.dataset.role); toast(`${st.name} joined as ${ROLES[st.role].name}.`); }
   else if (a === 'fire') { const id = +b.dataset.sid, st = S.staff.find(x => x.id === id); if (st && confirm(`Let ${st.name} go?`)) S.staff = S.staff.filter(x => x.id !== id); }
   else if (a === 'water') { S.water = b.dataset.v; }
@@ -3390,6 +3429,7 @@ function endPtr(e, cancel){
   if (cancel) { P.drag = null; pend = null; return; }
   if (S.mode === 'play') { P.drag = null; return; }
   if (!pend) return;
+  if (S.landMode && pend.start && !pend.active && (pend.moved || 0) < 8) { const lt = tileAtScreen(pend.start); landTap(lt.x, lt.y); pend = null; return; }
   if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; } }
   if (pend.kind === 'tap') { if (S.tool === 'house') houseTap(pend.t.x, pend.t.y); else if (S.tool === 'upgrade') facTapUpgrade(pend.t.x, pend.t.y); else if (S.tool === 'edit') { const fi = FO[pend.t.y*COLS + pend.t.x]; if (fi >= 0 && S.facilities[fi] && !S.editMove) openFacEd(fi); else editTap(pend.t.x, pend.t.y); } else if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
   else if (pend.kind === 'paint' && !pend.active) { checkpoint(); paintAt(pend.t.x, pend.t.y); }
@@ -3510,6 +3550,7 @@ $('holeEdClose').addEventListener('click', () => { $('holeEd').classList.add('hi
 
 
 function updateHint(){
+  if (S.mode === 'build' && S.tray === 'upg') { $('hint').textContent = 'Upgrades you can buy. Tap a facility to see what its next level does, or tap equipment to buy it. Dimmed ones cost more than you have.'; return; }
   if (S.mode === 'play') {
     const hl = S.holes[P.hole]; if (!hl) { $('hint').textContent = ''; return; }
     const p = pinOf(), d = Math.hypot(p.x-P.bx, p.y-P.by), gr = onGreenP();
@@ -3539,7 +3580,8 @@ function updateHint(){
   $('hint').textContent = h;
 }
 const TRAYS = {
-  fac:   { icon:'🏛️', name:'Facilities', tools:['upgrade','f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
+  upg:   { icon:'⬆️', name:'Upgrades', parent:'build', tools:[] },
+  fac:   { icon:'🏛️', name:'Facilities', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
   build: { icon:'🏗️', name:'Build', tools:['hole','edit','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge','house'] },
   land:  { icon:'🌳', name:'Landscape', tools:['fcut','deep','fescue','trees','shrubs','flowers','river','water','raise','lower','clear'] },
   trees: { icon:'🌲', name:'Trees', parent:'land', tools:['tree_round','tree_pine','tree_autumn','tree_blossom','tree_willow','tree_palm','tree_cypress'] },
@@ -3548,7 +3590,7 @@ const TRAYS = {
 function openTray(id){
   S.trayAnim = true;
   if (S.tray === id) return closeTray();
-  S.tray = id; if (!TRAYS[id].tools.includes(S.tool)) S.tool = TRAYS[id].tools[0];
+  S.tray = id; if (!TRAYS[id].tools.includes(S.tool)) S.tool = TRAYS[id].tools[0] || 'move';
   if (S.tool !== 'hole') S.pendingTee = null; buildTools(); updateHint();
 }
 $('undoBtn').addEventListener('click', () => { undo(); updateUndo(); });
@@ -3572,12 +3614,14 @@ function buildTools(){
     for (const id of T0.tools) { if (isPar3() && (id === 'dogleg' || (TOOLS[id].fac && !PAR3_FAC.includes(TOOLS[id].fac) && FACS[TOOLS[id].fac].kind !== 'scenery'))) continue; const t = TOOLS[id].fac ? { ...FACS[TOOLS[id].fac], sw:null } : TOOLS[id];
       add('tool' + (S.tool === id ? ' on' : ''), `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${t.req && S.course.stars < t.req ? '🔒 ' + t.req + '★' : fmt(t.cost)}</span>`,
         () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; if (id !== 'edit') { S.editMove = null; editSel = -1; } buildTools(); updateHint(); }); }
-    if (S.tray === 'build') { add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac')); add('tool', '<span class="ic">🗺️</span><span class="nm">Buy land</span><span class="pr">Expand</span>', openLand); }
-    if (!['hole','dogleg','edit','house','upgrade'].includes(S.tool) && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
+    if (S.tray === 'upg') { const cards = upgradeCards(); for (const c of cards) { const b = add('tool' + (c.can ? '' : ' dim') + (c.max ? ' maxed' : ''), `<span class="ic">${c.ic}</span><span class="nm">${esc(c.nm)}</span><span class="pr">${c.pr}</span>`, () => useUpgradeCard(c)); } if (!cards.some(c => c.fi != null)) add('tool dim', '<span class="ic">🏛️</span><span class="nm">No facilities yet</span><span class="pr">Build some first</span>', () => openTray('fac')); }
+    if (S.tray === 'build') { const nUp = upgradesReady(); add('tool', `<span class="ic">⬆️</span><span class="nm">Upgrades ›</span><span class="pr">${nUp ? nUp + ' ready' : 'Facilities, gear'}</span>${nUp ? `<span class="tbadge">${nUp}</span>` : ''}`, () => openTray('upg'));
+      add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac')); add('tool', '<span class="ic">🗺️</span><span class="nm">Buy land</span><span class="pr">Expand</span>', openLand); }
+    if (!['move','hole','dogleg','edit','house','upgrade'].includes(S.tool) && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
   }
   const dock = document.createElement('div'); dock.className = 'dock'; nav.appendChild(dock);
   const mk = (ic, nm, fn, on, extra) => { const b = document.createElement('button'); b.className = 'dockbtn' + (on ? ' on' : ''); b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>${extra || ''}`; b.addEventListener('click', fn); dock.appendChild(b); };
-  mk(TRAYS.build.icon, TRAYS.build.name, () => S.tray === 'fac' ? closeTray() : openTray('build'), S.tray === 'build' || S.tray === 'fac');
+  mk(TRAYS.build.icon, TRAYS.build.name, () => ['fac','upg'].includes(S.tray) ? closeTray() : openTray('build'), ['build','fac','upg'].includes(S.tray));
   mk(TRAYS.land.icon, TRAYS.land.name, () => ['land','trees','marks'].includes(S.tray) ? closeTray() : openTray('land'), ['land','trees','marks'].includes(S.tray));
   mk('🏌️', 'Play', startRound);
   mk('🏆', 'Club', () => openClub(), false, `<span class="badge hidden" id="clubPr"></span>`);
@@ -3708,7 +3752,7 @@ function startLevel(i, cont){
     delete store.saves[i]; saveStore();
   }
   S.mode = 'build'; P.fl = null; P.drag = null; hist = []; future = []; curAct = null; S.event = null; S.setup = null; S.matches = []; S.matchSetup = null; S.follow = null; $('prof').classList.add('hidden'); scView = null; $('sc').classList.add('hidden'); $('round').classList.add('hidden'); $('club').classList.add('hidden'); $('evDone').classList.add('hidden');
-  clearAnimals(); S.cup = null; S.cupSetup = null; facSel = -1;
+  clearAnimals(); S.cup = null; S.cupSetup = null; facSel = -1; S.landMode = false; S.landSel = null; $('landBar').classList.add('hidden'); $('stage').classList.remove('landing');
   S.golfers = []; S.dayT = 0; S.spawnT = 2; S.speed = 0; S.pendingTee = null; S.tool = 'move'; S.tray = null; S.dayFees = 0; S.dayGolfers = 0;
   S.active = true; setDoor(); computeOwn(); syncTourOffer(); S.editMove = null; editSel = -1; recompute(); buildTools(); cam.ready = false; layout(); terrainDirty = true; updateSpeed(); updateHUD(); updateHint();
   planMembers();
@@ -3914,6 +3958,51 @@ function startFlow(){
 }
 $('signinBody').addEventListener('input', e => { if (e.target.id === 'sEmail') cloud.email = e.target.value; else if (e.target.id === 'sPass') cloud.pass = e.target.value; });
 $('signinBody').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'sPass') { const b = $('signinBody').querySelector('[data-cact=signIn]'); if (b) b.click(); } });
+
+// Buying land on the map: parcels for sale are highlighted with their name and price; tap one to pick it.
+function openLand(){
+  S.landMode = true; S.landSel = null; S.tray = null; S.tool = 'move'; S.pendingTee = null; S.follow = null; buildTools();
+  view.tx = 0; view.tz = 0; view.dist = view.fitDist*.95; clampCam();
+  renderLandBar(); $('landBar').classList.remove('hidden'); $('stage').classList.add('landing'); updateHint();
+}
+function closeLand(){ S.landMode = false; S.landSel = null; $('landBar').classList.add('hidden'); $('stage').classList.remove('landing'); resetView(); updateHint(); }
+function forSale(){ return Object.keys(PARCELS).filter(k => !(S.parcels || []).includes(k) && !parcelOcean(k)); }
+function renderLandBar(){
+  const k = S.landSel, p = k && PARCELS[k], price = k ? parcelPrice(k) : 0;
+  $('landBarTxt').innerHTML = !forSale().length ? 'You own all the land around your course.' : p
+    ? `<b>${p.name}</b> · ${p.w}×${p.h} tiles · <b>${fmt(price)}</b>${S.money < price ? ' <span style="color:#ff8a7a">(not enough cash)</span>' : ''}`
+    : 'Tap a <b>highlighted</b> area to see what it costs. Your course is inside the gold line.';
+  $('landBuy').disabled = !p || S.money < price; $('landBuy').textContent = p ? `Buy for ${fmt(price)}` : 'Buy';
+}
+function landTap(x, y){
+  const k = forSale().find(k => { const p = PARCELS[k]; return x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h; });
+  S.landSel = k || null; renderLandBar();
+  if (!k) toast(ownedAt(x, y) ? 'That’s already your land.' : 'That land isn’t for sale.');
+}
+function drawLand(now){
+  const pulse = .5 + .5*Math.sin(now/300);
+  for (const k of forSale()) {
+    const p = PARCELS[k], sel = k === S.landSel, pts = [];
+    const edge = (x0, y0, x1, y1) => { const n = Math.max(2, Math.ceil(Math.hypot(x1-x0, y1-y0)/2)); for (let i=0; i<n; i++) { const x = lerp(x0, x1, i/n), y = lerp(y0, y1, i/n); pts.push(proj(x, y, heightAt(clamp(x, 0, COLS-.01), clamp(y, 0, ROWS-.01)) + .05)); } };
+    edge(p.x, p.y, p.x + p.w, p.y); edge(p.x + p.w, p.y, p.x + p.w, p.y + p.h); edge(p.x + p.w, p.y + p.h, p.x, p.y + p.h); edge(p.x, p.y + p.h, p.x, p.y);
+    ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath();
+    ctx.fillStyle = sel ? `rgba(255,210,63,${.35 + .2*pulse})` : 'rgba(255,210,63,.16)'; ctx.fill();
+    ctx.strokeStyle = sel ? '#ffd23f' : 'rgba(255,210,63,.8)'; ctx.lineWidth = sel ? 3 : 1.5; ctx.stroke();
+    const cx = p.x + p.w/2, cy = p.y + p.h/2, c = proj(cx, cy, heightAt(cx, cy) + .1);
+    const t1 = p.name.replace(' strip', '').replace(' corner', ''), t2 = fmt(parcelPrice(k));
+    ctx.font = '700 12px Rubik, system-ui, sans-serif'; const w = Math.max(ctx.measureText(t1).width, ctx.measureText(t2).width) + 16;
+    rr(ctx, c.x - w/2, c.y - 19, w, 38, 10); ctx.fillStyle = sel ? '#ffd23f' : 'rgba(16,30,20,.86)'; ctx.fill();
+    ctx.fillStyle = sel ? '#17301f' : '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t1, c.x, c.y - 7);
+    ctx.font = '600 11px Rubik, system-ui, sans-serif'; ctx.fillText(t2, c.x, c.y + 8);
+  }
+}
+$('landBuy').addEventListener('click', () => {
+  const k = S.landSel; if (!k) return; const price = parcelPrice(k);
+  if (S.money < price) return toast(`That land costs ${fmt(price)}.`);
+  S.money -= price; book('land', -price); S.parcels = [...(S.parcels || []), k]; computeOwn(); terrainDirty = true; recompute(); saveGame();
+  toast(`You bought the ${PARCELS[k].name}! It’s ready to build on.`, 3500); S.landSel = null; renderLandBar(); updateHUD();
+});
+$('landDone').addEventListener('click', closeLand);
 
 // ---------- backup ----------
 $('openBackup').addEventListener('click', () => { $('backupText').value = JSON.stringify(store); $('backupMsg').textContent = ''; $('backup').classList.remove('hidden'); });
