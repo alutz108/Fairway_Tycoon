@@ -16,6 +16,7 @@ You are helping Andrew keep building **Fairways Tycoon**, a SimGolf-style golf c
 - After changes, check the script has no syntax errors and that the game still loads, builds holes, simulates golfers and runs play mode.
 
 ## Cloud saves
+- The app opens on a **sign-in screen** (email/password); after signing in, players land on the empire screen with their saved courses. Keep that flow. A small "Play without signing in" link stays for the Claude-hosted link and first runs without internet.
 - Firebase email/password login with Firestore saves (`saves/{uid}` = the whole save store as JSON). Works in the GitHub home-screen version only; the Claude artifact blocks outside connections. The Firebase project is `fairway-tycoon`; its web config is built into `FB_CONFIG` (keep it there) and never weaken the Firestore rules in the README.
 
 ## Names and real-world content
@@ -24,7 +25,7 @@ You are helping Andrew keep building **Fairways Tycoon**, a SimGolf-style golf c
 
 ## GitHub version
 - He hosts the game on GitHub Pages as an installable home-screen app (files: index.html, sw.js, manifest.webmanifest, icons/, vendor/three.min.js + license, README.md). In the GitHub index.html, three.js loads from `vendor/three.min.js` with a cdnjs fallback if that file is missing, plus the PWA head tags and service-worker registration.
-- When the game changes, also produce an updated GitHub package and bump `VERSION` in sw.js (currently `fairway-v23`; next is `fairway-v24`). Remind him which files to upload.
+- When the game changes, also produce an updated GitHub package and bump `VERSION` in sw.js (currently `fairway-v25`; next is `fairway-v26`). Remind him which files to upload.
 
 ## Roadmap
 The original 7-step roadmap is complete. Follow the ideas list in FAIRWAY_TYCOON_DESIGN.md or what Andrew asks for next.
