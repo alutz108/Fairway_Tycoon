@@ -347,6 +347,9 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .mavf{position:relative;flex:0 0 auto}
 .fflag{position:absolute;right:-4px;bottom:-4px;font-size:.8rem;line-height:1;background:var(--panel);border-radius:6px;padding:1px 2px}
 .profface{display:inline-block;margin-right:10px;vertical-align:top}
+#prof .phead{position:sticky;top:-20px;z-index:3;background:var(--panel);margin:-20px -20px 0;padding:20px 20px 10px;border-bottom:1px solid var(--line)}
+.fopt{margin:10px 0 0}
+.fopt .chips{margin-top:4px}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}.fc-eyes{animation:none}}
 </style>
 </head>
@@ -3342,20 +3345,28 @@ function stepBoards(dt){ if (!scoreboards.length) return; boardT -= dt; if (boar
 const FACE_HAIR = ['#1d1b1a','#4a2f1d','#7a5230','#c99a52','#e3c27e','#a5432a'], FACE_GRAY = ['#9a9a9a','#e6e2da','#bdb8ae'];
 const FACE_BG = ['#e6f1fb','#eaf3de','#faeeda','#fbeaf0','#eeedfe','#e1f5ee','#f1efe8'];
 const faceCache = new Map();
-function nameSeed(s){ let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-function faceSVG(p, px = 40, moodOver){
-  const sat = p.sat ?? 60, mood = moodOver ?? (sat >= 65 ? 1 : sat < 45 ? -1 : 0);
-  const shirt = p.shirt || p.color || '#2f6fd6', hatS = p.hatStyle || 'none', hatC = p.hatColor || p.hat || '#1f2a44';
-  const key = [p.name, p.skin, shirt, hatS, hatC, p.type, mood, px].join('|'); if (faceCache.has(key)) return faceCache.get(key);
+const FACE_SHAPES = [[30,36],[32,34],[29,38],[33,35]];
+// The recipe for a face: picked from the player's name, then any parts they chose themselves (p.face) win.
+function faceParts(p, hatS = p.hatStyle || 'none'){
   const r = rng(nameSeed(p.name || 'Golfer')), pk = a => a[Math.floor(r()*a.length)];
-  const old = p.type === 'senior' || r() < .18, skin = p.skin || pk(SKIN);
+  const old = p.type === 'senior' || r() < .18;
   let hs = pk(['short','side','curly','long','pony','bald','buzz','short','side']); if (old && r() < .35) hs = 'bald';
-  const f = { skin, hair: old ? pk(FACE_GRAY) : pk(FACE_HAIR), shape: pk([[30,36],[32,34],[29,38],[33,35]]), brow: 1.6 + r()*1.4, eye: pk(['dot','almond','wide']), nose: pk([0,1,2]),
+  const f = { old, skin: p.skin || pk(SKIN), hs, hair: old ? pk(FACE_GRAY) : pk(FACE_HAIR), shape: Math.floor(r()*4), brow: 1.6 + r()*1.4, eye: pk(['dot','almond','wide']), nose: pk([0,1,2]),
     beard: r() < .3 ? pk(['stache','beard','goatee','stubble']) : 'none', glasses: r() < .25 ? pk(['round','square']) : 'none', freck: r() < .18, bg: pk(FACE_BG) };
   if (hatS === 'visor' || hatS === 'none') { if (r() < .25 && f.glasses === 'none') f.glasses = 'sun'; }
-  if (hatS !== 'none' && hs === 'long' && r() < .5) hs = 'pony';
+  if (hatS !== 'none' && f.hs === 'long' && r() < .5) f.hs = 'pony';
+  if (p.face) for (const k in p.face) if (k !== 'mood' && p.face[k] != null) f[k] = p.face[k];
+  return f;
+}
+function nameSeed(s){ let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function faceSVG(p, px = 40, moodOver){
+  const sat = p.sat ?? 60; let mood = moodOver ?? (sat >= 65 ? 1 : sat < 45 ? -1 : 0);
+  const shirt = p.shirt || p.color || '#2f6fd6', hatS = p.hatStyle || 'none', hatC = p.hatColor || p.hat || '#1f2a44';
+  const key = [p.name, p.skin, shirt, hatS, hatC, p.type, mood, px, p.face ? JSON.stringify(p.face) : ''].join('|'); if (faceCache.has(key)) return faceCache.get(key);
+  const f = faceParts(p, hatS), old = f.old, skin = f.skin, hs = f.hs;
+  if (p.face && p.face.mood != null) mood = p.face.mood;
   const st = '#151515', sw = 2.3, P = (d, fill, extra = '') => `<path d="${d}" fill="${fill}" stroke="${st}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
-  const [rx, ry] = f.shape, cx = 60, cy = 66, top = cy - ry;
+  const [rx, ry] = FACE_SHAPES[f.shape], cx = 60, cy = 66, top = cy - ry;
   let o = `<rect x="0" y="0" width="120" height="140" fill="${f.bg}"/>`;
   o += P(`M14 140 Q20 108 60 104 Q100 108 106 140Z`, shirt) + P(`M47 104 L60 119 L73 104`, '#ffffff');
   if (hs === 'long' || hs === 'pony') o += P(`M${cx-rx-3} ${cy-8} Q${cx-rx-8} ${cy+30} ${cx-rx+4} ${cy+38} L${cx+rx-4} ${cy+38} Q${cx+rx+8} ${cy+30} ${cx+rx+3} ${cy-8}Z`, f.hair);
@@ -3395,7 +3406,48 @@ const memberFace = (m, px) => faceSVG({ name:m.name, skin:m.skin, shirt:m.shirt 
 const golferFace = (g, px) => faceSVG({ name:g.name || 'Guest ' + g.id, skin:g.skin, color:g.color, hatStyle:g.hatStyle, hat:g.hat, type:g.type, sat:g.sat }, px);
 const nameFace = (name, px, extra) => faceSVG({ name, ...(extra || {}) }, px);
 
-const proFace = px => faceSVG({ name:S.pro.name, skin:S.pro.skin, shirt:S.pro.shirt, hatStyle:S.pro.hatStyle || 'cap', hatColor:S.pro.hatColor || '#1f5c35', type:'grinder', sat:75 }, px);
+const proFaceIn = () => ({ name:S.pro.name, skin:S.pro.skin, shirt:S.pro.shirt, hatStyle:S.pro.hatStyle || 'cap', hatColor:S.pro.hatColor || '#1f5c35', type:'grinder', sat:75, face:S.pro.face });
+const proFace = px => faceSVG(proFaceIn(), px);
+// ---------- build your pro's face ----------
+const FACE_OPTS = [
+  ['skin', 'Skin tone', 'sw', SKIN],
+  ['shape', 'Face shape', 'chip', [[0,'Oval'],[1,'Round'],[2,'Long'],[3,'Wide']]],
+  ['hs', 'Hair', 'chip', [['short','Short'],['side','Side part'],['buzz','Buzz cut'],['curly','Curly'],['long','Long'],['pony','Ponytail'],['bald','Bald']]],
+  ['hair', 'Hair color', 'sw', FACE_HAIR.concat(FACE_GRAY)],
+  ['eye', 'Eyes', 'chip', [['dot','Dots'],['almond','Almond'],['wide','Wide']]],
+  ['brow', 'Eyebrows', 'chip', [[1.6,'Thin'],[2.3,'Medium'],[3,'Bushy']]],
+  ['nose', 'Nose', 'chip', [[0,'Curved'],[1,'Pointed'],[2,'Button']]],
+  ['beard', 'Facial hair', 'chip', [['none','None'],['stache','Mustache'],['beard','Beard'],['goatee','Goatee'],['stubble','Stubble']]],
+  ['glasses', 'Glasses', 'chip', [['none','None'],['round','Round'],['square','Square'],['sun','Sunglasses']]],
+  ['mood', 'Expression', 'chip', [[1,'😀 Smile'],[0,'😐 Calm'],[-1,'😠 Game face']]],
+  ['freck', 'Freckles', 'chip', [[false,'No'],[true,'Yes']]],
+  ['old', 'Smile lines', 'chip', [[false,'No'],[true,'Yes']]],
+  ['bg', 'Background', 'sw', FACE_BG]
+];
+function faceEditorHtml(){
+  const cur = faceParts(proFaceIn()), mood = S.pro.face && S.pro.face.mood != null ? S.pro.face.mood : 1;
+  let h = `<h3 class="sec">🎨 Your face</h3><p class="small muted">Build your pro’s sketch. It shows up everywhere your pro does.</p><div class="btns" style="margin:4px 0 6px"><button class="btn alt sm" data-face-rand="1">🎲 Surprise me</button>${S.pro.face ? '<button class="btn alt sm" data-face-reset="1">↺ Start over</button>' : ''}</div>`;
+  for (const [k, label, kind, opts] of FACE_OPTS) {
+    const val = k === 'mood' ? mood : cur[k];
+    h += `<div class="fopt"><span class="small"><b>${label}</b></span><div class="chips">` + opts.map(o => {
+      const v = Array.isArray(o) ? o[0] : o, on = String(v) === String(val);
+      return kind === 'sw' ? `<button class="sw${on ? ' on' : ''}" data-fk="${k}" data-fv="${v}" style="background:${v}" aria-label="${label}"></button>`
+        : `<button class="chip${on ? ' on' : ''}" data-fk="${k}" data-fv="${v}">${o[1]}</button>`;
+    }).join('') + `</div></div>`;
+  }
+  return h;
+}
+function setFacePart(k, raw){
+  const v = raw === 'true' ? true : raw === 'false' ? false : /^-?\d+(\.\d+)?$/.test(raw) ? +raw : raw;
+  S.pro.face = { ...(S.pro.face || {}), [k]: v };
+  if (k === 'skin') S.pro.skin = v;
+}
+function randomFace(){
+  const pk = a => a[Math.floor(Math.random()*a.length)], val = o => Array.isArray(o) ? o[0] : o;
+  const f = {}; for (const [k, , , opts] of FACE_OPTS) f[k] = val(pk(opts));
+  if (Math.random() < .55) f.beard = 'none'; if (Math.random() < .6) f.glasses = 'none'; f.mood = 1;
+  S.pro.face = f; S.pro.skin = f.skin;
+}
 // Face for an event/tour/cup player: their member face, your pro's face, or one built from their name.
 function playerFace(p, px){
   if (!p) return '';
@@ -3767,6 +3819,7 @@ function renderProfile(){
   $('profRemove').classList.toggle('hidden', pro);
   let h = `<h3 class="sec">Nationality</h3><div class="chips">` + [''].concat(COUNTRIES.map(c => c.code)).map(code =>
     `<button class="chip${code ? ' flag' : ''}${m.country === code ? ' on' : ''}" data-ctry="${code}" aria-label="${code ? CTRY[code].name : 'No country'}">${code ? flagTxt(code) : 'None'}</button>`).join('') + '</div>';
+  if (pro) h += faceEditorHtml();
   const cap = pro ? 1.1 : 1;
   if (!pro) { const T = TYPES[m.type];
     h += `<p class="small muted" style="margin:8px 0 0">Traits: <b>${traitTxt(m)}</b></p>`;
@@ -3797,6 +3850,13 @@ $('profBody').addEventListener('input', e => {
   m[el.dataset.ab] = +el.value/100; m.skill = avgSkill(m); $('abv-' + el.dataset.ab).textContent = el.value; profSub(m);
 });
 $('profBody').addEventListener('change', () => saveGame());
+$('profBody').addEventListener('click', e => {
+  const fb = e.target.closest('[data-fk],[data-face-rand],[data-face-reset]');
+  if (fb && isProProfile()) {
+    if (fb.dataset.faceRand) randomFace(); else if (fb.dataset.faceReset) delete S.pro.face; else setFacePart(fb.dataset.fk, fb.dataset.fv);
+    const card = $('prof').querySelector('.card'), st = card.scrollTop; renderProfile(); card.scrollTop = st; saveGame(); return;
+  }
+});
 $('profBody').addEventListener('click', e => {
   const b = e.target.closest('button'), m = curM(); if (!b || !m || b.disabled) return;
   if (b.dataset.ctry != null) m.country = b.dataset.ctry;
