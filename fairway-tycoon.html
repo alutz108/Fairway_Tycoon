@@ -338,7 +338,16 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .sc-dbl{color:#2f6fd6;border:2px solid #2f6fd6;border-radius:3px;box-shadow:0 0 0 2px var(--panel),0 0 0 4px #2f6fd6}
 .cmp{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.84rem;margin:4px 0 8px}
 @media (orientation: landscape) and (max-height: 520px){.livescore{top:64px}}
-@media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
+.face{display:inline-block;border-radius:50%;overflow:hidden;flex:0 0 auto;vertical-align:middle;box-shadow:0 0 0 1.5px var(--line)}
+.face svg{display:block}
+.fc-eyes{animation:fc-blink 5s infinite;transform-origin:50% 50%;transform-box:fill-box}
+@keyframes fc-blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.withface{white-space:nowrap}
+.withface .face{margin-right:6px}
+.mavf{position:relative;flex:0 0 auto}
+.fflag{position:absolute;right:-4px;bottom:-4px;font-size:.8rem;line-height:1;background:var(--panel);border-radius:6px;padding:1px 2px}
+.profface{display:inline-block;margin-right:10px;vertical-align:top}
+@media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}.fc-eyes{animation:none}}
 </style>
 </head>
 <body>
@@ -1889,7 +1898,7 @@ function feedbackHtml(){
   if (R.length) { const avg = R.reduce((a,r) => a + r.stars, 0)/R.length; h += `<div class="recbox"><span class="small muted">Average review</span><b>${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))} ${avg.toFixed(1)}</b><span class="small">from the last ${R.length} golfers</span></div>`; }
   h += `<h3 class="sec">👎 Top complaints this week</h3>` + (neg.length ? neg.map(r => row(r, '#e2483d')).join('') : '<p class="small muted">No complaints lately.</p>');
   h += `<h3 class="sec">👍 What they love</h3>` + (pos.length ? pos.map(r => row(r, '#4fbf5a')).join('') : '<p class="small muted">Nothing yet. Scenery, great holes and good facilities get noticed.</p>');
-  h += `<h3 class="sec">💬 Recent reviews</h3>` + (R.length ? R.slice(0, 15).map(r => `<div class="review"><div class="spread" style="margin:0"><b>${esc(r.name)}</b><span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span></div><p style="margin:3px 0">“${esc(r.quote)}”</p><span class="small muted">${esc(r.kind)}${r.score ? ', shot ' + esc(r.score) : ''}, day ${r.day}</span></div>`).join('') : '<p class="small muted">Golfers leave a review when they finish their round.</p>');
+  h += `<h3 class="sec">💬 Recent reviews</h3>` + (R.length ? R.slice(0, 15).map(r => `<div class="review"><div class="spread" style="margin:0"><b class="withface">${nameFace(r.name, 30, { sat: r.stars*20 - 5 })} ${esc(r.name)}</b><span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span></div><p style="margin:3px 0">“${esc(r.quote)}”</p><span class="small muted">${esc(r.kind)}${r.score ? ', shot ' + esc(r.score) : ''}, day ${r.day}</span></div>`).join('') : '<p class="small muted">Golfers leave a review when they finish their round.</p>');
   return h;
 }
 
@@ -2936,7 +2945,7 @@ function cupsHtml(){
 function cupLiveHtml(){
   const c = S.cup;
   return `<h3 style="margin:4px 0">${esc(c.name)} (live)</h3><div class="cupscore"><span style="color:${TEAM_COL[0]}">${esc(c.teams[0])} <b>${ptsTxt(c.pts[0])}</b></span><span style="color:${TEAM_COL[1]}"><b>${ptsTxt(c.pts[1])}</b> ${esc(c.teams[1])}</span></div>` +
-    `<table><tbody>${c.matches.map(mt => `<tr><td style="color:${TEAM_COL[0]}">${esc(mt.pa.name)}</td><td class="small">${esc(cupMatchText(mt))}</td><td style="color:${TEAM_COL[1]}">${esc(mt.pb.name)}</td></tr>`).join('')}</tbody></table>`;
+    `<table><tbody>${c.matches.map(mt => `<tr><td class="withface" style="color:${TEAM_COL[0]}">${playerFace(mt.pa, 22)}${esc(mt.pa.name)}</td><td class="small">${esc(cupMatchText(mt))}</td><td class="withface" style="color:${TEAM_COL[1]}">${playerFace(mt.pb, 22)}${esc(mt.pb.name)}</td></tr>`).join('')}</tbody></table>`;
 }
 
 // --- members' practice visits: range, putting green, shop, food; no round ---
@@ -3037,7 +3046,7 @@ function tourHtml(){
   h += `<p class="small muted" style="margin:6px 0">Open a course on the schedule and host its event from 🏆 Club → Events.</p>`;
   h += `<table><thead><tr><th>Event</th><th>Winner</th></tr></thead><tbody>${t.sched.map(e => { const sv = store.saves[e.course]; return `<tr><td>${esc((sv && sv.clubName) || LEVELS[e.course].name)} Classic</td><td class="small">${e.done ? `🏆 ${esc(e.winner)} (${esc(e.score)})` : '<span class="muted">Not played yet</span>'}</td></tr>`; }).join('')}</tbody></table>`;
   const top = t.players.slice().sort((a, b) => b.pts - a.pts).slice(0, 10);
-  h += `<h3 class="sec">Season standings</h3><table><thead><tr><th>#</th><th>Player</th><th>Points</th><th>Wins</th></tr></thead><tbody>${top.map((p, i) => `<tr${p.id === 'pro' ? ' class="cur"' : ''}><td>${i + 1}</td><td>${p.id === 'pro' ? '🏌️ ' : ''}${esc((p.country ? flagTxt(p.country) + ' ' : '') + p.name)}</td><td>${p.pts}</td><td>${p.wins || 0}</td></tr>`).join('')}</tbody></table>`;
+  h += `<h3 class="sec">Season standings</h3><table><thead><tr><th>#</th><th>Player</th><th>Points</th><th>Wins</th></tr></thead><tbody>${top.map((p, i) => `<tr${p.id === 'pro' ? ' class="cur"' : ''}><td>${i + 1}</td><td class="withface">${playerFace(p, 22)}${p.id === 'pro' ? '🏌️ ' : ''}${esc((p.country ? flagTxt(p.country) + ' ' : '') + p.name)}</td><td>${p.pts}</td><td>${p.wins || 0}</td></tr>`).join('')}</tbody></table>`;
   if (t.history.length) h += `<h3 class="sec">Tour champions</h3>` + t.history.map(r => `<p class="small" style="margin:3px 0">Season ${r.season} (${TOUR_TIERS[r.tier].name}): 🏆 ${esc(r.champion)}, ${r.pts} pts</p>`).join('');
   return h;
 }
@@ -3329,6 +3338,71 @@ function drawBoard(sb){
 }
 function stepBoards(dt){ if (!scoreboards.length) return; boardT -= dt; if (boardT > 0) return; boardT = 1; for (const sb of scoreboards) drawBoard(sb); }
 
+// ---------- golfer portraits: a sketched face for every player, built from their name ----------
+const FACE_HAIR = ['#1d1b1a','#4a2f1d','#7a5230','#c99a52','#e3c27e','#a5432a'], FACE_GRAY = ['#9a9a9a','#e6e2da','#bdb8ae'];
+const FACE_BG = ['#e6f1fb','#eaf3de','#faeeda','#fbeaf0','#eeedfe','#e1f5ee','#f1efe8'];
+const faceCache = new Map();
+function nameSeed(s){ let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function faceSVG(p, px = 40, moodOver){
+  const sat = p.sat ?? 60, mood = moodOver ?? (sat >= 65 ? 1 : sat < 45 ? -1 : 0);
+  const shirt = p.shirt || p.color || '#2f6fd6', hatS = p.hatStyle || 'none', hatC = p.hatColor || p.hat || '#1f2a44';
+  const key = [p.name, p.skin, shirt, hatS, hatC, p.type, mood, px].join('|'); if (faceCache.has(key)) return faceCache.get(key);
+  const r = rng(nameSeed(p.name || 'Golfer')), pk = a => a[Math.floor(r()*a.length)];
+  const old = p.type === 'senior' || r() < .18, skin = p.skin || pk(SKIN);
+  let hs = pk(['short','side','curly','long','pony','bald','buzz','short','side']); if (old && r() < .35) hs = 'bald';
+  const f = { skin, hair: old ? pk(FACE_GRAY) : pk(FACE_HAIR), shape: pk([[30,36],[32,34],[29,38],[33,35]]), brow: 1.6 + r()*1.4, eye: pk(['dot','almond','wide']), nose: pk([0,1,2]),
+    beard: r() < .3 ? pk(['stache','beard','goatee','stubble']) : 'none', glasses: r() < .25 ? pk(['round','square']) : 'none', freck: r() < .18, bg: pk(FACE_BG) };
+  if (hatS === 'visor' || hatS === 'none') { if (r() < .25 && f.glasses === 'none') f.glasses = 'sun'; }
+  if (hatS !== 'none' && hs === 'long' && r() < .5) hs = 'pony';
+  const st = '#151515', sw = 2.3, P = (d, fill, extra = '') => `<path d="${d}" fill="${fill}" stroke="${st}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+  const [rx, ry] = f.shape, cx = 60, cy = 66, top = cy - ry;
+  let o = `<rect x="0" y="0" width="120" height="140" fill="${f.bg}"/>`;
+  o += P(`M14 140 Q20 108 60 104 Q100 108 106 140Z`, shirt) + P(`M47 104 L60 119 L73 104`, '#ffffff');
+  if (hs === 'long' || hs === 'pony') o += P(`M${cx-rx-3} ${cy-8} Q${cx-rx-8} ${cy+30} ${cx-rx+4} ${cy+38} L${cx+rx-4} ${cy+38} Q${cx+rx+8} ${cy+30} ${cx+rx+3} ${cy-8}Z`, f.hair);
+  o += P(`M${cx-6} ${cy+ry-6} L${cx-7} ${cy+ry+8} L${cx+7} ${cy+ry+8} L${cx+6} ${cy+ry-6}Z`, skin);
+  o += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${skin}" stroke="${st}" stroke-width="${sw}"/>`;
+  for (const s of [-1, 1]) o += `<ellipse cx="${cx + s*rx}" cy="${cy+2}" rx="4" ry="7" fill="${skin}" stroke="${st}" stroke-width="${sw}"/>`;
+  if (hs === 'short' || hs === 'buzz') o += P(`M${cx-rx+1} ${cy-6} Q${cx-rx} ${top-4} ${cx} ${top-6} Q${cx+rx} ${top-4} ${cx+rx-1} ${cy-6} Q${cx+8} ${top+8} ${cx-rx+1} ${cy-6}Z`, f.hair);
+  if (hs === 'side') o += P(`M${cx-rx+1} ${cy-4} Q${cx-rx-2} ${top-6} ${cx+4} ${top-7} Q${cx+rx+3} ${top-2} ${cx+rx-1} ${cy-6} Q${cx+rx-12} ${top+4} ${cx-6} ${top+10} Q${cx-rx+6} ${top+12} ${cx-rx+1} ${cy-4}Z`, f.hair);
+  if (hs === 'curly') for (let k=0; k<9; k++) { const a = Math.PI*(1.05 + k*.11); o += `<circle cx="${cx + Math.cos(a)*(rx-2)}" cy="${cy - 4 + Math.sin(a)*(ry-1)}" r="8" fill="${f.hair}" stroke="${st}" stroke-width="${sw*.8}"/>`; }
+  if (hs === 'long' || hs === 'pony') o += P(`M${cx-rx} ${cy-2} Q${cx-rx} ${top-6} ${cx} ${top-6} Q${cx+rx} ${top-6} ${cx+rx} ${cy-2} Q${cx} ${top+6} ${cx-rx} ${cy-2}Z`, f.hair);
+  if (hs === 'bald' && old) o += P(`M${cx-rx+1} ${cy+2} Q${cx-rx-1} ${cy-12} ${cx-rx+6} ${cy-16}`, 'none') + P(`M${cx+rx-1} ${cy+2} Q${cx+rx+1} ${cy-12} ${cx+rx-6} ${cy-16}`, 'none');
+  if (hatS === 'cap' || hatS === 'back') { o += P(`M${cx-rx-2} ${cy-10} Q${cx} ${top-14} ${cx+rx+2} ${cy-10}Z`, hatC); o += hatS === 'cap' ? P(`M${cx-rx-2} ${cy-10} Q${cx-rx-4} ${cy-3} ${cx+rx+16} ${cy-6} L${cx+rx+2} ${cy-10}Z`, hatC) : P(`M${cx-rx-14} ${cy-12} L${cx-rx+4} ${cy-11} L${cx-rx} ${cy-6}Z`, hatC); }
+  if (hatS === 'visor') { o += P(`M${cx-rx-1} ${cy-12} L${cx+rx+1} ${cy-12} L${cx+rx+1} ${cy-7} L${cx-rx-1} ${cy-7}Z`, hatC); o += P(`M${cx-rx} ${cy-7} Q${cx} ${cy-2} ${cx+rx+12} ${cy-6} L${cx+rx} ${cy-9}Z`, hatC); }
+  if (hatS === 'bucket') { o += P(`M${cx-rx+3} ${cy-8} Q${cx-rx+2} ${top-12} ${cx} ${top-12} Q${cx+rx-2} ${top-12} ${cx+rx-3} ${cy-8}Z`, hatC); o += P(`M${cx-rx-12} ${cy-4} Q${cx} ${cy-14} ${cx+rx+12} ${cy-4} Q${cx} ${cy-9} ${cx-rx-12} ${cy-4}Z`, hatC); }
+  const ey = cy + 2, ex = 12;
+  o += P(`M${cx-ex-7} ${ey-9+(mood<0?2:0)} Q${cx-ex} ${ey-12-(mood>0?1:0)} ${cx-ex+7} ${ey-9-(mood<0?2:0)}`, 'none', `stroke-width="${f.brow}"`) + P(`M${cx+ex-7} ${ey-9-(mood<0?2:0)} Q${cx+ex} ${ey-12-(mood>0?1:0)} ${cx+ex+7} ${ey-9+(mood<0?2:0)}`, 'none', `stroke-width="${f.brow}"`);
+  o += `<g class="fc-eyes">`;
+  for (const s of [-1, 1]) { const x = cx + s*ex; o += f.eye === 'dot' ? `<circle cx="${x}" cy="${ey}" r="2.6" fill="${st}"/>` : f.eye === 'almond' ? `<path d="M${x-5} ${ey} Q${x} ${ey-4} ${x+5} ${ey} Q${x} ${ey+3} ${x-5} ${ey}Z" fill="#fff" stroke="${st}" stroke-width="${sw*.8}"/><circle cx="${x}" cy="${ey}" r="1.9" fill="${st}"/>` : `<circle cx="${x}" cy="${ey}" r="4" fill="#fff" stroke="${st}" stroke-width="${sw*.8}"/><circle cx="${x+.5}" cy="${ey+.5}" r="2" fill="${st}"/>`; }
+  o += `</g>`;
+  if (f.glasses === 'round') o += `<circle cx="${cx-ex}" cy="${ey}" r="7" fill="none" stroke="${st}" stroke-width="${sw}"/><circle cx="${cx+ex}" cy="${ey}" r="7" fill="none" stroke="${st}" stroke-width="${sw}"/>` + P(`M${cx-5} ${ey} L${cx+5} ${ey}`, 'none');
+  if (f.glasses === 'square') o += `<rect x="${cx-ex-8}" y="${ey-6}" width="16" height="11" rx="2" fill="none" stroke="${st}" stroke-width="${sw}"/><rect x="${cx+ex-8}" y="${ey-6}" width="16" height="11" rx="2" fill="none" stroke="${st}" stroke-width="${sw}"/>`;
+  if (f.glasses === 'sun') o += `<path d="M${cx-ex-9} ${ey-5} L${cx-2} ${ey-5} L${cx-4} ${ey+5} L${cx-ex-7} ${ey+5}Z M${cx+2} ${ey-5} L${cx+ex+9} ${ey-5} L${cx+ex+7} ${ey+5} L${cx+4} ${ey+5}Z" fill="#1b1b1b" stroke="${st}" stroke-width="${sw}"/>`;
+  const ny = cy + 12;
+  o += [P(`M${cx-1} ${ey+3} Q${cx-5} ${ny} ${cx} ${ny+1}`, 'none'), P(`M${cx} ${ey+4} L${cx-3} ${ny} Q${cx} ${ny+3} ${cx+3} ${ny}`, 'none'), P(`M${cx-4} ${ny-1} Q${cx} ${ny+3} ${cx+4} ${ny-1}`, 'none')][f.nose];
+  if (old) o += P(`M${cx-ex-9} ${ey+4} l3 2 M${cx+ex+9} ${ey+4} l-3 2`, 'none', `stroke-width="${sw*.7}"`);
+  if (f.freck) for (const s of [-1, 1]) for (let k=0; k<3; k++) o += `<circle cx="${cx + s*(9 + k*3)}" cy="${ny - 3 + (k % 2)*2}" r=".9" fill="#a0603a"/>`;
+  const my = cy + 21;
+  if (f.beard === 'beard') o += P(`M${cx-rx+2} ${cy+4} Q${cx-rx+4} ${cy+ry+8} ${cx} ${cy+ry+10} Q${cx+rx-4} ${cy+ry+8} ${cx+rx-2} ${cy+4} Q${cx+12} ${my+2} ${cx} ${my+3} Q${cx-12} ${my+2} ${cx-rx+2} ${cy+4}Z`, f.hair);
+  if (f.beard === 'goatee') o += P(`M${cx-7} ${my+4} Q${cx} ${cy+ry+8} ${cx+7} ${my+4}Z`, f.hair);
+  if (f.beard === 'stubble') for (let k=0; k<14; k++) o += `<circle cx="${cx - 14 + (k % 7)*4.6}" cy="${my + 4 + Math.floor(k/7)*4}" r=".8" fill="${st}" opacity=".6"/>`;
+  o += mood > 0 ? P(`M${cx-10} ${my-1} Q${cx} ${my+9} ${cx+10} ${my-1} Q${cx} ${my+3} ${cx-10} ${my-1}Z`, '#ffffff') : mood < 0 ? P(`M${cx-8} ${my+3} Q${cx} ${my-3} ${cx+8} ${my+3}`, 'none') : P(`M${cx-7} ${my+1} L${cx+7} ${my+1}`, 'none');
+  if (f.beard === 'stache' || f.beard === 'beard') o += P(`M${cx-11} ${my-3} Q${cx-5} ${my-8} ${cx} ${my-4} Q${cx+5} ${my-8} ${cx+11} ${my-3} Q${cx} ${my-4} ${cx-11} ${my-3}Z`, f.hair);
+  const out = `<span class="face" style="width:${px}px;height:${px}px"><svg viewBox="12 20 96 96" width="${px}" height="${px}" aria-hidden="true">${o}</svg></span>`;
+  if (faceCache.size > 1500) faceCache.clear(); faceCache.set(key, out); return out;
+}
+const memberFace = (m, px) => faceSVG({ name:m.name, skin:m.skin, shirt:m.shirt || m.color, hatStyle:m.hatStyle || 'cap', hatColor:m.hatColor || '#1f5c35', type:m.type, sat:m.sat }, px);
+const golferFace = (g, px) => faceSVG({ name:g.name || 'Guest ' + g.id, skin:g.skin, color:g.color, hatStyle:g.hatStyle, hat:g.hat, type:g.type, sat:g.sat }, px);
+const nameFace = (name, px, extra) => faceSVG({ name, ...(extra || {}) }, px);
+
+const proFace = px => faceSVG({ name:S.pro.name, skin:S.pro.skin, shirt:S.pro.shirt, hatStyle:S.pro.hatStyle || 'cap', hatColor:S.pro.hatColor || '#1f5c35', type:'grinder', sat:75 }, px);
+// Face for an event/tour/cup player: their member face, your pro's face, or one built from their name.
+function playerFace(p, px){
+  if (!p) return '';
+  if (p.isPro || p.id === 'pro') return proFace(px);
+  const m = p.mid ? S.members.find(x => x.id === p.mid) : S.members.find(x => x === p);
+  return m ? memberFace(m, px) : nameFace(p.name, px, { type:p.type });
+}
 // ---------- clubhouse location ----------
 const houseAt = () => S.house || { x:CHX, y:CHY };
 function setDoor(){ const h = houseAt(); DOOR.x = h.x + 2.4; DOOR.y = h.y + 1; }
@@ -3441,7 +3515,7 @@ function standings(ev){
 }
 function boardTable(board){
   return `<table><thead><tr><th>Pos</th><th>${S.event && S.event.team ? 'Team' : 'Player'}</th><th>To par</th><th>Thru</th></tr></thead><tbody>` +
-    board.map((r,i) => `<tr${r.ps.some(p => p.isPro) ? ' class="cur"' : ''}><td>${i+1}</td><td>${r.ps.some(p => p.isPro) ? '🏌️ ' : ''}${esc(who(r.p))}</td><td>${r.thru ? toParStr(r.toPar) : '–'}</td><td>${r.thru >= S.holes.length ? 'F' : r.thru}</td></tr>`).join('') + '</tbody></table>';
+    board.map((r,i) => `<tr${r.ps.some(p => p.isPro) ? ' class="cur"' : ''}><td>${i+1}</td><td class="withface">${r.ps.length === 1 ? playerFace(r.ps[0], 24) : ''}${esc(who(r.p))}</td><td>${r.thru ? toParStr(r.toPar) : '–'}</td><td>${r.thru >= S.holes.length ? 'F' : r.thru}</td></tr>`).join('') + '</tbody></table>';
 }
 function finishEvent(){
   const ev = S.event, t = ev.def || defOf(ev.type);
@@ -3492,7 +3566,7 @@ function renderClub(){
   let h = '';
   if (clubTab === 'club') {
     h += attentionHtml();
-    h += `<button class="mcard" data-act="profile" data-mid="pro"><span class="mav" style="background:${S.pro.shirt}">${flagTxt(S.pro.country) || '🏌️'}</span><span class="mi"><b>${esc(S.pro.name)}</b><span class="small muted">Your club pro: ${S.pro.starts} start${S.pro.starts === 1 ? '' : 's'}, ${S.pro.wins} win${S.pro.wins === 1 ? '' : 's'}, ${fmt(S.pro.earnings)} won</span></span><span class="chev" aria-hidden="true">›</span></button>`;
+    h += `<button class="mcard" data-act="profile" data-mid="pro"><span class="mavf">${proFace(44)}${S.pro.country ? `<span class="fflag">${flagTxt(S.pro.country)}</span>` : ''}</span><span class="mi"><b>${esc(S.pro.name)}</b><span class="small muted">Your club pro: ${S.pro.starts} start${S.pro.starts === 1 ? '' : 's'}, ${S.pro.wins} win${S.pro.wins === 1 ? '' : 's'}, ${fmt(S.pro.earnings)} won</span></span><span class="chev" aria-hidden="true">›</span></button>`;
     const ls = S.lessonSetup || (S.lessonSetup = { mid:(S.members[0] || {}).id, k:'dr' });
     if (!S.members.find(m => m.id === ls.mid) && S.members.length) ls.mid = S.members[0].id;
     h += `<h3 class="sec">Pro lessons <span class="small muted">(${S.lessonsLeft} of ${LESSONS_PER_DAY} left today)</span></h3>`;
@@ -3529,7 +3603,7 @@ function renderClub(){
     h += `<p class="small muted">Fair dues for your course right now are about ${fmt(fairDues())} a week.</p>`;
     if (!S.members.length) h += `<p class="muted">No members yet. Add some yourself, or wait for applications once you have a few holes open.</p>`;
     for (const m of S.members) { const T = TYPES[m.type];
-      h += `<button class="mcard" data-act="profile" data-mid="${m.id}"><span class="mav" style="background:${m.shirt}">${flagTxt(m.country) || T.icon}</span><span class="mi"><b>${esc(m.name)}${m.titles ? ' ' + '🏆'.repeat(Math.min(3, m.titles)) : ''}</b><span class="small muted">${T.icon} ${T.name}, Hcp ${hcp(m.skill)}${m.rec.w + m.rec.l + m.rec.h ? `, ${m.rec.w}-${m.rec.l}-${m.rec.h} in matches` : ''}</span></span><span aria-label="${mood(m.sat)}">${mood(m.sat).split(' ')[0]}</span><span class="chev" aria-hidden="true">›</span></button>`; }
+      h += `<button class="mcard" data-act="profile" data-mid="${m.id}"><span class="mavf">${memberFace(m, 44)}${m.country ? `<span class="fflag">${flagTxt(m.country)}</span>` : ''}</span><span class="mi"><b>${esc(m.name)}${m.titles ? ' ' + '🏆'.repeat(Math.min(3, m.titles)) : ''}</b><span class="small muted">${T.icon} ${T.name}, Hcp ${hcp(m.skill)}${m.rec.w + m.rec.l + m.rec.h ? `, ${m.rec.w}-${m.rec.l}-${m.rec.h} in matches` : ''}</span></span><span aria-label="${mood(m.sat)}">${mood(m.sat).split(' ')[0]}</span><span class="chev" aria-hidden="true">›</span></button>`; }
     h += `<div class="btns"><button class="btn alt" data-act="addMember" ${S.members.length >= memberCap() ? 'disabled' : ''}>Add a member</button></div>`;
   } else if (clubTab === 'staff') {
     h += staffTab();
@@ -3590,7 +3664,7 @@ function renderClub(){
     }
   } else {
     h += recordBook();
-    h += S.history.length ? `<table><thead><tr><th>Day</th><th>Event</th><th>Champion</th><th>Score</th></tr></thead><tbody>${S.history.map(r => `<tr><td>${r.day}</td><td>${esc(r.name)}</td><td>${esc((r.country ? flagOf(r.country) + ' ' : '') + r.winner)}</td><td>${r.score}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No events yet. Your champions will be listed here.</p>';
+    h += S.history.length ? `<table><thead><tr><th>Day</th><th>Event</th><th>Champion</th><th>Score</th></tr></thead><tbody>${S.history.map(r => `<tr><td>${r.day}</td><td>${esc(r.name)}</td><td class="withface">${r.winner && !/ & |Team|Club|Tied/.test(r.winner) ? nameFace(r.winner, 22) : ''}${esc((r.country ? flagOf(r.country) + ' ' : '') + r.winner)}</td><td>${r.score}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No events yet. Your champions will be listed here.</p>';
     h += `<h3 class="sec">Member matches</h3>` + (S.matchLog.length ? S.matchLog.map(r => `<div class="spread small"><span>${esc(r.text)}</span><span class="muted">Day ${r.day}</span></div>`).join('') : '<p class="small muted">No matches played yet.</p>');
   }
   $('clubBody').innerHTML = h;
@@ -3689,7 +3763,7 @@ function closeProfile(){
 function renderProfile(){
   const m = curM(); if (!m) { $('prof').classList.add('hidden'); return; }
   const pro = isProProfile();
-  $('profAvatar').innerHTML = avatarSVG(m); $('pName').value = m.name; profSub(m);
+  $('profAvatar').innerHTML = `<span class="profface">${isProProfile() ? proFace(72) : memberFace(m, 72)}</span>` + avatarSVG(m); $('pName').value = m.name; profSub(m);
   $('profRemove').classList.toggle('hidden', pro);
   let h = `<h3 class="sec">Nationality</h3><div class="chips">` + [''].concat(COUNTRIES.map(c => c.code)).map(code =>
     `<button class="chip${code ? ' flag' : ''}${m.country === code ? ' on' : ''}" data-ctry="${code}" aria-label="${code ? CTRY[code].name : 'No country'}">${code ? flagTxt(code) : 'None'}</button>`).join('') + '</div>';
@@ -3774,7 +3848,7 @@ function renderScores(){
     $('scTitle').textContent = 'On the course';
     const gs = S.golfers.filter(g => !g.done);
     body.innerHTML = tabs + (gs.length ? `<p class="small muted">Tap anyone for their full scorecard. You can also tap golfers right on the map.</p><table><thead><tr><th>Golfer</th><th>Type</th><th>Thru</th><th>To par</th></tr></thead><tbody>` +
-      gs.map(g => { const c = cardStats(g); return `<tr data-gid="${g.id}"><td><u>${esc(golferLabel(g))}</u></td><td>${esc(golferKind(g))}</td><td>${g.leaving ? 'F' : c.thru}</td><td>${c.thru ? toParStr(c.toPar) : '–'}</td></tr>`; }).join('') + '</tbody></table>'
+      gs.map(g => { const c = cardStats(g); return `<tr data-gid="${g.id}"><td class="withface">${g.isPro ? proFace(24) : golferFace(g, 24)}<u>${esc(golferLabel(g))}</u></td><td>${esc(golferKind(g))}</td><td>${g.leaving ? 'F' : c.thru}</td><td>${c.thru ? toParStr(c.toPar) : '–'}</td></tr>`; }).join('') + '</tbody></table>'
       : '<p class="muted">Nobody is on the course right now. Press ▶ to open for golfers.</p>');
     btns.innerHTML = '<button class="btn" data-sc="close">Back to the course</button>';
     return;
@@ -3788,7 +3862,7 @@ function renderScores(){
   const cells = S.holes.map((h,i) => { const sc = (g.card || [])[i], now = !g.leaving && i === g.hole && sc == null, d = sc != null ? sc - h.info.par : 0;
     return `<div class="hc${now ? ' now' : ''}"><span>${i+1}</span><b class="${d < 0 ? 'under' : d > 0 ? 'over' : ''}">${sc ?? (now ? '•' : '')}</b></div>`; }).join('');
   const sub = [golferKind(g), traitTxt(g), g.country && CTRY[g.country] ? CTRY[g.country].name : '', g.mid && !g.ep ? 'Hcp ' + hcp(g.skill) : ''].filter(Boolean).join(', ');
-  body.innerHTML = `<div class="gcard"><div class="ghead"><div class="gav">${avatarSVG({ shirt:g.color, pants:g.pants || '#384057', skin:g.skin || SKIN[0], hatStyle:g.hatStyle, hatColor:g.hat, bottoms:g.bottoms })}</div>` +
+  body.innerHTML = `<div class="gcard"><div class="ghead"><div class="gav">${g.isPro ? proFace(64) : g.mid ? memberFace(S.members.find(x => x.id === g.mid) || g, 64) : golferFace(g, 64)}</div>` +
     `<div class="ginfo"><span class="small muted">${esc(sub)}</span>${T ? `<b>${T.icon} ${T.name}</b>` : ''}<span class="gq">“${quote}”</span><span class="small">Likes: <b>${T ? T.likes : 'tough, fair holes'}</b></span></div></div>` +
     `<div class="moods">${bar('Fun', sat)}${bar('Energy', g.energy ?? 100)}${bar('Hunger', 100 - (g.hunger || 0))}${bar('Thirst', 100 - (g.thirst || 0))}</div>` +
     `<div class="hstrip">${cells}<div class="hc tot"><span>Tot</span><b>${c.thru ? c.tot : 0}</b></div></div>` +
