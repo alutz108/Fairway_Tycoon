@@ -322,6 +322,10 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .emath.good{background:rgba(79,191,90,.13)}
 .emath.bad{background:rgba(226,72,61,.1)}
 .shapechip svg{vertical-align:middle}
+.shoprow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.shopic{font-size:1.3rem}
+.shopnm{flex:1;display:flex;flex-direction:column;min-width:0}
+.shopp{min-width:62px;text-align:center;font-weight:700}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
@@ -540,7 +544,7 @@ const TOOLS = {
   water:   { name:'Pond',    cost:60,  paint:T.WATER, sw:'#3f86c8' },
   dogleg:  { name:'Dogleg',  cost:100, icon:'↪️' },
   bridge:  { name:'Bridge',  cost:80,  icon:'🌉' },
-  ...Object.fromEntries(Object.entries({ snack:'🌭', drinks:'🥤', bench:'🪑', restroom:'🚻', proshop:'🛍️', range:'🎯', putting:'⛳', carts:'🚗', restaurant:'🍽️', windmill:1, lighthouse:1, gazebo:1, fountain:1, statue:1 }).map(([k]) => ['f_' + k, { fac:k }])),
+  ...Object.fromEntries(Object.entries({ snack:'🌭', drinks:'🥤', bench:'🪑', restroom:'🚻', proshop:'🛍️', range:'🎯', putting:'⛳', carts:'🚗', restaurant:'🍽️', windmill:1, lighthouse:1, gazebo:1, fountain:1, statue:1, scoreboard:1 }).map(([k]) => ['f_' + k, { fac:k }])),
   raise:   { name:'Raise',   cost:40,  elev:1,  icon:'⛰️' },
   lower:   { name:'Lower',   cost:40,  elev:-1, icon:'🔻' },
   clear:   { name:'Clear',   cost:10,  paint:T.ROUGH, sw:'#5d9a45' }
@@ -687,7 +691,7 @@ function saveStore(fromCloud){ if (!fromCloud) store.savedAt = Date.now(); try {
 function saveGame(){
   store.saves[S.level] = { species:Array.from(TS), grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
-    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, pinDaily:!!S.pinDaily, house:S.house, fb:S.fb, reviews:S.reviews, cupLast:S.cupLast, parcels:S.parcels || [], news:(S.news || []).slice(0, 40), weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
+    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, shopPrices:S.shopPrices || {}, shopSold:S.shopSold || {}, pinDaily:!!S.pinDaily, house:S.house, fb:S.fb, reviews:S.reviews, cupLast:S.cupLast, parcels:S.parcels || [], news:(S.news || []).slice(0, 40), weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
   saveStore();
 }
 
@@ -797,10 +801,12 @@ function openFacEd(fi){
   $('facEdTitle').textContent = `${F.icon} ${F.name}, level ${lv}`;
   $('facEdBody').innerHTML = `<div class="moods"><div class="spread" style="margin:0"><span>Earnings and effects</span><b>×${FAC_EARN[lv-1]}</b></div><div class="spread" style="margin:0"><span>Upkeep a day</span><b>${fmt(F.upkeep*FAC_UPK[lv-1])}</b></div></div>` +
     (lv < 3 ? `<h3 class="sec">Level ${lv+1}</h3><p class="small">${LV_FX[f.type] || ''}</p><p class="small muted">Earnings and effects ×${FAC_EARN[lv]}, upkeep ${fmt(F.upkeep*FAC_UPK[lv])} a day.</p><div class="btns"><button class="btn" data-fu="1" ${S.money < cost ? 'disabled' : ''}>Upgrade for ${fmt(cost)}</button></div>`
-      : `<p class="small" style="color:var(--brand);font-weight:700;margin-top:10px">Fully upgraded ✓</p>`);
+      : `<p class="small" style="color:var(--brand);font-weight:700;margin-top:10px">Fully upgraded ✓</p>`) + (f.type === 'proshop' ? shopPricingHtml() : '');
   $('facEd').classList.remove('hidden');
 }
 $('facEdBody').addEventListener('click', e => {
+  const sp = e.target.closest('[data-sp],[data-spfair]');
+  if (sp) { S.shopPrices = S.shopPrices || {}; if (sp.dataset.spfair) S.shopPrices = {}; else { const k = sp.dataset.sp, step = Math.max(1, Math.round(fairShop(k)*.05)); S.shopPrices[k] = Math.max(1, shopPrice(k) + step*(+sp.dataset.d)); } const card = $('facEd').querySelector('.card'), st = card.scrollTop; openFacEd(facSel); card.scrollTop = st; return; }
   if (!e.target.closest('[data-fu]')) return; const f = S.facilities[facSel]; if (!f) return; const cost = upCost(f);
   if (!cost || S.money < cost) return toast(`That upgrade costs ${fmt(cost)}.`);
   S.money -= cost; book('build', -cost); spend(cost); f.lv = facLvOf(f) + 1; terrainDirty = true; recompute(); saveGame();
@@ -1168,7 +1174,7 @@ function buildProps(){
   const fl = new TH.Mesh(new TH.PlaneGeometry(.3,.18), new TH.MeshLambertMaterial({ color:0x1f5c35, side:TH.DoubleSide })); fl.position.set(1.2,1.3,.95); hg.add(fl);
   hg.position.set(W2(HS.x+1), base, Z2(HS.y+1)); propGroup.add(hg);
   ensureAnimals();
-  spinners = []; for (const f of S.facilities) { const m = facModel(f); if (m.userData.spin) spinners.push(m.userData.spin); propGroup.add(m); }
+  spinners = []; scoreboards = []; for (const f of S.facilities) { const m = facModel(f); if (m.userData.spin) spinners.push(m.userData.spin); propGroup.add(m); }
   holeSig = '';
 }
 
@@ -1844,6 +1850,7 @@ fbk(-1, 'Long walks, no cart paths', 'Start each hole near the last green and ad
 fbk(-1, 'Slow pace of play', 'Hire a marshal and add cart paths.', ['This is taking forever.']);
 fbk(-1, 'Hungry and thirsty', 'Add a snack bar or drink stand out on the course.', ['I could really use a drink.', 'I’m getting hungry.']);
 fbk(-1, 'Tired out', 'Add benches and cart paths.', ['I’m worn out.']);
+fbk(-1, 'Pro shop prices too high', 'Lower your prices: tap the pro shop.', ['Pro shop prices are steep!']);
 fbk(1, 'Beautiful scenery', '', [...LINES.view]);
 fbk(1, 'Great hole design', '', [...LINES.parGreat, 'Love a risk-reward hole.', 'Driver, baby!']);
 fbk(1, 'Course in great shape', '', ['Course is in perfect shape!']);
@@ -2221,6 +2228,7 @@ const FACS = {
   lighthouse: { name:'Lighthouse',    icon:'🗼', w:1, h:1, cost:5000, upkeep:10, kind:'scenery', blurb:'A striped lighthouse. Perfect beside water or the coast.' },
   gazebo:     { name:'Gazebo',        icon:'⛺', w:2, h:2, cost:2500, upkeep:5,  kind:'scenery', blurb:'A white gazebo. Adds charm to any hole.' },
   fountain:   { name:'Fountain',      icon:'⛲', w:1, h:1, cost:2000, upkeep:6,  kind:'scenery', blurb:'A stone fountain. Lovely by a tee box or the clubhouse.' },
+  scoreboard: { name:'Scoreboard',    icon:'📊', w:2, h:1, cost:4000, upkeep:15, kind:'scenery', unique:true, blurb:'A giant leaderboard. During tournaments and team cups it shows the live standings; other days, club records and news.' },
   statue:     { name:'Founder statue', icon:'🗿', w:1, h:1, cost:1200, upkeep:2, kind:'scenery', blurb:'A bronze statue of your club’s founder.' }
 };
 const landmarksNear = h => S.facilities.filter(f => FACS[f.type].kind === 'scenery').filter(f => { const c = facCenter(f); return Math.hypot(c.x - h.pin.x - .5, c.y - h.pin.y - .5) < 6 || Math.hypot(c.x - h.tee.x - .5, c.y - h.tee.y - .5) < 6; }).length;
@@ -2265,7 +2273,7 @@ function arriveExtras(g){
   if (hasFac('range') && Math.random() < .3 + .35*sp + .1*(typeLv('range') - 1)) { const lv = typeLv('range'); earnFac('range', Math.round(8*earnMul('range')), g); g.bonus = { ...(g.bonus || {}), dr:.02*lv, ac:.03*lv }; g.sat += 1 + lv; warm.push(S.facilities.find(f => f.type === 'range')); }
   if (hasFac('putting') && Math.random() < .5 + .1*(typeLv('putting') - 1)) { const lv = typeLv('putting'); g.bonus = { ...(g.bonus || {}), pt:.04*lv, ch:.02*lv }; g.sat += lv; if (Math.random() < .5) warm.push(S.facilities.find(f => f.type === 'putting')); }
   if (warm.length && !g.mp) { g.warm = warm.filter(Boolean); const f = g.warm.shift(), c = facCenter(f); g.detour = { x:c.x + .1, y:c.y + FACS[f.type].h/2 + .3, f }; }
-  if (hasFac('proshop') && Math.random() < .25 + .45*sp + .08*(typeLv('proshop') - 1)) { earnFac('shop', Math.round((10 + sp*50)*earnMul('proshop')), g); g.sat += 2; if (Math.random() < .3) say(g, 'Picked up a new glove.'); }
+  if (hasFac('proshop') && shopVisit(g) && Math.random() < .3) say(g, 'Picked up some new gear.');
 }
 function planDetour(g, prev, n){
   if (g.ep || !S.facilities.length) return;
@@ -2309,6 +2317,7 @@ function facModel(f){
     case 'range': add('box','#7a6a52',[0,.04,1.95],[1.8,.06,.5]); for (const x of [-.6,-.2,.2,.6]) { add('box','#5a9a3a',[x,.08,1.95],[.25,.02,.3]); add('sphere','#ffffff',[x,.11,1.85],[.025,.025,.025]); }
       for (const [z,c] of [[.9,'#e2483d'],[-.2,'#f2bd44'],[-1.4,'#2f6fd6']]) { add('cyl',c,[0,.05,z],[.3,.02,.3]); add('cyl','#f4f4ef',[0,.25,z],[.008,.4,.008]); }
       for (const x of [-.95,.95]) add('cyl','#9aa3ad',[x,.6,-2.3],[.015,1.2,.015]); break;
+    case 'scoreboard': makeScoreboard(g, add); break;
     case 'windmill': {
       add('cyl','#f1e6d0',[0,.6,0],[.36,1.2,.36]); add('cone','#8a4a32',[0,1.36,0],[.42,.36,.42]);
       add('box','#6b4a2f',[.37,.28,0],[.02,.34,.18]);
@@ -2755,7 +2764,7 @@ function planMembers(){
 function clubDay(){
   const msgs = [];
   if (S.day % 7 === 0 && S.members.length) { const amt = S.members.length*S.dues; S.money += amt; book('dues', amt); msgs.push(`Weekly dues +${fmt(amt)}.`); }
-  if (S.day % 7 === 0) { S.lastBooks = S.books; S.books = {}; }
+  if (S.day % 7 === 0) { S.lastBooks = S.books; S.books = {}; S.shopSold = {}; }
   S.lessonsLeft = LESSONS_PER_DAY;
   for (const o of S.offers.slice()) if (S.day >= o.expires) { S.offers = S.offers.filter(x => x !== o); msgs.push(`The ${o.name} invitation expired.`); }
   if (S.holes.length && S.offers.length < 3 && Math.random() < .4) { const o = newOffer(); S.offers.push(o); msgs.push(`📨 New invitation: ${o.name}.`); }
@@ -2917,7 +2926,7 @@ function practiceUse(g, f){
   const boost = (keys, amt) => { if (!m) return; for (const k of keys) if (m.at && m.at[k] != null) m.at[k] = Math.min(1, m.at[k] + amt*lv); };
   if (f.type === 'range') { earnFac('range', Math.round(10*mul), g); boost(['dr','ac','ir'], .003); say(g, pick(['Working on my driver.', 'Grooving my swing.', 'Hitting it pure today.']), true); }
   else if (f.type === 'putting') { boost(['pt','ch'], .003); say(g, pick(['Rolling a few putts.', 'Dialed in on the greens.']), true); }
-  else if (f.type === 'proshop') { earnFac('shop', Math.round((10 + sp*50)*mul), g); say(g, 'Picked up some new gear.', true); }
+  else if (f.type === 'proshop') { if (shopVisit(g)) say(g, 'Picked up some new gear.', true); }
   else { earnFac('food', Math.round((8 + sp*20)*mul), g); say(g, 'Lunch at the club!', true); }
   if (m) m.sat = Math.min(100, m.sat + 2);
 }
@@ -3221,6 +3230,73 @@ function cartRoute(x0, y0, x1, y1){
   if (found) { r = []; for (let i = goal; i !== -1; i = prev[i]) r.push([(i % COLS) + .5, Math.floor(i/COLS) + .5]); r.reverse(); }
   routeCache.set(key, r); return r;
 }
+
+// ---------- pro shop pricing ----------
+const SHOP_ITEMS = {
+  balls:  { name:'Golf balls', icon:'⚪', fair:12,  base:.35 },
+  glove:  { name:'Gloves',     icon:'🧤', fair:18,  base:.15 },
+  hat:    { name:'Logo hats',  icon:'🧢', fair:28,  base:.12 },
+  polo:   { name:'Club polos', icon:'👕', fair:55,  base:.08 },
+  driver: { name:'Drivers',    icon:'🏌️', fair:350, base:.012 }
+};
+const fairShop = k => Math.max(1, Math.round(SHOP_ITEMS[k].fair*(1 + .08*(S.course.stars - 3) + Math.min(S.prestige, 20)*.01)));
+const shopPrice = k => (S.shopPrices && S.shopPrices[k]) || fairShop(k);
+// One golfer browsing the shop: each item sells more often near its fair price, less when it's pricey.
+function shopVisit(g){
+  const sp = g.spend ?? .5, lvMul = 1 + .25*(typeLv('proshop') - 1) + (staffN('clerk') ? .2 : 0); let spent = 0, steep = false;
+  for (const [k, it] of Object.entries(SHOP_ITEMS)) {
+    const p = shopPrice(k), ratio = p/fairShop(k), ch = it.base*(.6 + .8*sp)*lvMul*clamp(1.8 - .8*ratio, 0, 1.6);
+    if (ratio > 1.4) steep = true;
+    if (Math.random() < ch) { spent += p; S.shopSold = S.shopSold || {}; S.shopSold[k] = (S.shopSold[k] || 0) + 1; }
+  }
+  if (spent) { S.money += spent; book('shop', spent); g.spent = (g.spent || 0) + spent; g.sat += 2; }
+  if (steep && Math.random() < .3) { g.sat -= 1.5; say(g, 'Pro shop prices are steep!'); }
+  return spent;
+}
+function shopPricingHtml(){
+  let h = `<h3 class="sec">🏷️ Prices</h3><p class="small muted">Near the fair price is the sweet spot; a little above earns slightly more per golfer. Much higher and fewer people buy, and golfers grumble. Fair prices rise with your rating and prestige.</p>`;
+  for (const [k, it] of Object.entries(SHOP_ITEMS)) {
+    const p = shopPrice(k), f = fairShop(k), r = p/f, sold = (S.shopSold || {})[k] || 0;
+    h += `<div class="shoprow"><span class="shopic">${it.icon}</span><span class="shopnm"><b>${it.name}</b><span class="small muted">fair ${fmt(f)} · ${sold} sold this week</span></span><div class="group"><button data-sp="${k}" data-d="-1" aria-label="Lower ${it.name} price">−</button><span class="shopp" style="color:${r > 1.4 ? '#e2483d' : r < .75 ? '#e8b93a' : 'inherit'}">${fmt(p)}</span><button data-sp="${k}" data-d="1" aria-label="Raise ${it.name} price">+</button></div></div>`;
+  }
+  return h + `<div class="btns" style="margin-top:6px"><button class="btn alt sm" data-spfair="1">Reset to fair prices</button></div>`;
+}
+
+// ---------- giant scoreboard ----------
+let scoreboards = [], boardT = 0;
+function makeScoreboard(g, add){
+  for (const x of [-.85, .85]) add('cyl','#3a3a3a',[x,.65,0],[.04,1.3,.04]);
+  add('box','#14301f',[0,1.3,-.03],[2.0,1.15,.06]);
+  const c = document.createElement('canvas'); c.width = 512; c.height = 296;
+  const tex = new TH.CanvasTexture(c), m = new TH.Mesh(new TH.PlaneGeometry(1.9, 1.1), new TH.MeshBasicMaterial({ map:tex }));
+  m.position.set(0, 1.3, .005); g.add(m);
+  const sb = { c, x:c.getContext('2d'), tex }; scoreboards.push(sb); drawBoard(sb);
+}
+function drawBoard(sb){
+  const x = sb.x, W = 512, H = 296; x.fillStyle = '#0e2a1a'; x.fillRect(0, 0, W, H); x.strokeStyle = '#f2bd44'; x.lineWidth = 6; x.strokeRect(5, 5, W - 10, H - 10);
+  const title = S.event ? S.event.name : S.cup ? S.cup.name : S.clubName || 'Leaderboard';
+  x.fillStyle = '#f2bd44'; x.font = '700 30px Rubik, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(title.length > 28 ? title.slice(0, 27) + '…' : title, W/2, 34);
+  x.font = '600 26px Rubik, system-ui, sans-serif'; x.textAlign = 'left';
+  const row = (i, a, b, c, col) => { const y = 82 + i*40; x.fillStyle = i % 2 ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.09)'; x.fillRect(14, y - 18, W - 28, 36); x.fillStyle = col || '#fff'; x.textAlign = 'left'; x.fillText(a, 24, y); x.textAlign = 'right'; x.fillText(b, W - 110, y); x.fillText(c, W - 24, y); };
+  if (S.event) {
+    const st = standings(S.event).slice(0, 5);
+    st.forEach((r, i) => row(i, `${i + 1}. ${(r.p.name || '').slice(0, 18)}`, r.thru ? toParStr(r.toPar) : '–', r.thru >= S.holes.length ? 'F' : (r.thru || '–') + '', r.toPar < 0 ? '#ff8a7a' : '#fff'));
+    if (!st.length) row(0, 'Players teeing off…', '', '');
+  } else if (S.cup) {
+    const c = S.cup; x.textAlign = 'center'; x.font = '700 40px Rubik, system-ui, sans-serif';
+    x.fillStyle = '#7fb2ff'; x.fillText(`${c.teams[0].slice(0, 14)} ${ptsTxt(c.pts[0])}`, W/2, 110); x.fillStyle = '#ff8a7a'; x.fillText(`${c.teams[1].slice(0, 14)} ${ptsTxt(c.pts[1])}`, W/2, 170);
+    x.font = '500 22px Rubik, system-ui, sans-serif'; x.fillStyle = '#fff'; x.fillText(`${c.matches.filter(m => m.res).length} of ${c.matches.length} matches finished`, W/2, 236);
+  } else {
+    const n = S.holes.length, cr = S.records && S.records.rounds[n], last = S.history[0], w = S.weather;
+    row(0, 'Course record', cr ? toParStr(cr.toPar) : '–', cr ? cr.name.split(' ')[0].slice(0, 10) : '');
+    row(1, 'Last champion', last ? last.score : '–', last ? last.winner.split(' ')[0].slice(0, 10) : '');
+    row(2, 'Holes · Rating', `${n}`, `${S.course.stars.toFixed(1)}★`);
+    row(3, `Day ${S.day}`, w ? `${w.temp}°` : '', w ? (w.mph ? w.mph + ' mph' : '') : '');
+    row(4, 'Golfers on course', '', `${S.golfers.length}`);
+  }
+  sb.tex.needsUpdate = true;
+}
+function stepBoards(dt){ if (!scoreboards.length) return; boardT -= dt; if (boardT > 0) return; boardT = 1; for (const sb of scoreboards) drawBoard(sb); }
 
 // ---------- clubhouse location ----------
 const houseAt = () => S.house || { x:CHX, y:CHY };
@@ -3755,7 +3831,8 @@ function endPtr(e, cancel){
   if (S.mode === 'play') { P.drag = null; return; }
   if (!pend) return;
   if (S.landMode && pend.start && !pend.active && (pend.moved || 0) < 8) { const lt = tileAtScreen(pend.start); landTap(lt.x, lt.y); pend = null; return; }
-  if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; } }
+  if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; }
+    if (S.tool === 'move' && S.mode === 'build') { const tt = tileAtScreen(pend.start), fi = tt.x >= 0 && tt.y >= 0 && tt.x < COLS && tt.y < ROWS ? FO[tt.y*COLS + tt.x] : -1; if (fi >= 0 && S.facilities[fi] && FACS[S.facilities[fi].type].kind !== 'scenery') { pend = null; openFacEd(fi); return; } } }
   if (pend.kind === 'tap') { if (TOOLS[S.tool].gshape) stampGreen(pend.t.x, pend.t.y, TOOLS[S.tool].gshape); else if (S.tool === 'house') houseTap(pend.t.x, pend.t.y); else if (S.tool === 'upgrade') facTapUpgrade(pend.t.x, pend.t.y); else if (S.tool === 'edit') { const fi = FO[pend.t.y*COLS + pend.t.x]; if (fi >= 0 && S.facilities[fi] && !S.editMove) openFacEd(fi); else editTap(pend.t.x, pend.t.y); } else if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
   else if (pend.kind === 'paint' && !pend.active) { checkpoint(); paintAt(pend.t.x, pend.t.y); }
   pend = null;
@@ -3929,7 +4006,7 @@ const TRAYS = {
   plants:  { icon:'🌸', name:'Plants', parent:'land', sub:'Shrubs, flowers', tools:['shrubs','flowers'] },
   waterT:  { icon:'💧', name:'Water', parent:'land', sub:'Creek, pond', tools:['river','water'] },
   terrain: { icon:'⛰️', name:'Hills', parent:'land', sub:'Raise, lower', tools:['raise','lower'] },
-  marks:   { icon:'🗼', name:'Landmarks', parent:'land', sub:'Windmill, more', tools:['f_windmill','f_lighthouse','f_gazebo','f_fountain','f_statue'] }
+  marks:   { icon:'🗼', name:'Landmarks', parent:'land', sub:'Windmill, more', tools:['f_scoreboard','f_windmill','f_lighthouse','f_gazebo','f_fountain','f_statue'] }
 };
 const trayRoot = id => id && TRAYS[id] ? (TRAYS[id].parent || id) : null;
 function openTray(id){
@@ -4092,11 +4169,11 @@ function startLevel(i, cont){
     TS = sv.species && sv.species.length === COLS*ROWS ? Uint8Array.from(sv.species) : new Uint8Array(COLS*ROWS); G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
     S.money = sv.money; S.earned = sv.earned; S.day = sv.day; S.fee = sv.fee; S.recent = sv.recent || []; S.won = !!sv.won;
     S.clubName = sv.clubName || L.name + ' Golf Club'; S.trophy = sv.trophy || 'Founders Cup';
-    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.pinDaily = !!sv.pinDaily; S.house = sv.house || { x:CHX, y:CHY }; S.fb = sv.fb || {}; S.reviews = sv.reviews || []; S.cupLast = sv.cupLast || {}; S.parcels = sv.parcels || []; S.news = sv.news || []; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
+    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.shopPrices = sv.shopPrices || {}; S.shopSold = sv.shopSold || {}; S.pinDaily = !!sv.pinDaily; S.house = sv.house || { x:CHX, y:CHY }; S.fb = sv.fb || {}; S.reviews = sv.reviews || []; S.cupLast = sv.cupLast || {}; S.parcels = sv.parcels || []; S.news = sv.news || []; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
   } else {
     TS = new Uint8Array(COLS*ROWS); G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.facilities = []; S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
     S.clubName = L.name + ' Golf Club'; S.trophy = 'Founders Cup';
-    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.pinDaily = false; S.house = { x:CHX, y:CHY }; S.fb = {}; S.reviews = []; S.cupLast = {}; S.parcels = []; S.news = []; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
+    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.shopPrices = {}; S.shopSold = {}; S.pinDaily = false; S.house = { x:CHX, y:CHY }; S.fb = {}; S.reviews = []; S.cupLast = {}; S.parcels = []; S.news = []; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
     delete store.saves[i]; saveStore();
   }
   S.mode = 'build'; P.fl = null; P.drag = null; hist = []; future = []; curAct = null; S.event = null; S.setup = null; S.matches = []; S.matchSetup = null; S.follow = null; $('prof').classList.add('hidden'); scView = null; $('sc').classList.add('hidden'); $('round').classList.add('hidden'); $('club').classList.add('hidden'); $('evDone').classList.add('hidden');
@@ -4384,7 +4461,7 @@ function frame(now){
     if (!g || S.mode !== 'build') S.follow = null;
     else { view.tx += (W2(g.x) - view.tx)*.12; view.tz += (Z2(g.y) - view.tz)*.12; clampCam(); }
   }
-  if (S.active) { stepAnimals(Math.min(dt, .05)*Math.max(1, S.speed), now); stepRangeBalls(Math.min(dt, .05)*Math.max(1, S.speed)); }
+  if (S.active) { stepBoards(dt); stepAnimals(Math.min(dt, .05)*Math.max(1, S.speed), now); stepRangeBalls(Math.min(dt, .05)*Math.max(1, S.speed)); }
   if (S.speed > 0 || S.mode === 'play' || S.follow || !S.active || now - lastInteract < 1500 || (++idleN % 4) === 0) draw(now);
   hudT += dt; if (hudT > .2) { hudT = 0; if (S.active) updateHUD(); if (scView && ++scTick % 5 === 0) renderScores(); }
   requestAnimationFrame(frame);

@@ -25,7 +25,7 @@ You are helping Andrew keep building **Fairways Tycoon**, a SimGolf-style golf c
 
 ## GitHub version
 - He hosts the game on GitHub Pages as an installable home-screen app (files: index.html, sw.js, manifest.webmanifest, icons/, vendor/three.min.js + license, README.md). In the GitHub index.html, three.js loads from `vendor/three.min.js` with a cdnjs fallback if that file is missing, plus the PWA head tags and service-worker registration.
-- When the game changes, also produce an updated GitHub package and bump `VERSION` in sw.js (currently `fairway-v36`; next is `fairway-v37`). Remind him which files to upload.
+- When the game changes, also produce an updated GitHub package and bump `VERSION` in sw.js (currently `fairway-v37`; next is `fairway-v38`). Remind him which files to upload.
 
 ## Roadmap
 The original 7-step roadmap is complete. Follow the ideas list in FAIRWAY_TYCOON_DESIGN.md or what Andrew asks for next.

@@ -9,6 +9,15 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Pro shop pricing
+Tap the pro shop (in look mode, or via Upgrades / ✏️ Edit) → **🏷️ Prices**: golf balls, gloves, logo hats, club polos, drivers (`SHOP_ITEMS`, saved `S.shopPrices`, weekly `S.shopSold`). Fair prices (`fairShop`) rise with stars and prestige. Every arriving golfer (and practicing member) browses once (`shopVisit`): each item's buy chance = base × spending habit × shop level/clerk × clamp(1.8 − 0.8 × price/fair). Revenue per golfer peaks around +10% over fair (~$19 vs ~$18 at fair); above +40% golfers grumble ("Pro shop prices are steep!", a Feedback complaint) and sales fall. Tapping any non-landmark facility in look mode opens its sheet.
+
+### Tournament scoreboard (🌳 Landscape → Landmarks → 📊 Scoreboard)
+2×1 landmark, $4,000, one per course. A canvas-texture board on posts (`makeScoreboard`, `drawBoard`, refreshed every second by `stepBoards`): during events it shows the live top 5 (name, to par, thru); during team cups the team score and matches finished; otherwise course record, last champion, holes and rating, day and weather, golfers on course. Counts as a landmark for beauty.
+
+### Golfer portraits (planned)
+A sample sheet of generated sketch portraits (pencil / ink / watercolor, mood expressions, blinking) was shown to Andrew; waiting for his pick of style before building them into members, golfer cards, reviews, leaderboards, tour standings, cups and Honors.
+
 ### Club attention, event value, member cap
 - The red number on 🏆 Club counts **attention items** (`clubAttention`): invitations waiting, crew short-handed, equipment under 40%, unhappy members (<45 mood), dues far above fair. The Club tab opens with a red **Needs your attention** box (each item has a button that jumps to the right tab), and each tab shows its own red count.
 - Every event card (invitations, club events, team cups) and every setup screen shows an **estimate** (`eventMath`): how long it runs (field × 1.6 s + holes × your seconds per hole), your normal daily public income (green fees + food + shop + range + carts, from last week), what closing costs, and the estimated net plus prestige. Green if it pays, red if it costs.
