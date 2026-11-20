@@ -1220,23 +1220,39 @@ function syncHoles(now){
 
 // --- golfers ---
 const people = new Map();
-function makePerson(shirt, skin, hat, pants){
+// --- golfer outfits: hat styles and shorts/pants ---
+const HAT_STYLES = [['cap','🧢 Cap'], ['back','🔄 Backward cap'], ['visor','🕶️ Visor'], ['bucket','🪣 Bucket hat'], ['none','No hat']];
+const HAT_COLORS = ['#ffffff','#1f2a44','#e2483d','#2f6fd6','#f2bd44','#2e7d4f','#111111','#d9cfb4','#e84393','#ff8a3d'];
+const randHatStyle = () => { const r = Math.random(); return r < .42 ? 'cap' : r < .54 ? 'back' : r < .7 ? 'visor' : r < .84 ? 'bucket' : 'none'; };
+const randBottoms = () => Math.random() < .45 ? 'shorts' : 'pants';
+// Adds a hat around a head centered at (0, y, z) with head radius ~0.052.
+function addHat(part, grp, style, color, y, z){
+  if (style === 'none') { part(grp, 'hemi', '#4a3426', [0, y + .006, z - .004], [.054, .034, .054]); return; }
+  if (style === 'visor') { part(grp, 'cyl', color, [0, y + .022, z], [.055, .014, .055]); part(grp, 'cyl', color, [0, y + .016, z + .042], [.044, .005, .044]); return; }
+  if (style === 'bucket') { part(grp, 'hemi', color, [0, y + .012, z], [.056, .045, .056]); part(grp, 'cyl', color, [0, y + .014, z], [.08, .006, .08]); return; }
+  part(grp, 'hemi', color, [0, y + .01, z], [.056, .04, .056]);
+  part(grp, 'cyl', color, [0, y + .01, z + (style === 'back' ? -.036 : .036)], [.04, .005, .04]);
+}
+
+function makePerson(shirt, skin, hat, pants, look = {}){
   const root = new TH.Group(), walker = new TH.Group(), cart = new TH.Group();
   const part = (grp, g, c, p, s, r) => { const m = new TH.Mesh(GEO[g], mat(c)); m.position.set(...p); m.scale.set(...s); if (r) m.rotation.set(...r); m.castShadow = true; grp.add(m); return m; };
-  const leg = x => { const pv = new TH.Group(); pv.position.set(x, .16, 0); part(pv, 'cyl', pants || '#384057', [0,-.08,0], [.022,.16,.022]); walker.add(pv); return pv; };
+  const leg = x => { const pv = new TH.Group(); pv.position.set(x, .16, 0);
+    if (look.bottoms === 'shorts') { part(pv, 'cyl', pants || '#384057', [0,-.035,0], [.025,.075,.025]); part(pv, 'cyl', skin, [0,-.105,0], [.018,.075,.018]); part(pv, 'cyl', '#ffffff', [0,-.148,0], [.02,.022,.02]); }
+    else part(pv, 'cyl', pants || '#384057', [0,-.08,0], [.022,.16,.022]);
+    walker.add(pv); return pv; };
   const legL = leg(-.032), legR = leg(.032);
   part(walker, 'cyl', shirt, [0,.245,0], [.062,.17,.05]);
   part(walker, 'sphere', shirt, [0,.33,0], [.064,.03,.05]);
   part(walker, 'sphere', skin, [0,.385,0], [.052,.056,.052]);
-  part(walker, 'hemi', hat, [0,.395,0], [.056,.04,.056]);
-  part(walker, 'cyl', hat, [0,.395,.035], [.04,.005,.04]);
+  addHat(part, walker, look.hat || 'cap', hat, .385, 0);
   const club = new TH.Group(); club.position.set(.045, .25, .05); walker.add(club); part(club, 'cyl', '#9aa3ad', [0,-.15,0], [.006,.3,.006]); part(club, 'box', '#5a5f66', [0,-.3,.012], [.012,.012,.03]); club.visible = false;
   part(cart, 'box', '#f4f4ef', [0,.13,0], [.24,.12,.4]);
   part(cart, 'box', '#1f5c35', [0,.44,0], [.27,.02,.42]);
   for (const [x,z] of [[-.11,-.17],[.11,-.17],[-.11,.17],[.11,.17]]) { part(cart, 'cyl', '#2a2a2a', [x,.05,z], [.05,.03,.05], [0,0,Math.PI/2]); part(cart, 'cyl', '#d8d8d2', [x,.28,z], [.008,.3,.008]); }
   part(cart, 'cyl', shirt, [0,.25,.02], [.055,.12,.045]);
   part(cart, 'sphere', skin, [0,.35,.02], [.05,.054,.05]);
-  part(cart, 'hemi', hat, [0,.36,.02], [.054,.038,.054]);
+  addHat(part, cart, look.hat || 'cap', hat, .35, .02);
   root.add(walker); root.add(cart); cart.visible = false; root.scale.setScalar(1.3);
   const ball = new TH.Mesh(GEO.sphere, mat('#ffffff')); ball.scale.setScalar(.032); ball.castShadow = true; ball.visible = false; scene.add(ball);
   scene.add(root);
@@ -1262,7 +1278,7 @@ function syncGolfers(){
   const seen = new Set(), show = S.mode !== 'play';
   for (const g of S.golfers) {
     seen.add(g.id);
-    let rec = people.get(g.id); if (!rec) { rec = makePerson(g.color, g.skin || SKIN[0], g.hat || '#ffffff', g.pants); people.set(g.id, rec); }
+    let rec = people.get(g.id); if (!rec) { rec = makePerson(g.color, g.skin || SKIN[0], g.hat || '#ffffff', g.pants, { hat:g.hatStyle || 'cap', bottoms:g.bottoms || 'pants' }); people.set(g.id, rec); }
     if (!show) { rec.root.visible = false; rec.ball.visible = false; continue; }
     const h = S.holes[g.hole], face = g.state === 'address' && h ? Math.atan2(h.pin.x+.5 - g.bx, h.pin.y+.5 - g.by) : null;
     const follow = g.state === 'flight' && g.fl && g.fl.t < .45 && g.fl.apex > 0;
@@ -1275,7 +1291,7 @@ function syncGolfers(){
   for (const id of [...people.keys()]) if (id !== 'P' && !seen.has(id)) dropPerson(id);
   let pr = people.get('P');
   if (S.mode === 'play' && S.holes[P.hole]) {
-    if (!pr) { pr = makePerson(S.pro.shirt, S.pro.skin, '#1f5c35', S.pro.pants); people.set('P', pr); }
+    if (!pr) { pr = makePerson(S.pro.shirt, S.pro.skin, S.pro.hatColor || '#1f5c35', S.pro.pants, { hat:S.pro.hatStyle || 'cap', bottoms:S.pro.bottoms || 'pants' }); people.set('P', pr); }
     const fx = P.fl ? P.fl.fx : P.bx, fy = P.fl ? P.fl.fy : P.by, pin = pinOf();
     const pf = P.fl && P.fl.t < .45 && P.fl.apex > 0, m = P.meter, back = m.phase === 'power' ? -2.1*Math.min(1, m.v) : m.phase === 'acc' ? -2.1 : 0;
     const sx = fx + Math.cos(P.aim - Math.PI/2)*.3, sy = fy + Math.sin(P.aim - Math.PI/2)*.3;
@@ -1487,7 +1503,7 @@ function nextInterval(){
 function makeGolfer(o){
   const h = S.holes[0];
   const g = { id:++gid, x:DOOR.x, y:DOOR.y, bx:h.tee.x+.5, by:h.tee.y+.5, hole:0, strokes:0, state:'walk', toTee:true, leaving:false,
-    skill:.25 + Math.random()*.7, color:pick(SHIRTS), pants:pick(PANTS), skin:pick(SKIN), hat:pick(HATS), spend:Math.random(), patience:Math.random(), t0:S.clock || 0, ht0:S.clock || 0, sat:55, energy:100, hunger:Math.random()*20, thirst:Math.random()*20, log:[], fl:null, thought:null, quiet:0, ...o };
+    skill:.25 + Math.random()*.7, color:pick(SHIRTS), pants:pick(PANTS), skin:pick(SKIN), hat:pick(HATS), hatStyle:randHatStyle(), bottoms:randBottoms(), spend:Math.random(), patience:Math.random(), t0:S.clock || 0, ht0:S.clock || 0, sat:55, energy:100, hunger:Math.random()*20, thirst:Math.random()*20, log:[], fl:null, thought:null, quiet:0, ...o };
   S.golfers.push(g); return g;
 }
 function spawn(){
@@ -2554,10 +2570,11 @@ function fixMember(m){
   if (m.patience == null) m.patience = Math.random(); if (m.spend == null) m.spend = Math.random();
   m.type = TYPES[m.type] ? m.type : pick(TYPE_IDS); m.country = m.country || '';
   m.shirt = m.shirt || m.color || pick(SHIRTS); m.pants = m.pants || pick(PANTS); m.skin = m.skin || pick(SKIN);
+  m.hatStyle = m.hatStyle || randHatStyle(); m.hatColor = m.hatColor || pick(HAT_COLORS); m.bottoms = m.bottoms || randBottoms();
   m.rec = m.rec || { w:0, l:0, h:0 }; m.h2h = m.h2h || {}; m.titles = m.titles || 0; m.rounds = m.rounds || 0; m.lessons = m.lessons || 0;
   m.skill = avgSkill(m); return m;
 }
-const memberGolfer = m => ({ name:m.name, mid:m.id, country:m.country, type:m.type, skill:m.skill, at:m.at, patience:m.patience, spend:m.spend, color:m.shirt, pants:m.pants, skin:m.skin });
+const memberGolfer = m => ({ name:m.name, mid:m.id, country:m.country, type:m.type, skill:m.skill, at:m.at, patience:m.patience, spend:m.spend, color:m.shirt, pants:m.pants, skin:m.skin, hat:m.hatColor, hatStyle:m.hatStyle, bottoms:m.bottoms });
 const coinCost = v => Math.max(2, Math.round(2 + (v*100 - 50)/7));
 const LESSONS_PER_DAY = 3, LESSON_FEE = 40, LESSON_COINS = 4;
 const busy = id => S.golfers.some(g => g.mid === id && !g.done);
@@ -2907,12 +2924,12 @@ function newOffer(){
   return makeOffer('amateur');
 }
 function fixPro(p){
-  p = Object.assign({ name:'Your Club Pro', country:'', shirt:'#1f5c35', pants:'#d9cfb4', skin:SKIN[0], starts:0, wins:0, top10:0, earnings:0, log:[] }, p || {});
+  p = Object.assign({ name:'Your Club Pro', country:'', shirt:'#1f5c35', pants:'#d9cfb4', skin:SKIN[0], hatStyle:'cap', hatColor:'#1f5c35', bottoms:'pants', starts:0, wins:0, top10:0, earnings:0, log:[] }, p || {});
   if (!p.at) p.at = p.pow != null ? attrsFrom({ pow:p.pow, acc:p.acc, put:p.put, skill:.75 }) : { dr:.75, ac:.75, ir:.75, ch:.75, sd:.75, rc:.75, pt:.75, cm:.75 };
   if (p.at.ir == null) p.at.ir = p.at.ac; if (p.at.cm == null) p.at.cm = .75;
   p.skill = avgSkill(p); return p;
 }
-const proGolfer = () => ({ name:S.pro.name, country:S.pro.country, skill:avgSkill(S.pro), at:S.pro.at, color:S.pro.shirt, pants:S.pro.pants, skin:S.pro.skin, isPro:true });
+const proGolfer = () => ({ name:S.pro.name, country:S.pro.country, skill:avgSkill(S.pro), at:S.pro.at, color:S.pro.shirt, pants:S.pro.pants, skin:S.pro.skin, hat:S.pro.hatColor, hatStyle:S.pro.hatStyle, bottoms:S.pro.bottoms, isPro:true });
 const ord = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v-20) % 10] || s[v] || s[0]); };
 function openSetup(id){
   const t = defOf(id), free = S.members.filter(m => !busy(m.id));
@@ -3188,9 +3205,16 @@ const isProProfile = () => profId === 'pro';
 const curM = () => isProProfile() ? S.pro : S.members.find(m => m.id === profId);
 function avatarSVG(m){
   return `<svg viewBox="0 0 60 80" width="60" height="80" aria-hidden="true"><ellipse cx="30" cy="77" rx="17" ry="3" fill="rgba(0,0,0,.15)"/>` +
-    `<rect x="20.5" y="47" width="8.5" height="29" rx="3.5" fill="${m.pants}" stroke="rgba(0,0,0,.18)"/><rect x="31" y="47" width="8.5" height="29" rx="3.5" fill="${m.pants}" stroke="rgba(0,0,0,.18)"/>` +
+    (m.bottoms === 'shorts' ? [20.5, 31].map(x => `<rect x="${x + 1}" y="56" width="6.5" height="18" rx="3" fill="${m.skin}"/><rect x="${x + 1}" y="72" width="6.5" height="4" rx="1.5" fill="#ffffff" stroke="rgba(0,0,0,.15)"/><rect x="${x}" y="47" width="8.5" height="13" rx="3" fill="${m.pants}" stroke="rgba(0,0,0,.18)"/>`).join('')
+      : `<rect x="20.5" y="47" width="8.5" height="29" rx="3.5" fill="${m.pants}" stroke="rgba(0,0,0,.18)"/><rect x="31" y="47" width="8.5" height="29" rx="3.5" fill="${m.pants}" stroke="rgba(0,0,0,.18)"/>`) +
     `<rect x="16" y="24" width="28" height="28" rx="9" fill="${m.shirt}" stroke="rgba(0,0,0,.18)"/><circle cx="30" cy="15" r="9" fill="${m.skin}"/>` +
-    `<path d="M21 14a9 9 0 0 1 18 0z" fill="#1f5c35"/><rect x="29" y="12" width="13" height="3" rx="1.5" fill="#1f5c35"/></svg>`;
+    hatSVG(m.hatStyle || 'cap', m.hatColor || '#1f5c35') + `</svg>`;
+}
+function hatSVG(st, c){
+  if (st === 'none') return `<path d="M21 14a9 9 0 0 1 18 0z" fill="#4a3426"/>`;
+  if (st === 'visor') return `<rect x="21" y="9.5" width="18" height="3.5" rx="1.5" fill="${c}" stroke="rgba(0,0,0,.15)"/><rect x="31" y="11" width="13" height="3" rx="1.5" fill="${c}" stroke="rgba(0,0,0,.15)"/>`;
+  if (st === 'bucket') return `<path d="M22 13a8 8.5 0 0 1 16 0z" fill="${c}" stroke="rgba(0,0,0,.15)"/><rect x="16.5" y="11.5" width="27" height="3.5" rx="1.75" fill="${c}" stroke="rgba(0,0,0,.15)"/>`;
+  return `<path d="M21 14a9 9 0 0 1 18 0z" fill="${c}" stroke="rgba(0,0,0,.15)"/><rect x="${st === 'back' ? 17 : 30}" y="12" width="13" height="3" rx="1.5" fill="${c}" stroke="rgba(0,0,0,.15)"/>`;
 }
 function profSub(m){
   const ctry = m.country && CTRY[m.country] ? ', ' + CTRY[m.country].name : '';
@@ -3218,7 +3242,10 @@ function renderProfile(){
   h += ATTRS.map(([k,l,d]) => { const v = m.at[k], c = coinCost(v), max = v >= cap - .001;
     return `<div class="ab"><span><b>${l}</b> <span class="small muted">${d}</span></span><span class="abv">${Math.round(v*100)}</span><div class="trainrow"><div class="bar"><i style="width:${Math.min(100, v/cap*100)}%"></i></div><button class="btn alt sm" data-up="${k}" ${max || S.coins < c ? 'disabled' : ''}>${max ? 'Maxed' : `+1 for 🪙 ${c}`}</button></div></div>`; }).join('');
   h += `<h3 class="sec">Shirt</h3><div class="chips">` + SHIRT_PICK.map(c => `<button class="sw${m.shirt === c ? ' on' : ''}" data-shirt="${c}" style="background:${c}" aria-label="Shirt color"></button>`).join('') + '</div>';
-  h += `<h3 class="sec">Pants</h3><div class="chips">` + PANTS.map(c => `<button class="sw${m.pants === c ? ' on' : ''}" data-pants="${c}" style="background:${c}" aria-label="Pants color"></button>`).join('') + '</div>';
+  h += `<h3 class="sec">Shorts or pants</h3><div class="chips">` + [['shorts','🩳 Shorts'],['pants','👖 Pants']].map(([k,l]) => `<button class="chip${(m.bottoms || 'pants') === k ? ' on' : ''}" data-bottoms="${k}">${l}</button>`).join('') + '</div>';
+  h += `<div class="chips" style="margin-top:8px">` + PANTS.map(c => `<button class="sw${m.pants === c ? ' on' : ''}" data-pants="${c}" style="background:${c}" aria-label="${m.bottoms === 'shorts' ? 'Shorts' : 'Pants'} color"></button>`).join('') + '</div>';
+  h += `<h3 class="sec">Hat</h3><div class="chips">` + HAT_STYLES.map(([k,l]) => `<button class="chip${(m.hatStyle || 'cap') === k ? ' on' : ''}" data-hstyle="${k}">${l}</button>`).join('') + '</div>';
+  if ((m.hatStyle || 'cap') !== 'none') h += `<div class="chips" style="margin-top:8px">` + HAT_COLORS.map(c => `<button class="sw${m.hatColor === c ? ' on' : ''}" data-hcolor="${c}" style="background:${c}" aria-label="Hat color"></button>`).join('') + '</div>';
   if (pro) {
     h += `<h3 class="sec">Tour record</h3><div class="stats"><div><b>${m.starts}</b><span>Starts</span></div><div><b>${m.wins}</b><span>Wins</span></div><div><b>${m.top10}</b><span>Top 10s</span></div><div><b>${fmt(m.earnings)}</b><span>Won</span></div></div>`;
     h += m.log.length ? `<table><thead><tr><th>Day</th><th>Event</th><th>Finish</th><th>Prize</th></tr></thead><tbody>${m.log.map(r => `<tr><td>${r.day}</td><td>${esc(r.name)}</td><td>${r.place} (${r.score})</td><td>${r.prize ? fmt(r.prize) : '–'}</td></tr>`).join('')}</tbody></table>`
@@ -3242,12 +3269,16 @@ $('profBody').addEventListener('click', e => {
   else if (b.dataset.ptype && !isProProfile()) m.type = b.dataset.ptype;
   else if (b.dataset.shirt) m.shirt = b.dataset.shirt;
   else if (b.dataset.pants) m.pants = b.dataset.pants;
+  else if (b.dataset.bottoms) m.bottoms = b.dataset.bottoms;
+  else if (b.dataset.hstyle) m.hatStyle = b.dataset.hstyle;
+  else if (b.dataset.hcolor) m.hatColor = b.dataset.hcolor;
   else if (b.dataset.up) {
     const k = b.dataset.up, cap = isProProfile() ? 1.1 : 1, c = coinCost(m.at[k]);
     if (S.coins < c || m.at[k] >= cap - .001) return;
     S.coins -= c; m.at[k] = Math.min(cap, m.at[k] + .01); m.skill = avgSkill(m); profSub(m); updateHUD();
   }
   else return;
+  if (b.dataset.shirt || b.dataset.pants || b.dataset.bottoms || b.dataset.hstyle || b.dataset.hcolor) { if (isProProfile()) dropPerson('P'); for (const g of S.golfers) if ((g.mid && g.mid === m.id) || (g.isPro && isProProfile())) { g.color = m.shirt; g.pants = m.pants; g.bottoms = m.bottoms; g.hatStyle = m.hatStyle; g.hat = m.hatColor; dropPerson(g.id); } }
   const card = $('prof').querySelector('.card'), st = card.scrollTop; renderProfile(); card.scrollTop = st; saveGame();
 });
 $('pName').addEventListener('input', e => { const m = curM(); if (m) m.name = e.target.value; });
@@ -3297,7 +3328,7 @@ function renderScores(){
   const cells = S.holes.map((h,i) => { const sc = (g.card || [])[i], now = !g.leaving && i === g.hole && sc == null, d = sc != null ? sc - h.info.par : 0;
     return `<div class="hc${now ? ' now' : ''}"><span>${i+1}</span><b class="${d < 0 ? 'under' : d > 0 ? 'over' : ''}">${sc ?? (now ? '•' : '')}</b></div>`; }).join('');
   const sub = [golferKind(g), traitTxt(g), g.country && CTRY[g.country] ? CTRY[g.country].name : '', g.mid && !g.ep ? 'Hcp ' + hcp(g.skill) : ''].filter(Boolean).join(', ');
-  body.innerHTML = `<div class="gcard"><div class="ghead"><div class="gav">${avatarSVG({ shirt:g.color, pants:g.pants || '#384057', skin:g.skin || SKIN[0] })}</div>` +
+  body.innerHTML = `<div class="gcard"><div class="ghead"><div class="gav">${avatarSVG({ shirt:g.color, pants:g.pants || '#384057', skin:g.skin || SKIN[0], hatStyle:g.hatStyle, hatColor:g.hat, bottoms:g.bottoms })}</div>` +
     `<div class="ginfo"><span class="small muted">${esc(sub)}</span>${T ? `<b>${T.icon} ${T.name}</b>` : ''}<span class="gq">“${quote}”</span><span class="small">Likes: <b>${T ? T.likes : 'tough, fair holes'}</b></span></div></div>` +
     `<div class="moods">${bar('Fun', sat)}${bar('Energy', g.energy ?? 100)}${bar('Hunger', 100 - (g.hunger || 0))}${bar('Thirst', 100 - (g.thirst || 0))}</div>` +
     `<div class="hstrip">${cells}<div class="hc tot"><span>Tot</span><b>${c.thru ? c.tot : 0}</b></div></div>` +

@@ -9,6 +9,9 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Golfer outfits
+Members and your pro have `hatStyle` (cap, back = backward cap, visor, bucket, none), `hatColor` (`HAT_COLORS`) and `bottoms` (shorts or pants) next to `shirt`/`pants`, edited in their profile (Shorts or pants + color, Hat style + color). Old members get a random style on load (`fixMember`); the pro defaults to a green cap and pants. Visitors get random looks (`randHatStyle`, `randBottoms`). 3D: `addHat()` builds each hat on the walker and the cart rider; shorts = short pant leg, bare lower leg and a white sock. The profile avatar draws the same (`hatSVG`). Changing an outfit redraws that golfer on the course right away.
+
 ### Par 3 courses (LEVELS 9 and 10, `par3:true`, `isPar3()`)
 **Oak Hollow Par 3** (parkland, $12,000 incl. $9,000 build budget, $20 fee) and **Sea Breeze Par 3** (seaside, pot bunkers, $15,000 incl. $10,000, $22 fee). Rules: every hole 100–250 yards (`PAR3_MAX`, also when moving tees/pins), no doglegs (tool hidden), facilities limited to snack bar, drink stand, bench, restroom, pro shop and putting green (`PAR3_FAC`; landmarks still allowed; no range, restaurant or cart barn). Only local amateur invitations. Never count toward the golf tour (`tourQual`). Variety rating uses length spread and elevation instead of par mix; quick rounds bring 30% more golfers. Deer at Oak Hollow, gators at Sea Breeze.
 
