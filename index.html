@@ -395,6 +395,25 @@ body{overflow:hidden;-webkit-touch-callout:none}
 </div></div>
 
 <script src="vendor/three.min.js"></script>
+<script>window.THREE || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
+<script>
+// Safety net: if the game fails to start, explain why and keep the save backup usable.
+(function () {
+  function fail(msg) {
+    if (window.__ftReady || window.__ftFailed) return; window.__ftFailed = true;
+    var l = document.getElementById('levelList');
+    if (l) l.innerHTML = '<p style="color:#e2483d;font-weight:600">The game couldn’t start.</p><p class="small">' + String(msg).replace(/[<>&]/g, '') + '</p><p class="small muted">Close the app completely and open it again. On the GitHub version, check that the vendor folder (three.min.js) is uploaded. Your saves are safe, and you can copy them with the backup button.</p>';
+    var ob = document.getElementById('openBackup'), bk = document.getElementById('backup'), ta = document.getElementById('backupText');
+    if (ob && bk && ta) {
+      ob.onclick = function () { try { ta.value = localStorage.getItem('fairway-tycoon-v1') || ''; } catch (e) {} bk.classList.remove('hidden'); };
+      document.getElementById('backupClose').onclick = function () { bk.classList.add('hidden'); };
+      document.getElementById('backupCopy').onclick = function () { ta.select(); try { navigator.clipboard.writeText(ta.value); } catch (e) {} };
+    }
+  }
+  window.addEventListener('error', function (e) { fail(e.message || 'Unknown error'); });
+  window.addEventListener('DOMContentLoaded', function () { setTimeout(function () { if (!window.__ftReady) fail(typeof THREE === 'undefined' ? 'The 3D engine (three.js) didn’t load.' : 'Loading stopped partway.'); }, 4000); });
+})();
+</script>
 <script>
 (() => {
 'use strict';
@@ -544,7 +563,7 @@ function migrateSave(i, sv){
   sv.holes = (sv.holes || []).map(h => ({ ...h, tee:sh(h.tee), pin:sh(h.pin), bend:sh(h.bend) }));
   sv.facilities = (sv.facilities || []).map(f => ({ ...f, x:f.x + ox, y:f.y + oy }));
 }
-for (const k of Object.keys(store.saves)) migrateSave(+k, store.saves[k]);
+for (const k of Object.keys(store.saves)) { try { migrateSave(+k, store.saves[k]); } catch (e) { console.error('Could not convert save', k, e); } }
 ensureEmpire();
 function saveStore(){ try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} }
 function saveGame(){
@@ -2777,7 +2796,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 new ResizeObserver(() => layout()).observe(stage);
-G = genMap(LEVELS[0]); layout(); showLevels(); requestAnimationFrame(frame);
+G = genMap(LEVELS[0]); layout(); showLevels(); requestAnimationFrame(frame); window.__ftReady = true;
 })();
 </script>
 <script>
