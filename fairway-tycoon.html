@@ -326,6 +326,18 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .shopic{font-size:1.3rem}
 .shopnm{flex:1;display:flex;flex-direction:column;min-width:0}
 .shopp{min-width:62px;text-align:center;font-weight:700}
+.vmeter .markpow{position:absolute;left:-4px;right:-4px;height:3px;background:#f2bd44;margin-bottom:-1px;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.vmeter .markacc{position:absolute;left:-4px;right:-4px;height:3px;background:#4fbf5a;margin-bottom:-1px;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.vmeter .markacc.miss{background:#e2483d}
+.livescore{position:absolute;left:50%;transform:translateX(-50%);top:118px;background:rgba(14,34,22,.86);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:7px 14px;font:inherit;font-size:.85rem;white-space:nowrap;pointer-events:auto}
+.livescore .under{color:#ff8a7a;font-weight:700}.livescore .over{color:#8ab4ff;font-weight:700}
+.sc{display:inline-block;min-width:24px;text-align:center;font-weight:700}
+.sc-birdie,.sc-eagle,.sc-ace{color:#e2483d;border:2px solid #e2483d;border-radius:50%}
+.sc-eagle,.sc-ace{box-shadow:0 0 0 2px var(--panel),0 0 0 4px #e2483d}
+.sc-bogey{color:#2f6fd6;border:2px solid #2f6fd6;border-radius:3px}
+.sc-dbl{color:#2f6fd6;border:2px solid #2f6fd6;border-radius:3px;box-shadow:0 0 0 2px var(--panel),0 0 0 4px #2f6fd6}
+.cmp{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.84rem;margin:4px 0 8px}
+@media (orientation: landscape) and (max-height: 520px){.livescore{top:64px}}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
@@ -344,7 +356,8 @@ body{overflow:hidden;-webkit-touch-callout:none}
     </div>
   </header>
   <main id="stage"><canvas id="gl" aria-hidden="true"></canvas><canvas id="map" aria-label="Golf course map"></canvas><div class="zoom"><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="rotL" aria-label="Rotate left">⟲</button><button id="rotR" aria-label="Rotate right">⟳</button><button id="zFit" class="fit" aria-label="Show whole course">Fit</button></div><div class="undoBox hidden" id="undoBox"><button id="undoBtn" aria-label="Undo, refunds the cost">↶</button><button id="redoBtn" aria-label="Redo">↷</button></div><div id="playUI" class="hidden">
-  <div class="vmeter" aria-hidden="true"><i class="over" id="meterOver"></i><i id="meterSweet" class="sweet"></i><i id="meterFull" class="full"></i><b id="meterFill"></b><span id="meterMark" class="hidden"></span><em id="meterLbl" class="hidden"></em></div>
+  <button id="liveScore" class="livescore" aria-label="Open scoreboard"></button>
+  <div class="vmeter" aria-hidden="true"><i class="over" id="meterOver"></i><i id="meterSweet" class="sweet"></i><i id="meterFull" class="full"></i><b id="meterFill"></b><i id="markPow" class="markpow hidden"></i><i id="markAcc" class="markacc hidden"></i><span id="meterMark" class="hidden"></span><em id="meterLbl" class="hidden"></em></div>
   <div class="windlbl" id="windLbl"></div>
   <button class="pbtn view" id="viewBtn" aria-label="Switch view">🗺️</button>
   <div class="pbar"><button class="pbtn" id="aimL" aria-label="Aim left">◀</button><div class="pclub"><button id="clubPrev" aria-label="Longer club">‹</button><span id="clubName">Driver</span><button id="clubNext" aria-label="Shorter club">›</button></div><button class="pbtn" id="aimR" aria-label="Aim right">▶</button><button class="pbtn swing" id="swingBtn">Swing</button></div>
@@ -2568,20 +2581,25 @@ function autoClub(){
 }
 function resetShot(){ P.aim = autoAim(); P.club = autoClub(); P.meter = { phase:'idle', v:0, power:0 }; updateHint(); updatePlayUI(); }
 function swingTap(){
+  if (P.meter && P.meter.phase === 'idle' && !P.busy && !P.fl) { P.lastPow = null; P.lastAcc = null; }
   if (S.mode !== 'play' || P.busy || P.fl) return;
   const m = P.meter;
   if (m.phase === 'idle') { m.phase = 'power'; m.v = 0; }
-  else if (m.phase === 'power') { m.power = m.v; m.phase = 'acc'; }
+  else if (m.phase === 'power') { m.power = m.v; m.phase = 'acc'; P.lastPow = m.v; }
   else if (m.phase === 'acc') hitP(m.v);
   updateHint(); updatePlayUI();
 }
 function stepMeter(dt){
   const m = P.meter; if (!m || S.mode !== 'play') return;
-  if (m.phase === 'power') { m.v += dt/1.6; if (m.v >= 1.1) { m.v = 1.1; m.power = 1.1; m.phase = 'acc'; updateHint(); } }
-  else if (m.phase === 'acc') { m.v -= dt/1.25; if (m.v <= -.15) { m.v = -.15; hitP(-.15); } }
+  const mt = meterTimes();
+  if (m.phase === 'power') { m.v += dt/mt.up; if (m.v >= 1.1) { m.v = 1.1; m.power = 1.1; m.phase = 'acc'; updateHint(); } }
+  else if (m.phase === 'acc') { m.v -= dt/mt.down; if (m.v <= -.15) { m.v = -.15; hitP(-.15); } }
   if (m.phase !== 'idle') updatePlayUI();
 }
-function sweetW(){ const putt = CLUBS[P.club].putter, p = pinOf(), chip = !putt && Math.hypot(p.x-P.bx, p.y-P.by) < 2.5; return .03 + .045*A(S.pro, putt ? 'pt' : chip ? 'ch' : 'ac'); }
+function shotSkill(){ const putt = CLUBS[P.club].putter, p = pinOf(), d = Math.hypot(p.x-P.bx, p.y-P.by), chip = !putt && d < 2.5; return A(S.pro, putt ? 'pt' : chip ? 'ch' : d < 8 ? 'ir' : 'ac'); }
+function sweetW(){ return .02 + .075*clamp(shotSkill(), .2, 1.1); }
+// Better players get a calmer meter: up to ~25% slower.
+const meterTimes = () => { const k = clamp(shotSkill(), .3, 1.1); return { up: 1.35 + .55*k, down: 1.05 + .45*k }; };
 function hitP(acc){
   const putting = CLUBS[P.club].putter, lie = playLie(), p = pinOf(), m = P.meter, dToPin = Math.hypot(p.x-P.bx, p.y-P.by);
   const chip = !putting && dToPin < 2.5, sk = putting ? A(S.pro,'pt') : chip ? A(S.pro,'ch') : A(S.pro, dToPin < 8 ? 'ir' : 'ac');
@@ -2602,6 +2620,7 @@ function hitP(acc){
   const q = Math.abs(acc) <= sw/2 ? (over ? 'Big swing!' : 'Pure strike!') : acc > 0 ? 'Pushed it right.' : 'Pulled it left.';
   if (!putting) toast(q, 1100);
   P.fl = { fx:P.bx, fy:P.by, tx:x, ty:y, t:0, T: putting ? .45 + dd*.2 : .5 + dd*.04, apex: putting ? 0 : Math.min(2.4, .4 + dd*.13), holed, putting };
+  P.lastPow = m.power; P.lastAcc = acc; P.lastSw = sw; P.lastWord = Math.abs(acc) <= sw/2 ? (over ? 'Big swing!' : 'Pure!') : acc > 0 ? 'Pushed right' : 'Pulled left';
   P.meter = { phase:'idle', v:0, power:0 }; P.strokes++; P.busy = true; updateHint(); updatePlayUI();
 }
 function updatePlayUI(){
@@ -2618,7 +2637,13 @@ function updatePlayUI(){
   const lbl = $('meterLbl');
   if (m.phase === 'power') { const d = clubMaxP()*Math.min(m.v, 1.1); lbl.textContent = c.putter ? Math.round(d*75) + ' ft' : Math.round(d*YD) + ' yds'; lbl.style.bottom = Y(mv); lbl.classList.remove('hidden'); }
   else if (m.phase === 'acc') { lbl.textContent = Math.abs(mv) <= sw/2 ? 'Now!' : mv > 0 ? 'Wait…' : 'Late!'; lbl.style.bottom = Y(mv); lbl.classList.remove('hidden'); }
+  else if (P.lastPow != null && P.lastAcc != null) { lbl.textContent = `${Math.round(P.lastPow*100)}% · ${P.lastWord}`; lbl.style.bottom = Y(P.lastPow); lbl.classList.remove('hidden'); }
   else lbl.classList.add('hidden');
+  const mp = $('markPow'), ma = $('markAcc');
+  if (P.lastPow != null) { mp.style.bottom = Y(P.lastPow); mp.classList.remove('hidden'); } else mp.classList.add('hidden');
+  if (P.lastAcc != null) { ma.style.bottom = Y(P.lastAcc); ma.classList.toggle('miss', Math.abs(P.lastAcc) > (P.lastSw || sw)/2); ma.classList.remove('hidden'); } else ma.classList.add('hidden');
+  { const done = P.scores.length, par = S.holes.slice(0, done).reduce((a, h) => a + h.info.par, 0), tot = P.scores.reduce((a, b) => a + b, 0), tp = tot - par;
+    $('liveScore').innerHTML = `<b>Hole ${P.hole + 1}</b> · ${done ? `<span class="${tp < 0 ? 'under' : tp > 0 ? 'over' : ''}">${toParStr(tp)}</span> thru ${done}` : 'E'} · Stroke ${P.strokes + (P.fl ? 0 : 1)} <span class="lsi">📋</span>`; }
   $('swingBtn').textContent = m.phase === 'idle' ? 'Swing' : m.phase === 'power' ? 'Set power' : 'Hit!';
   $('swingBtn').disabled = !!(P.busy || P.fl);
   { const w = wx(), el = $('windLbl'); if (w.mph >= 2) { const rel = (w.dir - P.aim)*180/Math.PI; el.innerHTML = `<span class="warr" style="transform:rotate(${rel.toFixed(0)}deg)">⬆</span><b>${w.mph}</b><small>mph</small>`; el.classList.remove('hidden'); } else el.classList.add('hidden'); }
@@ -2669,8 +2694,14 @@ function showCard(){
   const finished = done === S.holes.length;
   $('roundTitle').textContent = finished ? 'Round complete' : 'Scorecard';
   $('roundText').textContent = !done ? 'No holes finished yet.' : `${finished ? 'You shot' : 'Through ' + done + (done === 1 ? ' hole' : ' holes') + ', you’re at'} ${tot} on par ${par}, ${d === 0 ? 'even par' : d > 0 ? d + ' over' : (-d) + ' under'}.`;
-  $('roundTable').innerHTML = `<table><thead><tr><th>Hole</th><th>Par</th><th>Yards</th><th>Score</th></tr></thead><tbody>` +
-    S.holes.map((h,i) => `<tr><td>${i+1}</td><td>${h.info.par}</td><td>${h.info.yards}</td><td>${P.scores[i] ?? '–'}</td></tr>`).join('') + '</tbody></table>';
+  let run = 0;
+  const cell = (sc, par) => { if (sc == null) return '–'; const df = sc - par, cls = sc === 1 ? 'sc-ace' : df <= -2 ? 'sc-eagle' : df === -1 ? 'sc-birdie' : df === 1 ? 'sc-bogey' : df >= 2 ? 'sc-dbl' : ''; return `<span class="sc ${cls}">${sc}</span>`; };
+  const cr = S.records && S.records.rounds[S.holes.length], best = S.pro.bestRounds && S.pro.bestRounds[S.holes.length];
+  $('roundTable').innerHTML = `<div class="cmp">${cr ? `<span>🏆 Course record <b>${toParStr(cr.toPar)}</b> (${esc(cr.name)})</span>` : '<span>🏆 No course record yet</span>'}${best != null ? `<span>⭐ ${esc(S.pro.name)}’s best <b>${toParStr(best)}</b></span>` : ''}</div>` +
+    `<table class="scoretbl"><thead><tr><th>Hole</th><th>Par</th><th>Yds</th><th>Score</th><th>Total</th></tr></thead><tbody>` +
+    S.holes.map((h,i) => { const sc = P.scores[i]; if (sc != null) run += sc - h.info.par; return `<tr${i === P.hole && sc == null ? ' class="cur"' : ''}><td>${i+1}</td><td>${h.info.par}</td><td>${h.info.yards}</td><td>${cell(sc, h.info.par)}</td><td>${sc != null ? `<span class="${run < 0 ? 'under' : run > 0 ? 'over' : ''}">${toParStr(run)}</span>` : ''}</td></tr>`; }).join('') +
+    `</tbody><tfoot><tr><td colspan="3"><b>Total</b></td><td><b>${done ? tot : '–'}</b></td><td><b>${done ? toParStr(d) : ''}</b></td></tr></tfoot></table><p class="small muted"><span class="sc sc-birdie">3</span> birdie or better · <span class="sc sc-bogey">5</span> bogey · <span class="sc sc-dbl">6</span> double or worse</p>`;
+  if (finished && !P.paid) { S.pro.bestRounds = S.pro.bestRounds || {}; const k = S.holes.length; if (S.pro.bestRounds[k] == null || d < S.pro.bestRounds[k]) { if (S.pro.bestRounds[k] != null) $('roundText').textContent += ` A new personal best for ${S.pro.name}!`; S.pro.bestRounds[k] = d; } }
   if (finished && !P.paid) { const rr = recordRound(P.scores, S.pro.name, 'Your club pro', S.pro.country); if (rr) $('roundText').textContent += rr.beat ? ' That’s a new course record!' : ' That’s the first course record here!'; }
   if (finished && !P.paid) { P.paid = true; const bonus = 5 + (d < 0 ? 5 : 0); P.coins += bonus; S.coins += bonus; saveGame(); }
   if (P.coins) $('roundText').textContent += ` ${S.pro.name} earned ${P.coins} coin${P.coins === 1 ? '' : 's'} this round${finished ? ', including a round bonus' : ''}.`;
@@ -4195,6 +4226,7 @@ for (const [id, dir] of [['aimL', -1], ['aimR', 1]]) {
 $('clubPrev').addEventListener('click', () => { if (P.meter.phase === 'idle') { P.club = Math.max(0, P.club - 1); updatePlayUI(); } });
 $('clubNext').addEventListener('click', () => { if (P.meter.phase === 'idle') { P.club = Math.min(PUTTER - 1, P.club + 1); updatePlayUI(); } });
 $('swingBtn').addEventListener('click', swingTap);
+$('liveScore').addEventListener('click', e => { e.stopPropagation(); showCard(); });
 $('viewBtn').addEventListener('click', () => {
   P.overview = !P.overview;
   if (P.overview) { const p = pinOf(); view.tx = W2((P.bx + p.x)/2); view.tz = Z2((P.by + p.y)/2); view.dist = view.fitDist*.4; clampCam(); }

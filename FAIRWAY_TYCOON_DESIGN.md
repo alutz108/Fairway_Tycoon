@@ -9,6 +9,11 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Swing meter feedback and live score (play mode)
+- The meter now scales with your pro's skill for the shot (`shotSkill`: putting, chipping inside ~60 yds, irons inside 200, otherwise driving accuracy): power fill 1.35 + 0.55×skill seconds, return 1.05 + 0.45×skill (`meterTimes`), and the green sweet spot is 2% + 7.5%×skill of the meter (`sweetW`) — roughly 5% for a beginner, ~10% for a top pro.
+- After each swing the meter keeps a gold mark at the power you set and a green (or red if missed) mark where you stopped for accuracy, with a label like "52% · Pure!" (`P.lastPow`, `P.lastAcc`, `P.lastWord`), until you start the next swing.
+- A live score chip at the top (`#liveScore`) shows hole, score to par, holes played and current stroke; tapping it opens the scoreboard (`showCard`): hole, par, yards, score (birdie+ red circle, eagle double circle, bogey blue square, double+ double square), running total, totals, course record and your pro's best round for this layout (`S.pro.bestRounds`, a new best is announced).
+
 ### Pro shop pricing
 Tap the pro shop (in look mode, or via Upgrades / ✏️ Edit) → **🏷️ Prices**: golf balls, gloves, logo hats, club polos, drivers (`SHOP_ITEMS`, saved `S.shopPrices`, weekly `S.shopSold`). Fair prices (`fairShop`) rise with stars and prestige. Every arriving golfer (and practicing member) browses once (`shopVisit`): each item's buy chance = base × spending habit × shop level/clerk × clamp(1.8 − 0.8 × price/fair). Revenue per golfer peaks around +10% over fair (~$19 vs ~$18 at fair); above +40% golfers grumble ("Pro shop prices are steep!", a Feedback complaint) and sales fall. Tapping any non-landmark facility in look mode opens its sheet.
 
