@@ -2871,7 +2871,14 @@ $('viewBtn').addEventListener('click', () => {
 
 // ---------- cloud saves (Firebase) ----------
 // Paste your Firebase web config object here (or in the game's Cloud saves screen). It isn't secret; the Firestore rules protect the data.
-const FB_CONFIG = null;
+const FB_CONFIG = {
+  apiKey: "AIzaSyDOFD3IsaDW2V204ssJ71H7fyZOJYMHEVE",
+  authDomain: "fairway-tycoon.firebaseapp.com",
+  projectId: "fairway-tycoon",
+  storageBucket: "fairway-tycoon.firebasestorage.app",
+  messagingSenderId: "217125156632",
+  appId: "1:217125156632:web:5bb8e1cbe6502b30fc106d"
+};
 const FB_VER = '10.12.2', FB_KEY = 'fairway-tycoon-firebase', FB_ON = 'fairway-tycoon-cloud-on';
 var cloud = { auth:null, db:null, user:null, loading:null, timer:null, status:'', err:'', choice:null, auto:true, busy:false };
 function cloudConfig(){ if (FB_CONFIG) return FB_CONFIG; try { return JSON.parse(localStorage.getItem(FB_KEY) || 'null'); } catch(e) { return null; } }
