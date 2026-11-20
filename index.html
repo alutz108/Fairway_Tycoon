@@ -262,25 +262,31 @@ body{overflow:hidden;-webkit-touch-callout:none}
   .dockbtn{min-height:42px;flex-direction:row;gap:6px}
   .dockbtn .di{font-size:1.1rem}
   #toast{top:58px}
+  .dock.three{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion: reduce){.overlay > .card,.tray.enter{animation:none}}
 .recbox{display:flex;flex-direction:column;gap:2px;background:var(--chip);border-radius:12px;padding:10px 12px;margin-bottom:8px}
 .recbox b{font-size:1.4rem}
-#playUI{position:absolute;left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:8px;z-index:4}
-.meter{position:relative;height:24px;border-radius:12px;background:rgba(14,34,22,.82);overflow:hidden;border:1px solid rgba(255,255,255,.25)}
-.meter .sweet{position:absolute;top:0;bottom:0;background:#4fbf5a}
-.meter .full{position:absolute;top:0;bottom:0;width:2px;background:#fff}
-.meter b{position:absolute;top:5px;bottom:5px;background:rgba(242,189,68,.85);border-radius:3px}
-.meter span{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-2px;background:#fff;box-shadow:0 0 6px #000}
-.prow{display:flex;gap:8px;align-items:stretch}
-.pbtn{background:rgba(14,34,22,.85);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:12px;min-width:52px;min-height:48px;font-size:1.15rem;font-weight:700}
-.pbtn.wide{flex:1;font-size:.9rem}
-.pbtn.swing{flex:1.4;background:#e0a526;color:#17301f;font-size:1.1rem}
+#playUI{position:absolute;inset:0;pointer-events:none;z-index:4}
+#playUI > *{pointer-events:auto}
+.vmeter{position:absolute;right:12px;top:30%;bottom:66px;width:26px;border-radius:13px;background:rgba(14,34,22,.72);border:1px solid rgba(255,255,255,.3);pointer-events:none}
+.vmeter i,.vmeter b{position:absolute;left:0;right:0}
+.vmeter .over{background:rgba(226,72,61,.35);top:0;border-radius:13px 13px 0 0}
+.vmeter .sweet{background:#4fbf5a}
+.vmeter .full{height:2px;background:#fff}
+.vmeter b{left:6px;right:6px;background:rgba(242,189,68,.9);border-radius:3px}
+.vmeter span{position:absolute;left:-7px;right:-7px;height:5px;margin-bottom:-2px;background:#fff;border-radius:3px;box-shadow:0 0 6px rgba(0,0,0,.7)}
+.vmeter em{position:absolute;right:34px;margin-bottom:-11px;font-style:normal;font-weight:700;font-size:.8rem;color:#fff;background:rgba(14,34,22,.85);border-radius:8px;padding:3px 7px;white-space:nowrap}
+.pbtn.view{position:absolute;right:4px;bottom:10px;min-width:42px;width:42px;min-height:42px;font-size:1.1rem;padding:0}
+.pbar{position:absolute;left:8px;right:56px;bottom:8px;display:flex;gap:6px;align-items:stretch}
+.pbtn{background:rgba(14,34,22,.8);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:12px;min-width:44px;min-height:46px;font-size:1.05rem;font-weight:700}
+.pbtn.swing{flex:0 0 auto;min-width:84px;background:#e0a526;color:#17301f;font-size:1rem}
 .pbtn:disabled{opacity:.5}
-.pclub{flex:1;display:flex;align-items:center;justify-content:space-between;gap:4px;background:rgba(14,34,22,.85);color:#fff;border-radius:12px;padding:0 4px;font-weight:700;font-size:.88rem;text-align:center}
-.pclub button{background:none;border:0;color:#fff;font-size:1.5rem;min-width:40px;min-height:44px}
+.pclub{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;background:rgba(14,34,22,.8);color:#fff;border-radius:12px;font-weight:700;font-size:.8rem;text-align:center;line-height:1.15}
+.pclub span{min-width:0;overflow:hidden}
+.pclub button{background:none;border:0;color:#fff;font-size:1.4rem;min-width:30px;min-height:44px;padding:0}
 #stage.playing .zoom,#stage.playing .undoBox{display:none}
-.namebox{width:100%;font:15px 'Rubik',system-ui,sans-serif;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);color:var(--ink);margin:4px 0 10px;-webkit-user-select:text;user-select:text}
+.namebox{width:100%;font:16px 'Rubik',system-ui,sans-serif;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);color:var(--ink);margin:4px 0 10px;-webkit-user-select:text;user-select:text}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}}
 </style>
 </head>
@@ -299,9 +305,9 @@ body{overflow:hidden;-webkit-touch-callout:none}
     </div>
   </header>
   <main id="stage"><canvas id="gl" aria-hidden="true"></canvas><canvas id="map" aria-label="Golf course map"></canvas><div class="zoom"><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="rotL" aria-label="Rotate left">⟲</button><button id="rotR" aria-label="Rotate right">⟳</button><button id="zFit" class="fit" aria-label="Show whole course">Fit</button></div><div class="undoBox hidden" id="undoBox"><button id="undoBtn" aria-label="Undo, refunds the cost">↶</button><button id="redoBtn" aria-label="Redo">↷</button></div><div id="playUI" class="hidden">
-  <div class="meter" aria-hidden="true"><i id="meterSweet" class="sweet"></i><i id="meterFull" class="full"></i><b id="meterFill"></b><span id="meterMark" class="hidden"></span></div>
-  <div class="prow"><button class="pbtn" id="aimL" aria-label="Aim left">◀</button><div class="pclub"><button id="clubPrev" aria-label="Longer club">‹</button><span id="clubName">Driver</span><button id="clubNext" aria-label="Shorter club">›</button></div><button class="pbtn" id="aimR" aria-label="Aim right">▶</button></div>
-  <div class="prow"><button class="pbtn wide" id="viewBtn">🗺️ Hole view</button><button class="pbtn swing" id="swingBtn">Swing</button></div>
+  <div class="vmeter" aria-hidden="true"><i class="over" id="meterOver"></i><i id="meterSweet" class="sweet"></i><i id="meterFull" class="full"></i><b id="meterFill"></b><span id="meterMark" class="hidden"></span><em id="meterLbl" class="hidden"></em></div>
+  <button class="pbtn view" id="viewBtn" aria-label="Switch view">🗺️</button>
+  <div class="pbar"><button class="pbtn" id="aimL" aria-label="Aim left">◀</button><div class="pclub"><button id="clubPrev" aria-label="Longer club">‹</button><span id="clubName">Driver</span><button id="clubNext" aria-label="Shorter club">›</button></div><button class="pbtn" id="aimR" aria-label="Aim right">▶</button><button class="pbtn swing" id="swingBtn">Swing</button></div>
 </div><button id="eventChip" class="hidden"></button><div id="toast" role="status" aria-live="polite"></div></main>
   <p id="hint"></p>
   <nav id="tools" aria-label="Build tools"></nav>
@@ -312,7 +318,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <p class="muted">Build courses, run your clubs and grow a golf empire. New land goes up for sale as your empire grows.</p>
   <div id="empireStats" class="estats"></div>
   <div id="levelList"></div>
-  <div class="btns"><button class="btn alt" id="openBackup">Back up or restore saves</button></div>
+  <div class="btns"><button class="btn" id="openCloud">☁️ Cloud saves</button><button class="btn alt" id="openBackup">Back up or restore saves</button></div>
 </div></div>
 
 <div id="help" class="overlay hidden"><div class="card">
@@ -373,6 +379,12 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <div class="btns"><button class="btn" id="ratingClose">Back to the course</button></div>
 </div></div>
 
+<div id="cloud" class="overlay hidden"><div class="card">
+  <h2>☁️ Cloud saves</h2>
+  <div id="cloudBody"></div>
+  <div class="btns"><button class="btn alt" id="cloudClose">Close</button></div>
+</div></div>
+
 <div id="backup" class="overlay hidden"><div class="card">
   <h2>Back up your saves</h2>
   <p class="small muted">Your courses live on this device. Copy the backup code and keep it somewhere safe, like Notes or an email to yourself. To restore, paste a code into the box and tap Restore.</p>
@@ -419,7 +431,9 @@ body{overflow:hidden;-webkit-touch-callout:none}
 'use strict';
 const $ = id => document.getElementById(id);
 const COLS = 34, ROWS = 46, YD = 25, DAY = 40, MAXG = 30;
-const T = { ROUGH:0, FAIR:1, GREEN:2, TEE:3, SAND:4, WATER:5, TREES:6, HOUSE:7, FLOWERS:8, ROCK:9, NATIVE:10, PATH:11 };
+const T = { ROUGH:0, FAIR:1, GREEN:2, TEE:3, SAND:4, WATER:5, TREES:6, HOUSE:7, FLOWERS:8, ROCK:9, NATIVE:10, PATH:11, POT:12, WASTE:13, GBUNK:14, FCUT:15, DEEP:16, FESCUE:17 };
+const isBunker = t => t === T.SAND || t === T.POT || t === T.GBUNK || t === T.WASTE;
+const rollOf = (t, gr = .2) => t === T.FAIR || t === T.TEE ? .45 : t === T.GREEN ? gr : t === T.FCUT ? .3 : t === T.WASTE ? .15 : t === T.ROUGH ? .08 : 0;
 const CHX = Math.floor(COLS/2) - 1, CHY = ROWS - 2, AF = COLS*ROWS/468, MK = Math.hypot(COLS, ROWS)/31.6;
 const DOOR = { x: CHX + 2.4, y: CHY + 1 };
 const TOOLS = {
@@ -428,6 +442,12 @@ const TOOLS = {
   fairway: { name:'Fairway', cost:30,  paint:T.FAIR,  sw:'#7fc25a' },
   green:   { name:'Green',   cost:60,  paint:T.GREEN, sw:'#a6e283' },
   sand:    { name:'Bunker',  cost:25,  paint:T.SAND,  sw:'#ead8a0' },
+  pot:     { name:'Pot bunker', cost:40, paint:T.POT, sw:'#c9b47a' },
+  gbunk:   { name:'Grass-faced', cost:35, paint:T.GBUNK, sw:'#f3e9cf' },
+  waste:   { name:'Waste area', cost:15, paint:T.WASTE, sw:'#cdb98a' },
+  fcut:    { name:'First cut', cost:20, paint:T.FCUT, sw:'#6dae3f' },
+  deep:    { name:'Deep rough', cost:10, paint:T.DEEP, sw:'#3a6f26' },
+  fescue:  { name:'Fescue',  cost:15,  paint:T.FESCUE, sw:'#c4b664' },
   trees:   { name:'Trees',   cost:20,  paint:T.TREES, sw:'#2f6b2f' },
   flowers: { name:'Flowers', cost:35,  paint:T.FLOWERS, sw:'#e86aa6' },
   path:    { name:'Cart path', cost:15, paint:T.PATH, sw:'#d9d1bf' },
@@ -439,15 +459,15 @@ const TOOLS = {
   lower:   { name:'Lower',   cost:40,  elev:-1, icon:'🔻' },
   clear:   { name:'Clear',   cost:10,  paint:T.ROUGH, sw:'#5d9a45' }
 };
-const UPKEEP = { [T.FAIR]:1, [T.GREEN]:3, [T.SAND]:.5, [T.TEE]:1, [T.FLOWERS]:1, [T.PATH]:.2 };
-const ALL_TOOLS = ['hole','dogleg','fairway','green','sand','path','bridge','trees','flowers','water','raise','lower','clear'];
+const UPKEEP = { [T.FAIR]:1, [T.GREEN]:3, [T.SAND]:.5, [T.TEE]:1, [T.FLOWERS]:1, [T.PATH]:.2, [T.POT]:.8, [T.GBUNK]:.7, [T.WASTE]:.2, [T.FCUT]:.6, [T.DEEP]:.1 };
+const ALL_TOOLS = ['hole','dogleg','fairway','green','sand','pot','gbunk','waste','fcut','deep','fescue','path','bridge','trees','flowers','water','raise','lower','clear'];
 const NATIVE_STYLE = {
   desert:    { rim:'#c79f6e', fill:'#dcbb8c', tuft:'#8a7a4a', name:'desert', dots:true },
   sandhills: { rim:'#d3bf8c', fill:'#e8d8aa', tuft:'#9a8f52', name:'waste area' },
   fescue:    { rim:'#b9ad63', fill:'#cfc27a', tuft:'#a39548', name:'fescue' }
 };
 const nativeOf = () => NATIVE_STYLE[LEVELS[S.level].native || 'sandhills'];
-const LIEVAL = { [T.GREEN]:5, [T.FAIR]:4, [T.TEE]:3.5, [T.ROUGH]:1, [T.SAND]:-2, [T.TREES]:-4, [T.WATER]:-12, [T.HOUSE]:-12, [T.FLOWERS]:-3, [T.ROCK]:-15, [T.NATIVE]:-1, [T.PATH]:2.5 };
+const LIEVAL = { [T.GREEN]:5, [T.FAIR]:4, [T.TEE]:3.5, [T.ROUGH]:1, [T.SAND]:-2, [T.TREES]:-4, [T.WATER]:-12, [T.HOUSE]:-12, [T.FLOWERS]:-3, [T.ROCK]:-15, [T.NATIVE]:-1, [T.PATH]:2.5, [T.POT]:-4, [T.GBUNK]:-2.5, [T.WASTE]:-.5, [T.FCUT]:2.5, [T.DEEP]:-1.5, [T.FESCUE]:-3 };
 const LEVELS = [
   { name:'Meadow Run', style:'Open farmland', blurb:'Gentle rolling farmland with a pond or two. The easiest place to learn.',
     seed:11, cash:12000, fee:30, tree:'round', trees:.12, ponds:1, sand:2, goals:{ holes:3, stars:2, earned:1500 } },
@@ -565,7 +585,7 @@ function migrateSave(i, sv){
 }
 for (const k of Object.keys(store.saves)) { try { migrateSave(+k, store.saves[k]); } catch (e) { console.error('Could not convert save', k, e); } }
 ensureEmpire();
-function saveStore(){ try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} }
+function saveStore(fromCloud){ if (!fromCloud) store.savedAt = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} if (!fromCloud) cloudQueue(); }
 function saveGame(){
   store.saves[S.level] = { grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
@@ -645,7 +665,7 @@ function holeInfo(h){
     if (f>.15 && f<.85) { mid++; const t = at(x,y); if (t===T.FAIR || t===T.GREEN) fair++; }
     for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) {
       const xx=Math.floor(x)+dx, yy=Math.floor(y)+dy, t=tile(xx,yy);
-      if (t===T.SAND || t===T.WATER || t===T.TREES || t===T.NATIVE || t===T.ROCK || t===T.FLOWERS) { hz.add(xx+','+yy); if (t===T.WATER) wz.add(xx+','+yy); else if (t===T.SAND) sz.add(xx+','+yy); }
+      if (isBunker(t) || t===T.WATER || t===T.TREES || t===T.NATIVE || t===T.ROCK || t===T.FLOWERS || t===T.DEEP || t===T.FESCUE) { hz.add(xx+','+yy); if (t===T.WATER) wz.add(xx+','+yy); else if (isBunker(t)) sz.add(xx+','+yy); }
     }
   }
   const cov = mid ? fair/mid : 0; const notes = []; let q = 0;
@@ -711,21 +731,90 @@ const GEO = {
   box: new TH.BoxGeometry(1, 1, 1), pyr: (() => { const g = new TH.ConeGeometry(1, 1, 4); g.rotateY(Math.PI/4); return g; })()
 };
 
-// --- terrain (crisp square tiles) ---
-const SUB = 3, VW = COLS*SUB + 1, VH = ROWS*SUB + 1;
+// --- terrain (smooth shapes, crisp grid while building) ---
+const SUB = 4, VW = COLS*SUB + 1, VH = ROWS*SUB + 1;
 let HGT = new Float32Array(VW*VH); const NRM = new Float32Array(VW*VH*3);
 const NVT = COLS*ROWS*SUB*SUB*6;
-const tPos = new Float32Array(NVT*3), tCol = new Float32Array(NVT*3), tNrm = new Float32Array(NVT*3);
+const tPos = new Float32Array(NVT*3), tNrm = new Float32Array(NVT*3);
 const terrainGeo = new TH.BufferGeometry();
-terrainGeo.setAttribute('position', new TH.BufferAttribute(tPos, 3)); terrainGeo.setAttribute('color', new TH.BufferAttribute(tCol, 3)); terrainGeo.setAttribute('normal', new TH.BufferAttribute(tNrm, 3));
-const terrain = new TH.Mesh(terrainGeo, new TH.MeshLambertMaterial({ vertexColors:true }));
+terrainGeo.setAttribute('position', new TH.BufferAttribute(tPos, 3)); terrainGeo.setAttribute('normal', new TH.BufferAttribute(tNrm, 3));
+// Ground colors come from a shader: tile types live in a small texture, and every pixel works out
+// which type dominates around it, giving smooth rounded shapes with crisp edges.
+const TILE_DATA = new Uint8Array(COLS*ROWS*4), tileTex = new TH.DataTexture(TILE_DATA, COLS, ROWS, TH.RGBAFormat);
+tileTex.magFilter = tileTex.minFilter = TH.NearestFilter;
+const PAL_DATA = new Uint8Array(32*2*4), palTex = new TH.DataTexture(PAL_DATA, 32, 2, TH.RGBAFormat);
+palTex.magFilter = palTex.minFilter = TH.NearestFilter;
+const TERRAIN_FRAG_HEAD = `
+uniform sampler2D uTiles; uniform sampler2D uPal; uniform vec2 uSize;
+varying vec2 vTile;
+float ftH(vec2 p){ p = mod(p, 512.0); return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
+vec4 ftTile(vec2 c){ c = clamp(c, vec2(0.0), uSize - 1.0); return texture2D(uTiles, (c + 0.5)/uSize); }
+float ftIdx(vec4 x, float t){ float pad = floor(x.b*255.0 + 0.5); if (pad > 0.5) return 20.0 + pad; if (x.g > 0.5) return 20.0; return t; }
+vec3 ftPal(float i){ return texture2D(uPal, vec2((i + 0.5)/32.0, 0.25)).rgb; }
+vec4 ftRim(float i){ return texture2D(uPal, vec2((i + 0.5)/32.0, 0.75)); }
+float ftEq(float a, float b){ return step(abs(a - b), 0.5); }
+float ftPat(float t, float pad, float fr, vec2 p){
+  float n = ftH(floor(p*8.0));
+  float s = 0.97 + 0.05*n;
+  if (pad > 1.5 && pad < 2.5 || (pad < 0.5 && ftEq(t, 2.0) > 0.5)) s *= mod(floor(p.x*2.0) + floor(p.y*2.0), 2.0) > 0.5 ? 1.04 : 0.97;
+  else if (pad > 0.5 && pad < 1.5) s *= mod(floor(p.y), 2.0) > 0.5 ? 1.06 : 0.95;
+  else if (pad > 0.5) s = 0.99;
+  else if (fr > 0.5) s *= 1.0;
+  else if (ftEq(t, 1.0) + ftEq(t, 3.0) > 0.5) s *= mod(floor((p.x - p.y)*0.9), 2.0) > 0.5 ? 1.07 : 0.94;
+  else if (ftEq(t, 15.0) > 0.5) s *= mod(floor((p.x + p.y)*0.9), 2.0) > 0.5 ? 1.04 : 0.97;
+  else if (ftEq(t, 0.0) > 0.5) s *= mod(floor((p.x + p.y)*0.5), 2.0) > 0.5 ? 1.03 : 0.97;
+  else if (ftEq(t, 16.0) > 0.5) s = 0.9 + 0.14*ftH(floor(p*6.0) + 3.0);
+  else if (ftEq(t, 13.0) > 0.5) s = ftH(floor(p*10.0) + 7.0) < 0.12 ? 0.8 : 0.95 + 0.08*n;
+  else if (ftEq(t, 17.0) > 0.5) s = 0.92 + 0.12*ftH(floor(p*7.0) + 1.0);
+  return s;
+}
+`;
+const TERRAIN_FRAG_BODY = `
+  vec2 fp = floor(vTile);
+  vec4 X[9]; float W[9]; float TY[9];
+  for (int k = 0; k < 9; k++) {
+    vec2 c = fp + vec2(float(k - (k/3)*3) - 1.0, float(k/3) - 1.0);
+    X[k] = ftTile(c); TY[k] = floor(X[k].r*255.0 + 0.5);
+    float d = length(c + 0.5 - vTile);
+    W[k] = pow(max(0.0, 1.0 - d/1.05), 2.0) + X[k].a*0.00005;
+  }
+  float bS = -1.0, bW = -1.0, bT = -1.0; vec4 bX = X[4];
+  for (int a = 0; a < 9; a++) {
+    float sc = 0.0;
+    for (int b = 0; b < 9; b++) sc += ftEq(TY[b], TY[a])*W[b];
+    if (sc > bS + 0.00001 || (ftEq(TY[a], bT) > 0.5 && W[a] > bW)) { bS = max(sc, bS); bT = TY[a]; bW = W[a]; bX = X[a]; }
+  }
+  float sS = 0.0, sT = bT; vec4 sX = bX;
+  for (int a = 0; a < 9; a++) {
+    if (ftEq(TY[a], bT) < 0.5) {
+      float sc = 0.0;
+      for (int b = 0; b < 9; b++) sc += ftEq(TY[b], TY[a])*W[b];
+      if (sc > sS) { sS = sc; sT = TY[a]; sX = X[a]; }
+    }
+  }
+  float m = sS > 0.0 ? (bS - sS)/(bS + sS + 0.0001) : 1.0;
+  float bi = ftIdx(bX, bT), si = ftIdx(sX, sT);
+  vec3 colB = ftPal(bi)*ftPat(bT, floor(bX.b*255.0 + 0.5), bX.g, vTile);
+  vec4 rim = ftRim(bi);
+  colB = mix(colB, rim.rgb, (1.0 - smoothstep(0.0, 0.3, m))*rim.a);
+  vec3 colS = ftPal(si)*ftPat(sT, floor(sX.b*255.0 + 0.5), sX.g, vTile);
+  vec3 ground = mix(colS, colB, 0.5 + 0.5*smoothstep(0.0, 0.03, m));
+  vec4 diffuseColor = vec4( ground, opacity );
+`;
+const terrainMat = new TH.MeshLambertMaterial({ color:0xffffff });
+terrainMat.onBeforeCompile = sh => {
+  sh.uniforms.uTiles = { value: tileTex }; sh.uniforms.uPal = { value: palTex }; sh.uniforms.uSize = { value: new TH.Vector2(COLS, ROWS) };
+  sh.vertexShader = 'varying vec2 vTile;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n  vTile = vec2(position.x + ${(COLS/2).toFixed(1)}, position.z + ${(ROWS/2).toFixed(1)});`);
+  sh.fragmentShader = TERRAIN_FRAG_HEAD + sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', TERRAIN_FRAG_BODY);
+};
+const terrain = new TH.Mesh(terrainGeo, terrainMat);
 terrain.receiveShadow = true; scene.add(terrain);
 const gridGeo = new TH.BufferGeometry();
-const gridLines = new TH.LineSegments(gridGeo, new TH.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:.28 })); gridLines.visible = false; scene.add(gridLines);
+const gridLines = new TH.LineSegments(gridGeo, new TH.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:.5 })); gridLines.visible = false; scene.add(gridLines);
 const RING = 14;
 const water = new TH.Mesh(new TH.PlaneGeometry(COLS + RING*2, ROWS + RING*2), new TH.MeshLambertMaterial({ color:0x1d5fa8, transparent:true, opacity:.92 }));
 water.rotation.x = -Math.PI/2; water.position.y = -.1; water.receiveShadow = true; scene.add(water);
-const TH_H = { [T.ROUGH]:.04, [T.FAIR]:.02, [T.GREEN]:.06, [T.TEE]:.11, [T.SAND]:-.06, [T.WATER]:-.42, [T.TREES]:.05, [T.HOUSE]:.02, [T.FLOWERS]:.08, [T.ROCK]:.32, [T.NATIVE]:.09, [T.PATH]:.03 };
+const TH_H = { [T.ROUGH]:.04, [T.FAIR]:.02, [T.GREEN]:.06, [T.TEE]:.11, [T.SAND]:-.06, [T.WATER]:-.42, [T.TREES]:.05, [T.HOUSE]:.02, [T.FLOWERS]:.08, [T.ROCK]:.32, [T.NATIVE]:.09, [T.PATH]:.03, [T.POT]:-.075, [T.GBUNK]:-.07, [T.WASTE]:-.01, [T.FCUT]:.03, [T.DEEP]:.06, [T.FESCUE]:.1 };
 function heightAt(x, y){
   const vx = clamp(x*SUB, 0, VW-1.001), vy = clamp(y*SUB, 0, VH-1.001), i = Math.floor(vx), j = Math.floor(vy), fx = vx-i, fy = vy-j;
   const h = (ii,jj) => HGT[jj*VW+ii];
@@ -735,7 +824,8 @@ function rebuildTerrain(){
   const LV = LEVELS[S.level], NS = nativeOf();
   const grass = LV.lush ? '#3f8530' : '#4c8a33';
   const TC = { [T.ROUGH]:grass, [T.FAIR]:'#86ca46', [T.GREEN]:'#a3e05a', [T.TEE]:'#93d452', [T.SAND]:'#f3e9cf', [T.WATER]:'#2c5878',
-    [T.TREES]: LV.desert ? NS.fill : '#5a4330', [T.HOUSE]:'#cbc3b0', [T.FLOWERS]:'#6b4a33', [T.ROCK]:'#8d877d', [T.NATIVE]:NS.fill, [T.PATH]:'#c9bfa8' };
+    [T.TREES]: LV.desert ? NS.fill : '#5a4330', [T.HOUSE]:'#cbc3b0', [T.FLOWERS]:'#6b4a33', [T.ROCK]:'#8d877d', [T.NATIVE]:NS.fill, [T.PATH]:'#c9bfa8',
+    [T.POT]:'#eadcb2', [T.GBUNK]:'#f6eed8', [T.WASTE]:'#d6c398', [T.FCUT]:LV.lush ? '#5f9e38' : '#6aa83d', [T.DEEP]:LV.lush ? '#336723' : '#3a6f26', [T.FESCUE]:'#c4b664' };
   const TCC = {}; for (const k in TC) TCC[k] = new TH.Color(TC[k]);
   const DRY_C = new TH.Color('#a99a5c'), FRINGE_C = new TH.Color('#96d257'), PAD = { range:new TH.Color('#80c24c'), putting:new TH.Color('#a3e05a') }, PAD_C = new TH.Color('#d6ccb8');
   // heights: blended so slopes stay smooth
@@ -756,32 +846,31 @@ function rebuildTerrain(){
     const sx = (HGT[j*VW+ir] - HGT[j*VW+il]) / ((ir-il)/SUB), sz = (HGT[jd*VW+i] - HGT[ju*VW+i]) / ((jd-ju)/SUB), l = Math.hypot(sx, 1, sz), k = (j*VW+i)*3;
     NRM[k] = -sx/l; NRM[k+1] = 1/l; NRM[k+2] = -sz/l;
   }
-  // colors: one terrain type per square tile, hard edges, mowing patterns
-  const band = a => ((a % 2) + 2) % 2;
-  let v = 0;
-  const put = (i, j, r, g, b) => { const k = j*VW+i, o = v*3; tPos[o] = W2(i/SUB); tPos[o+1] = HGT[k]; tPos[o+2] = Z2(j/SUB); tNrm[o] = NRM[k*3]; tNrm[o+1] = NRM[k*3+1]; tNrm[o+2] = NRM[k*3+2]; tCol[o] = r; tCol[o+1] = g; tCol[o+2] = b; v++; };
-  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
-    const idx = y*COLS+x, t = G[idx], fo = FO[idx], fac = fo >= 0 && S.facilities[fo] ? S.facilities[fo].type : null;
-    const fringe = (t === T.ROUGH || t === T.FAIR) && FR[idx];
-    let base = fac ? (PAD[fac] || PAD_C) : fringe ? FRINGE_C : (TCC[t] || TCC[T.ROUGH]);
-    if (!fac && (t === T.FAIR || t === T.TEE || t === T.ROUGH || t === T.GREEN || fringe)) { const cv = t === T.GREEN || fringe ? S.cond.greens : S.cond.turf, dryA = clamp((72 - cv)/72, 0, 1)*.6; if (dryA > 0) base = base.clone().lerp(DRY_C, dryA); }
-    const n0 = .97 + .06*hash(x*7+1, y*13+3);
-    for (let b=0; b<SUB; b++) for (let a=0; a<SUB; a++) {
-      let sh = n0; const si = x*SUB+a, sj = y*SUB+b;
-      if (fac === 'putting' || (!fac && t === T.GREEN)) sh *= band((si >> 1) + (sj >> 1)) ? 1.04 : .97;
-      else if (fac === 'range') sh *= band(y) ? 1.06 : .95;
-      else if (fac) sh *= .98 + .03*hash(si, sj);
-      else if (fringe) sh *= 1;
-      else if (t === T.FAIR || t === T.TEE) sh *= band(x - y) ? 1.07 : .94;
-      else if (t === T.ROUGH) sh *= band(Math.floor((x + y)/2)) ? 1.04 : .96;
-      else if (t === T.SAND || t === T.NATIVE) sh *= .97 + .05*hash(si, sj);
-      if (a === 0 || b === 0) sh *= .965;
-      const r = base.r*sh, g = base.g*sh, bl = base.b*sh;
-      put(si, sj, r, g, bl); put(si, sj+1, r, g, bl); put(si+1, sj, r, g, bl);
-      put(si+1, sj, r, g, bl); put(si, sj+1, r, g, bl); put(si+1, sj+1, r, g, bl);
-    }
+  // colors: fill the tile texture and palette the terrain shader reads (see TERRAIN_FRAG_BODY)
+  const PRI = t => t === T.ROUGH ? 0 : t === T.DEEP ? 1 : t === T.FCUT ? 2 : (t === T.FESCUE || t === T.NATIVE) ? 3 : t === T.FAIR ? 4 : 6;
+  for (let idx=0; idx<COLS*ROWS; idx++) {
+    const t = G[idx], fo = FO[idx], fac = fo >= 0 && S.facilities[fo] ? S.facilities[fo].type : null, o = idx*4;
+    TILE_DATA[o] = t; TILE_DATA[o+1] = (t === T.ROUGH || t === T.FAIR) && FR[idx] ? 255 : 0;
+    TILE_DATA[o+2] = fac ? (fac === 'range' ? 1 : fac === 'putting' ? 2 : 3) : 0; TILE_DATA[o+3] = PRI(t)*20 + (fac ? 120 : 0);
   }
-  terrainGeo.attributes.position.needsUpdate = true; terrainGeo.attributes.color.needsUpdate = true; terrainGeo.attributes.normal.needsUpdate = true; terrainGeo.computeBoundingSphere();
+  tileTex.needsUpdate = true;
+  const dryT = clamp((72 - S.cond.turf)/72, 0, 1)*.6, dryG = clamp((72 - S.cond.greens)/72, 0, 1)*.6;
+  const RIM = { [T.POT]:['#3f5f2a', .9], [T.GBUNK]:['#5f9a3c', .65], [T.SAND]:['#d4c393', .5], [T.WASTE]:['#b9a878', .4], [T.GREEN]:['#96d257', .55] };
+  const setPal = (i, c, rim) => {
+    const o = i*4, r = rim ? new TH.Color(rim[0]) : c, o2 = (32 + i)*4;
+    PAL_DATA[o] = clamp(c.r*255, 0, 255); PAL_DATA[o+1] = clamp(c.g*255, 0, 255); PAL_DATA[o+2] = clamp(c.b*255, 0, 255); PAL_DATA[o+3] = 255;
+    PAL_DATA[o2] = r.r*255; PAL_DATA[o2+1] = r.g*255; PAL_DATA[o2+2] = r.b*255; PAL_DATA[o2+3] = rim ? rim[1]*255 : 0;
+  };
+  for (let t=0; t<18; t++) { const c = (TCC[t] || TCC[T.ROUGH]).clone(); if (t === T.FAIR || t === T.TEE || t === T.ROUGH || t === T.FCUT) c.lerp(DRY_C, dryT); if (t === T.GREEN) c.lerp(DRY_C, dryG); setPal(t, c, RIM[t]); }
+  setPal(20, FRINGE_C.clone().lerp(DRY_C, dryG)); setPal(21, PAD.range); setPal(22, PAD.putting); setPal(23, PAD_C);
+  palTex.needsUpdate = true;
+  let v = 0;
+  const put = (i, j) => { const k = j*VW+i, o = v*3; tPos[o] = W2(i/SUB); tPos[o+1] = HGT[k]; tPos[o+2] = Z2(j/SUB); tNrm[o] = NRM[k*3]; tNrm[o+1] = NRM[k*3+1]; tNrm[o+2] = NRM[k*3+2]; v++; };
+  for (let sj=0; sj<VH-1; sj++) for (let si=0; si<VW-1; si++) {
+    if ((si + sj) & 1) { put(si, sj); put(si, sj+1); put(si+1, sj+1); put(si, sj); put(si+1, sj+1); put(si+1, sj); }
+    else { put(si, sj); put(si, sj+1); put(si+1, sj); put(si+1, sj); put(si, sj+1); put(si+1, sj+1); }
+  }
+  terrainGeo.attributes.position.needsUpdate = true; terrainGeo.attributes.normal.needsUpdate = true; terrainGeo.computeBoundingSphere();
   // tile grid shown while building
   const gp = [];
   for (let x=0; x<=COLS; x++) { const i = x*SUB; for (let j=0; j<VH-1; j++) gp.push(W2(i/SUB), HGT[j*VW+i]+.015, Z2(j/SUB), W2(i/SUB), HGT[(j+1)*VW+i]+.015, Z2((j+1)/SUB)); }
@@ -853,6 +942,14 @@ function buildProps(){
   for (const part of STYLE.bush) instanced(bushes, part);
   instanced(blooms, { g:'sphere', p:[0,0,0], s:[1,1,1] });
   for (const part of STYLE.rock) instanced(rocks, part);
+  const tufts = [], TUFT = { [T.FESCUE]:['#e2d27e','#d6c46c','#efe09a'], [T.DEEP]:['#4f8f34','#5c9c3c','#467f2e'], [T.WASTE]:['#9c8d58','#879a4c'] };
+  for (const ty of [T.FESCUE, T.DEEP, T.WASTE]) eachTile(ty, (x,y) => {
+    const n = ty === T.FESCUE ? 6 : ty === T.DEEP ? 5 : 2;
+    for (let k=0; k<n; k++) { if (ty === T.WASTE && hash(x*3+k, y) < .5) continue;
+      tufts.push({ x: x + .08 + hash(x*5+k*7, y*3+k)*.84, y: y + .08 + hash(x*7+k, y*5+k*3)*.84, s: (ty === T.FESCUE ? 1.35 : ty === T.DEEP ? .85 : .7)*(.8 + hash(x+k, y*2)*.4), r: hash(x*2+k, y)*6.28, col: TUFT[ty][Math.floor(hash(x+k*3, y+k)*TUFT[ty].length) % TUFT[ty].length] }); }
+  });
+  const byCol = {}; for (const o of tufts) (byCol[o.col] = byCol[o.col] || []).push(o);
+  for (const c in byCol) instanced(byCol[c], { g:'cone', c, p:[0,.1,0], s:[.075,.22,.075] });
   // clubhouse
   const hg = new TH.Group(), base = heightAt(CHX+1, CHY+1);
   const add = (g, c, p, s, r) => { const m = new TH.Mesh(GEO[g], mat(c, g === 'pyr')); m.position.set(...p); m.scale.set(...s); if (r) m.rotation.set(...r); m.castShadow = true; m.receiveShadow = true; hg.add(m); return m; };
@@ -1171,7 +1268,7 @@ function stepGolfer(g, dt){
 function swing(g){
   const h = S.holes[g.hole]; if (!h) return goHome(g);
   const px = h.pin.x+.5, py = h.pin.y+.5, lie = lieAt(g.bx, g.by), d = Math.hypot(px-g.bx, py-g.by);
-  const putting = lie === T.GREEN || (d < 1.1 && lie !== T.SAND && lie !== T.WATER && lie !== T.TREES);
+  const putting = lie === T.GREEN || (d < 1.1 && !isBunker(lie) && lie !== T.WATER && lie !== T.TREES && lie !== T.DEEP && lie !== T.FESCUE);
   const res = putting ? putt(g, px, py, d) : fullShot(g, px, py, d, lie);
   g.fl = { fx:g.bx, fy:g.by, tx:res.x, ty:res.y, t:0, T: putting ? .45 + Math.min(d,2)*.2 : .5 + res.len*.04, apex: putting ? 0 : Math.min(2.4, .4 + res.len*.13), res };
   g.state = 'flight'; g.strokes++;
@@ -1186,6 +1283,12 @@ function A0(g, k){
 function lieAdj(lie, g){
   const sd = A(g,'sd'), rc = A(g,'rc');
   if (lie === T.SAND) return { mult:.45 + .3*sd, err:1.9 - .8*sd };
+  if (lie === T.POT) return { mult:.28 + .22*sd, err:2.2 - .8*sd };
+  if (lie === T.GBUNK) return { mult:.38 + .3*sd, err:2 - .8*sd };
+  if (lie === T.WASTE) return { mult:.78 + .15*sd, err:1.25 - .2*sd };
+  if (lie === T.FCUT) return { mult:.92 + .05*rc, err:1.08 };
+  if (lie === T.DEEP) return { mult:.5 + .2*rc, err:1.8 - .5*rc };
+  if (lie === T.FESCUE) return { mult:.4 + .25*rc, err:2 - .6*rc };
   if (lie === T.TREES) return { mult:.35 + .25*rc, err:2.1 - .8*rc };
   if (lie === T.ROUGH) return { mult:.72 + .2*rc, err:1.5 - .4*rc };
   if (lie === T.NATIVE) return { mult:.6 + .2*rc, err:1.6 - .5*rc };
@@ -1224,7 +1327,7 @@ function fullShot(g, px, py, d, lie){
   let ddE = dd + dh0, x = g.bx + Math.cos(ang)*ddE, y = g.by + Math.sin(ang)*ddE;
   ddE = Math.max(.3, ddE - (elevAt(x,y) - elevAt(g.bx,g.by))*ELH); x = g.bx + Math.cos(ang)*ddE; y = g.by + Math.sin(ang)*ddE;
   const lt = at(x,y);
-  let roll = (lt===T.FAIR || lt===T.TEE) ? .45 : lt===T.GREEN ? .2 : lt===T.ROUGH ? .08 : 0;
+  let roll = rollOf(lt);
   if (aimPin) roll *= .4;
   x += Math.cos(ang)*roll; y += Math.sin(ang)*roll;
   return { x, y, len:dd, aimPin, putt:false };
@@ -1241,7 +1344,10 @@ function land(g){
     g.strokes++; g.sat -= g.type === 'casual' ? 4 : 2; say(g, 'Splash…', true);
     let k = 0; while (at(x,y) === T.WATER && k < 60) { x = lerp(x, f.fx, .08); y = lerp(y, f.fy, .08); k++; }
     if (at(x,y) === T.WATER) { x = f.fx; y = f.fy; }
-  } else if (t === T.SAND && Math.random() < .5) say(g, 'Beach again?');
+  } else if (t === T.POT && Math.random() < .7) say(g, 'A pot bunker. Ugh.');
+  else if ((t === T.SAND || t === T.GBUNK) && Math.random() < .5) say(g, 'Beach again?');
+  else if (t === T.FESCUE && Math.random() < .6) say(g, 'Lost in the fescue…');
+  else if (t === T.DEEP && Math.random() < .5) say(g, 'Buried in the deep stuff.');
   else if (t === T.TREES && Math.random() < .6) say(g, 'Into the trees…');
   else if (!r.putt && Math.hypot(px-x, py-y)*75 < 3 && Math.random() < .35) { g.bx = px; g.by = py; return holeOut(g); }
   g.bx = x; g.by = y;
@@ -1341,7 +1447,7 @@ const repairCost = () => Math.round((200 + (100 - S.cond.equip)*15)/10)*10;
 function hireStaff(role){ const st = { id:++S.staffId, role, name:randName() }; S.staff.push(st); return st; }
 function maintCalc(){
   const c = S.cond, eff = (1 + .3*Math.min(1, staffN('super'))) * (.6 + .4*c.equip/100);
-  let fair = 0, gr = 0, sand = 0; for (const t of G) { if (t === T.FAIR || t === T.TEE) fair++; else if (t === T.GREEN) gr++; else if (t === T.SAND) sand++; }
+  let fair = 0, gr = 0, sand = 0; for (const t of G) { if (t === T.FAIR || t === T.TEE) fair++; else if (t === T.GREEN) gr++; else if (t === T.SAND || t === T.POT || t === T.GBUNK) sand++; }
   const W = WATERING[S.water] || WATERING.normal;
   const turfCov = fair ? Math.min(1, staffN('grounds')*60*eff/fair) : 1;
   const greenCov = gr ? Math.min(1, (staffN('greens')*25 + staffN('grounds')*4)*eff/gr) : 1;
@@ -1786,7 +1892,7 @@ function holeTap(x, y){
 
 // ---------- play mode ----------
 const P = { hole:0, strokes:0, bx:0, by:0, scores:[], fl:null, drag:null, busy:false, coins:0, paid:false, aim:0, club:0, meter:{ phase:'idle', v:0, power:0 }, overview:false, camInit:false };
-const LIENAME = { [T.ROUGH]:'rough', [T.FAIR]:'fairway', [T.GREEN]:'green', [T.TEE]:'tee box', [T.SAND]:'bunker', [T.TREES]:'trees', [T.PATH]:'cart path' };
+const LIENAME = { [T.ROUGH]:'rough', [T.FAIR]:'fairway', [T.GREEN]:'green', [T.TEE]:'tee box', [T.SAND]:'bunker', [T.TREES]:'trees', [T.PATH]:'cart path', [T.POT]:'pot bunker', [T.GBUNK]:'grass-faced bunker', [T.WASTE]:'waste area', [T.FCUT]:'first cut', [T.DEEP]:'deep rough', [T.FESCUE]:'fescue' };
 function startRound(){
   if (S.event) return toast('Wait for the event to finish before playing a round');
   if (!S.holes.length) return toast('Build a hole first');
@@ -1802,7 +1908,7 @@ function teeUp(i){
 function endRound(){ $('playUI').classList.add('hidden'); $('stage').classList.remove('playing'); S.mode = 'build'; P.fl = null; P.drag = null; buildTools(); updateHint(); }
 const playLie = () => lieAt(P.bx, P.by);
 function pinOf(){ const h = S.holes[P.hole]; return { x:h.pin.x+.5, y:h.pin.y+.5 }; }
-function onGreenP(){ const lie = playLie(), p = pinOf(); return lie === T.GREEN || (Math.hypot(p.x-P.bx, p.y-P.by) < 1.1 && lie !== T.SAND && lie !== T.WATER && lie !== T.TREES); }
+function onGreenP(){ const lie = playLie(), p = pinOf(); return lie === T.GREEN || (Math.hypot(p.x-P.bx, p.y-P.by) < 1.1 && !isBunker(lie) && lie !== T.WATER && lie !== T.TREES && lie !== T.DEEP && lie !== T.FESCUE); }
 const CLUBS = [
   { name:'Driver', f:1 }, { name:'3 Wood', f:.86 }, { name:'5 Iron', f:.72 }, { name:'7 Iron', f:.6 },
   { name:'9 Iron', f:.48 }, { name:'Wedge', f:.34 }, { name:'Sand Wedge', f:.22 }, { name:'Putter', f:0, putter:true }
@@ -1835,8 +1941,8 @@ function swingTap(){
 }
 function stepMeter(dt){
   const m = P.meter; if (!m || S.mode !== 'play') return;
-  if (m.phase === 'power') { m.v += dt/1.05; if (m.v >= 1.1) { m.v = 1.1; m.power = 1.1; m.phase = 'acc'; updateHint(); } }
-  else if (m.phase === 'acc') { m.v -= dt/.8; if (m.v <= -.15) { m.v = -.15; hitP(-.15); } }
+  if (m.phase === 'power') { m.v += dt/1.6; if (m.v >= 1.1) { m.v = 1.1; m.power = 1.1; m.phase = 'acc'; updateHint(); } }
+  else if (m.phase === 'acc') { m.v -= dt/1.25; if (m.v <= -.15) { m.v = -.15; hitP(-.15); } }
   if (m.phase !== 'idle') updatePlayUI();
 }
 function sweetW(){ const putt = CLUBS[P.club].putter, p = pinOf(), chip = !putt && Math.hypot(p.x-P.bx, p.y-P.by) < 2.5; return .03 + .045*A(S.pro, putt ? 'pt' : chip ? 'ch' : 'ac'); }
@@ -1854,7 +1960,7 @@ function hitP(acc){
     const cx = P.bx + Math.cos(ang)*t, cy = P.by + Math.sin(ang)*t;
     if (Math.hypot(p.x-cx, p.y-cy)*75 < 1.4 && (dd-t)*75 < 6) { holed = true; x = p.x; y = p.y; }
   } else {
-    const lt = at(x,y), roll = (lt===T.FAIR || lt===T.TEE) ? .45 : lt===T.GREEN ? .15 : lt===T.ROUGH ? .08 : 0;
+    const lt = at(x,y), roll = rollOf(lt, .15);
     x += Math.cos(ang)*roll*Math.min(1, m.power); y += Math.sin(ang)*roll*Math.min(1, m.power);
   }
   const q = Math.abs(acc) <= sw/2 ? (over ? 'Big swing!' : 'Pure strike!') : acc > 0 ? 'Pushed it right.' : 'Pulled it left.';
@@ -1865,17 +1971,21 @@ function hitP(acc){
 function updatePlayUI(){
   if (S.mode !== 'play' || !S.holes[P.hole]) return;
   const c = CLUBS[P.club], m = P.meter, p = pinOf();
-  $('clubName').textContent = c.putter ? `Putter, ${Math.round(Math.hypot(p.x-P.bx, p.y-P.by)*75)} ft to the cup` : `${c.name}, ${Math.round(clubMaxP()*YD)} yds`;
-  const X = v => ((v + .15)/1.25*100).toFixed(2) + '%', sw = sweetW();
-  $('meterSweet').style.left = X(-sw/2); $('meterSweet').style.width = (sw/1.25*100).toFixed(2) + '%';
-  $('meterFull').style.left = X(1);
+  $('clubName').innerHTML = c.putter ? `Putter<br><small>${Math.round(Math.hypot(p.x-P.bx, p.y-P.by)*75)} ft to cup</small>` : `${c.name}<br><small>${Math.round(clubMaxP()*YD)} yds max</small>`;
+  const Y = v => ((v + .15)/1.25*100).toFixed(2) + '%', H = v => (v/1.25*100).toFixed(2) + '%', sw = sweetW();
+  $('meterSweet').style.bottom = Y(-sw/2); $('meterSweet').style.height = H(sw);
+  $('meterFull').style.bottom = Y(1); $('meterOver').style.bottom = Y(1);
   const pw = m.phase === 'power' ? m.v : m.phase === 'acc' ? m.power : 0;
-  $('meterFill').style.left = X(0); $('meterFill').style.width = (Math.max(0, pw)/1.25*100).toFixed(2) + '%';
-  $('meterMark').style.left = X(m.phase === 'idle' ? 0 : m.v);
-  $('meterMark').classList.toggle('hidden', m.phase === 'idle');
+  $('meterFill').style.bottom = Y(0); $('meterFill').style.height = H(Math.max(0, pw));
+  const mv = m.phase === 'idle' ? 0 : m.v;
+  $('meterMark').style.bottom = Y(mv); $('meterMark').classList.toggle('hidden', m.phase === 'idle');
+  const lbl = $('meterLbl');
+  if (m.phase === 'power') { const d = clubMaxP()*Math.min(m.v, 1.1); lbl.textContent = c.putter ? Math.round(d*75) + ' ft' : Math.round(d*YD) + ' yds'; lbl.style.bottom = Y(mv); lbl.classList.remove('hidden'); }
+  else if (m.phase === 'acc') { lbl.textContent = Math.abs(mv) <= sw/2 ? 'Now!' : mv > 0 ? 'Wait…' : 'Late!'; lbl.style.bottom = Y(mv); lbl.classList.remove('hidden'); }
+  else lbl.classList.add('hidden');
   $('swingBtn').textContent = m.phase === 'idle' ? 'Swing' : m.phase === 'power' ? 'Set power' : 'Hit!';
   $('swingBtn').disabled = !!(P.busy || P.fl);
-  $('viewBtn').textContent = P.overview ? '🏌️ Golfer view' : '🗺️ Hole view';
+  $('viewBtn').textContent = P.overview ? '🏌️' : '🗺️'; $('viewBtn').setAttribute('aria-label', P.overview ? 'Golfer view' : 'Hole view');
 }
 function playCamStep(){
   if (S.mode !== 'play' || P.overview || !S.holes[P.hole]) return;
@@ -2557,9 +2667,9 @@ function updateHint(){
     const away = gr ? `${Math.round(d*75)} ft` : `${Math.round(d*YD)} yds${Math.abs(dhp*YD) >= 4 ? ` (plays ${Math.round((d + dhp)*YD)}, ${dhp > 0 ? 'uphill' : 'downhill'})` : ''}`;
     let txt = `${S.pro.name}: hole ${P.hole+1} of ${S.holes.length}, par ${hl.info.par}. Stroke ${P.strokes+1}, ${away} to the pin from the ${isFringe(P.bx, P.by) && playLie() === T.FAIR && at(P.bx, P.by) === T.ROUGH ? 'fringe' : playLie() === T.NATIVE ? nativeOf().name : playLie() === T.FLOWERS ? 'flower beds' : LIENAME[playLie()] || 'rough'}.`;
     const ph = P.meter.phase;
-    if (ph === 'power') txt = 'Tap to set your power. Past the white line is an overswing.';
-    else if (ph === 'acc') txt = 'Tap when the marker hits the green zone. Early pushes right, late pulls left.';
-    else if (!P.busy) txt += ' Aim with ◀ ▶ or drag, pick a club, then tap Swing.';
+    if (ph === 'power') txt = 'Tap anywhere to set your power. Above the white line is an overswing.';
+    else if (ph === 'acc') txt = 'Tap when the marker drops into the green zone. Early pushes right, late pulls left.';
+    else if (!P.busy) txt += ' Aim with ◀ ▶ or drag, pick a club, then tap Swing. Tap anywhere to set power, then again when the marker drops into the green.';
     $('hint').textContent = txt; return;
   }
   let h;
@@ -2577,8 +2687,8 @@ function updateHint(){
 }
 const TRAYS = {
   fac:   { icon:'🏛️', name:'Facilities', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
-  build: { icon:'🏗️', name:'Build', tools:['hole','dogleg','fairway','green','sand','path','bridge'] },
-  land:  { icon:'🌳', name:'Landscape', tools:['trees','flowers','water','raise','lower','clear'] }
+  build: { icon:'🏗️', name:'Build', tools:['hole','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge'] },
+  land:  { icon:'🌳', name:'Landscape', tools:['fcut','deep','fescue','trees','flowers','water','raise','lower','clear'] }
 };
 function openTray(id){
   S.trayAnim = true;
@@ -2673,12 +2783,12 @@ function preview(L, grid){
   const x = c.getContext('2d'), ns = NATIVE_STYLE[L.native || 'sandhills'];
   const col = { [T.ROUGH]: L.lush ? '#5aa743' : '#69ad4c', [T.FAIR]:'#93d36e', [T.GREEN]:'#b3e995', [T.TEE]:'#a4e07c', [T.SAND]:'#f0dea6', [T.WATER]:'#3e8fd8',
     [T.TREES]: { pine:'#22603a', palm:'#3f8f4a', cactus:'#4f8a4a', cypress:'#2a5a40', longleaf:'#2f6b34' }[L.tree] || '#2b6e30',
-    [T.HOUSE]:'#c0524a', [T.FLOWERS]:'#e85d9a', [T.ROCK]:'#8d877d', [T.NATIVE]: ns.fill, [T.PATH]:'#ddd5c2' };
+    [T.HOUSE]:'#c0524a', [T.FLOWERS]:'#e85d9a', [T.ROCK]:'#8d877d', [T.NATIVE]: ns.fill, [T.PATH]:'#ddd5c2', [T.POT]:'#d9c58e', [T.GBUNK]:'#f3e7c4', [T.WASTE]:'#cdb98a', [T.FCUT]:'#7cb955', [T.DEEP]:'#3f7a2d', [T.FESCUE]:'#c4b664' };
   for (let y=0; y<ROWS; y++) for (let xx=0; xx<COLS; xx++) { x.fillStyle = col[grid[y*COLS+xx]] || '#69ad4c'; x.fillRect(xx*4, y*4, 4, 4); }
   return c;
 }
 function showLevels(){
-  S.active = false; S.speed = 0; updateSpeed(); ensureEmpire(); for (const id of ['help','goals','club','prof','rating','sc','round','done']) $(id).classList.add('hidden');
+  S.active = false; S.speed = 0; updateSpeed(); ensureEmpire(); for (const id of ['help','goals','club','prof','rating','sc','round','done','backup']) $(id).classList.add('hidden');
   const list = $('levelList'); list.innerHTML = '';
   const ev = empireValue(), owned = store.empire.owned, payers = owned.filter(i => store.saves[i]);
   const cash = payers.reduce((a,i) => a + Math.max(0, store.saves[i].money || 0), 0);
@@ -2759,6 +2869,126 @@ $('viewBtn').addEventListener('click', () => {
   updatePlayUI();
 });
 
+// ---------- cloud saves (Firebase) ----------
+// Paste your Firebase web config object here (or in the game's Cloud saves screen). It isn't secret; the Firestore rules protect the data.
+const FB_CONFIG = null;
+const FB_VER = '10.12.2', FB_KEY = 'fairway-tycoon-firebase', FB_ON = 'fairway-tycoon-cloud-on';
+var cloud = { auth:null, db:null, user:null, loading:null, timer:null, status:'', err:'', choice:null, auto:true, busy:false };
+function cloudConfig(){ if (FB_CONFIG) return FB_CONFIG; try { return JSON.parse(localStorage.getItem(FB_KEY) || 'null'); } catch(e) { return null; } }
+function parseFbConfig(txt){ const o = {}; String(txt).replace(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g, (_, k, v) => { o[k] = v; }); return o.apiKey && o.projectId && o.authDomain ? o : null; }
+function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load Firebase.')); document.head.appendChild(s); }); }
+function cloudInit(){
+  if (cloud.loading) return cloud.loading;
+  const cfg = cloudConfig(); if (!cfg) return Promise.reject(new Error('No Firebase settings yet.'));
+  const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
+  cloud.loading = loadScript(base + 'firebase-app-compat.js').then(() => loadScript(base + 'firebase-auth-compat.js')).then(() => loadScript(base + 'firebase-firestore-compat.js')).then(() => {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    cloud.auth = firebase.auth(); cloud.db = firebase.firestore();
+    return new Promise(res => { let first = true; cloud.auth.onAuthStateChanged(u => { cloud.user = u; try { localStorage.setItem(FB_ON, u ? '1' : ''); } catch(e) {} if (first) { first = false; res(u); } renderCloud(); }); });
+  }).catch(e => { cloud.loading = null; throw e; });
+  return cloud.loading;
+}
+const cloudDoc = () => cloud.db.collection('saves').doc(cloud.user.uid);
+const deviceName = () => /iPhone/.test(navigator.userAgent) ? 'iPhone' : /iPad/.test(navigator.userAgent) ? 'iPad' : /Android/.test(navigator.userAgent) ? 'Android' : /Mac/.test(navigator.userAgent) ? 'Mac' : /Windows/.test(navigator.userAgent) ? 'PC' : 'another device';
+const when = t => t ? new Date(t).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : 'never';
+const courseCount = st => Object.keys((st && st.saves) || {}).length;
+function cloudErr(e){
+  const c = e && e.code || '';
+  return c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') ? 'Wrong email or password.' :
+    c.includes('email-already-in-use') ? 'That email already has an account. Tap Sign in instead.' : c.includes('weak-password') ? 'Use a password with at least 6 characters.' :
+    c.includes('invalid-email') ? 'That email address doesn’t look right.' : c.includes('network') ? 'No connection. Check your internet and try again.' :
+    c.includes('permission-denied') ? 'Firebase refused the save. Check the Firestore rules from the setup steps.' : c.includes('too-many-requests') ? 'Too many tries. Wait a minute and try again.' : (e && e.message) || 'Something went wrong.';
+}
+function cloudUpload(){
+  if (!cloud.user || !cloud.db) return Promise.resolve();
+  const data = JSON.stringify(store);
+  if (data.length > 950000) { cloud.status = 'Your saves are too big for one cloud file.'; renderCloud(); return Promise.resolve(); }
+  return cloudDoc().set({ data, savedAt: store.savedAt || Date.now(), device: deviceName(), courses: courseCount(store) })
+    .then(() => { cloud.status = `Saved to the cloud ${when(Date.now())}.`; cloud.err = ''; renderCloud(); })
+    .catch(e => { cloud.err = cloudErr(e); renderCloud(); });
+}
+function cloudQueue(){ if (!cloud || !cloud.user || !cloud.auto) return; clearTimeout(cloud.timer); cloud.timer = setTimeout(cloudUpload, 6000); }
+function cloudFetch(){ return cloudDoc().get().then(d => d.exists ? d.data() : null); }
+function applyCloud(doc){
+  const data = JSON.parse(doc.data);
+  store = { unlocked: data.unlocked || 0, saves: data.saves || {}, empire: data.empire, names: data.names, savedAt: doc.savedAt || Date.now() };
+  for (const k of Object.keys(store.saves)) { try { migrateSave(+k, store.saves[k]); } catch(e) {} }
+  ensureEmpire(); saveStore(true); cloud.choice = null; cloud.status = `Loaded your cloud save from ${doc.device || 'another device'}.`;
+  if (!$('cloud').classList.contains('hidden')) renderCloud();
+  showLevels();
+}
+// After signing in or opening the app: decide which copy wins.
+function cloudSync(signedInNow){
+  return cloudFetch().then(doc => {
+    if (!doc) return cloudUpload();
+    const local = store.savedAt || 0, remote = doc.savedAt || 0;
+    if (!courseCount(store)) return applyCloud(doc);
+    if (signedInNow && Math.abs(remote - local) > 1000) { cloud.choice = doc; openCloud(); return; }
+    if (remote > local + 1000) { cloud.choice = doc; openCloud(); }
+    else if (local > remote + 1000) return cloudUpload();
+  }).catch(e => { cloud.err = cloudErr(e); renderCloud(); });
+}
+function cloudStartup(){
+  let on = ''; try { on = localStorage.getItem(FB_ON); } catch(e) {}
+  if (!cloudConfig() || !on) return;
+  cloudInit().then(u => { if (u) cloudSync(false); }).catch(() => {});
+}
+function openCloud(){
+  $('cloud').classList.remove('hidden'); renderCloud();
+  if (cloudConfig() && !cloud.auth && !cloud.loading) cloudInit().then(() => renderCloud()).catch(e => { cloud.err = e.message + ' Cloud saves work in the GitHub home-screen version with an internet connection.'; renderCloud(); });
+}
+function renderCloud(){
+  const body = $('cloudBody'); if (!body || $('cloud').classList.contains('hidden')) return;
+  let h = '';
+  const msg = (cloud.err ? `<p class="small" style="color:var(--flag)">${esc(cloud.err)}</p>` : '') + (cloud.status ? `<p class="small muted">${esc(cloud.status)}</p>` : '');
+  if (!cloudConfig()) {
+    h += `<p class="small">Sign in to keep the same courses on your iPhone and your computer. This needs a free Firebase project (a one-time setup). Paste the <b>firebaseConfig</b> block from your Firebase project settings here.</p>`;
+    h += `<textarea id="fbCfg" class="namebox" rows="6" spellcheck="false" placeholder="apiKey: &quot;…&quot;, authDomain: &quot;…&quot;, projectId: &quot;…&quot;, …"></textarea>${msg}`;
+    h += `<div class="btns"><button class="btn" data-cact="saveCfg">Save settings</button></div>`;
+  } else if (cloud.choice) {
+    const d = cloud.choice, rc = d.courses ?? courseCount(JSON.parse(d.data || '{}'));
+    h += `<p>Your cloud save and this device have different progress. Which do you want to keep?</p>`;
+    h += `<div class="recbox"><b style="font-size:1rem">☁️ Cloud save</b><span class="small">${rc} course${rc === 1 ? '' : 's'}, saved ${when(d.savedAt)} on ${esc(d.device || 'another device')}</span></div>`;
+    h += `<div class="recbox"><b style="font-size:1rem">📱 This device</b><span class="small">${courseCount(store)} course${courseCount(store) === 1 ? '' : 's'}, saved ${when(store.savedAt)}</span></div>`;
+    h += `<p class="small muted">The one you don’t pick gets replaced. If you’re unsure, tap Back up or restore saves first to copy this device’s saves.</p>${msg}`;
+    h += `<div class="btns"><button class="btn" data-cact="useCloud">Use the cloud save</button><button class="btn alt" data-cact="useLocal">Keep this device’s</button></div>`;
+  } else if (!cloud.auth) {
+    h += cloud.err ? msg : `<p class="muted">Connecting to Firebase…</p>`;
+  } else if (!cloud.user) {
+    h += `<p class="small">Sign in to save your courses online and pick them up on any device.</p>`;
+    h += `<label class="small muted" for="cEmail">Email</label><input id="cEmail" class="namebox" type="email" autocomplete="username" inputmode="email" value="${esc(cloud.email || '')}">`;
+    h += `<label class="small muted" for="cPass">Password</label><input id="cPass" class="namebox" type="password" autocomplete="current-password" value="${esc(cloud.pass || '')}">${msg}`;
+    h += `<div class="btns"><button class="btn" data-cact="signIn" ${cloud.busy ? 'disabled' : ''}>Sign in</button><button class="btn alt" data-cact="signUp" ${cloud.busy ? 'disabled' : ''}>Create account</button><button class="btn alt" data-cact="reset">Forgot password</button></div>`;
+  } else {
+    h += `<p>Signed in as <b>${esc(cloud.user.email || '')}</b>.</p>`;
+    h += `<label class="spread small" style="margin:8px 0"><span>Save to the cloud automatically</span><input type="checkbox" data-cact="auto" ${cloud.auto ? 'checked' : ''} style="width:22px;height:22px"></label>${msg}`;
+    h += `<div class="btns"><button class="btn" data-cact="upload">Save to cloud now</button><button class="btn alt" data-cact="download">Load cloud save</button><button class="btn alt" data-cact="signOut">Sign out</button></div>`;
+  }
+  if (cloudConfig() && !FB_CONFIG) h += `<p class="small muted" style="margin-top:14px"><button class="btn alt" style="padding:6px 10px;font-size:.8rem" data-cact="clearCfg">Change Firebase settings</button></p>`;
+  body.innerHTML = h;
+}
+$('openCloud').addEventListener('click', openCloud);
+$('cloudClose').addEventListener('click', () => { cloud.pass = ''; $('cloud').classList.add('hidden'); });
+$('cloudBody').addEventListener('input', e => { if (e.target.id === 'cEmail') cloud.email = e.target.value; else if (e.target.id === 'cPass') cloud.pass = e.target.value; });
+$('cloudBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-cact]'); if (!b || b.disabled) return; const a = b.dataset.cact;
+  cloud.err = ''; cloud.status = '';
+  const creds = () => [(cloud.email || '').trim(), cloud.pass || ''];
+  const busy = p => { cloud.busy = true; renderCloud(); return p.finally(() => { cloud.busy = false; renderCloud(); }); };
+  if (a === 'saveCfg') { const c = parseFbConfig($('fbCfg').value); if (!c) { cloud.err = 'That doesn’t look like a Firebase config. It needs apiKey, authDomain and projectId.'; return renderCloud(); } try { localStorage.setItem(FB_KEY, JSON.stringify(c)); } catch(err) {} openCloud(); }
+  else if (a === 'clearCfg') { if (!confirm('Remove the Firebase settings from this device?')) return; try { localStorage.removeItem(FB_KEY); localStorage.removeItem(FB_ON); } catch(err) {} if (cloud.auth) cloud.auth.signOut(); location.reload(); }
+  else if (a === 'signIn') { const [em, pw] = creds(); busy(cloud.auth.signInWithEmailAndPassword(em, pw).then(() => { cloud.pass = ''; return cloudSync(true); }).catch(err => { cloud.err = cloudErr(err); })); }
+  else if (a === 'signUp') { const [em, pw] = creds(); busy(cloud.auth.createUserWithEmailAndPassword(em, pw).then(() => { cloud.pass = ''; return cloudUpload(); }).then(() => { cloud.status = 'Account created. Your courses are saved to the cloud.'; }).catch(err => { cloud.err = cloudErr(err); })); }
+  else if (a === 'reset') { const em = (cloud.email || '').trim(); if (!em) { cloud.err = 'Type your email first, then tap Forgot password.'; return renderCloud(); } cloud.auth.sendPasswordResetEmail(em).then(() => { cloud.status = 'Password reset email sent.'; renderCloud(); }).catch(err => { cloud.err = cloudErr(err); renderCloud(); }); }
+  else if (a === 'upload') cloudUpload();
+  else if (a === 'download') { cloudFetch().then(doc => { if (!doc) { cloud.status = 'There’s no cloud save yet.'; return renderCloud(); } if (confirm(`Replace this device’s courses with your cloud save from ${when(doc.savedAt)}?`)) applyCloud(doc); }).catch(err => { cloud.err = cloudErr(err); renderCloud(); }); }
+  else if (a === 'useCloud') applyCloud(cloud.choice);
+  else if (a === 'useLocal') { cloud.choice = null; store.savedAt = Date.now(); saveStore(true); cloudUpload(); }
+  else if (a === 'signOut') { clearTimeout(cloud.timer); cloudUpload().then(() => cloud.auth.signOut()); }
+  else if (a === 'auto') { cloud.auto = b.checked; return; }
+  renderCloud();
+});
+
 // ---------- backup ----------
 $('openBackup').addEventListener('click', () => { $('backupText').value = JSON.stringify(store); $('backupMsg').textContent = ''; $('backup').classList.remove('hidden'); });
 $('backupClose').addEventListener('click', () => $('backup').classList.add('hidden'));
@@ -2772,7 +3002,7 @@ $('backupRestore').addEventListener('click', () => {
   let data; try { data = JSON.parse($('backupText').value.trim()); } catch(e) { $('backupMsg').textContent = 'That doesn’t look like a backup code.'; return; }
   if (!data || typeof data !== 'object' || !data.saves) { $('backupMsg').textContent = 'That doesn’t look like a backup code.'; return; }
   if (!confirm('Replace all your courses on this device with this backup?')) return;
-  store = { unlocked: data.unlocked || 0, saves: data.saves, empire: data.empire }; ensureEmpire(); saveStore();
+  store = { unlocked: data.unlocked || 0, saves: data.saves, empire: data.empire, names: data.names }; ensureEmpire(); saveStore();
   $('backup').classList.add('hidden'); showLevels();
 });
 
@@ -2796,7 +3026,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 new ResizeObserver(() => layout()).observe(stage);
-G = genMap(LEVELS[0]); layout(); showLevels(); requestAnimationFrame(frame); window.__ftReady = true;
+G = genMap(LEVELS[0]); layout(); showLevels(); requestAnimationFrame(frame); window.__ftReady = true; cloudStartup();
 })();
 </script>
 <script>

@@ -23,3 +23,18 @@ Turn your phone sideways: the course fills the screen and the controls move to a
 
 ## Installing
 Open the GitHub Pages link in Safari on iPhone, tap Share, then Add to Home Screen.
+
+## Cloud saves (Firebase)
+Sign in with email and password on the start screen (☁️ Cloud saves) to keep the same courses on every device.
+Firestore rules to publish (Firestore Database → Rules):
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /saves/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
+```
