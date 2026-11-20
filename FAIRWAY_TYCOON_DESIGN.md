@@ -9,6 +9,15 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Pace, messages and news
+Days last 240 sim seconds; golfers walk 3.2 tiles/s (carts 5.5), pre-shot routine 0.9s, longer ball flights, so an 18-hole round fits in a day (~16 s per hole). Pace rating and "taking forever" thresholds are calibrated to that. Toasts stay up 2.6–12 s depending on length, show a 📰 icon, and every message goes into `S.news` (saved, last 40). Tap a message or the day label to open **📰 Club news**, grouped by day.
+
+### Buying land
+Unowned land is muted in the shader (tile G channel 128) and outlined with a gold dashed line while a tray or the land sheet is open (`OWN`, `OWN_EDGES`, `computeOwn`, `drawOwnEdges`). Build tray → 🗺️ **Buy land** lists 8 parcels (`PARCELS`: N/S/E/W strips, 4 corners, ~$55 per tile + $2,000 for strips); on coastal settings the sea side is "Open water". Bought parcels are saved in `S.parcels` and add to property value. Painting, holes, facilities and doglegs only work on owned land (`ownedAt`, `notOwned`).
+
+### Hole editor
+Build tray → ✏️ **Edit hole**: tap a tee or pin to open the hole sheet (highlighted in gold). Move tee / Move pin ($100; a pin off the green adds one green tile; keeps 100–700 yds), Straighten dogleg, Play earlier / later (swaps hole order, records and golfers), Delete hole (tee box back to rough). Undo works for all edits.
+
 ### Crew coverage & equipment shed
 `crewShort()` works out how many more groundskeepers/greenskeepers are needed (first cut counts as half a fairway tile). Shown as a card at the top of Club → Staff (coverage bars + one-tap "Hire them" = `hireNeed`), a pulsing ⚠️ chip in the HUD when short-handed or condition < 50% (opens Staff), a daily warning in the end-of-day toast, and a toast when you paint more grass than the crew can handle (`crewCheckAfterPaint`). **Equipment shed** (`GEAR`, saved as `S.gear`, bought in Staff): Mower fleet (2 levels, crew +25%/+50%), Irrigation (2 levels, water bills −40%/−65%, turf +1/+2 a day), Greens roller (greens +1.5 a day), Maintenance shed (equipment wears half as fast). Playtest: a 6-hole course with the starting crew fell to 11% turf and 2.6★ in 30 days; following the warning kept it at 100% and 4.0★.
 
@@ -179,7 +188,7 @@ Controls: pinch/scroll zoom, two-finger or Move-tool pan, twist / right-drag / Q
 
 | Section marker | What's in it |
 |---|---|
-| (top) | Constants: grid `COLS=34, ROWS=46` (was 18×26; `migrateSave` moves old saves into the new map, offset so the old clubhouse lines up with the new one at `CHX, CHY`; feature counts scale by `AF`, camera fit by `MK`), `YD=25` yards per tile, `DAY=40`, `MAXG=30`, tile types `T`, `TOOLS`, `UPKEEP`, `ALL_TOOLS`, `NATIVE_STYLE`, `LIEVAL`, `LEVELS`, name pools, `COUNTRIES`, `EVENTS`, `SHIRTS`, helpers (`clamp`, `lerp`, `gauss`, `fmt`, `rng`, `hash`, `pick`) |
+| (top) | Constants: map `COLS=50, ROWS=62` with the starting property `BX0=8, BY0=8, BW=34, BH=46` in the middle; clubhouse at `CHX=BX0+16, CHY=BY0+44`. `DAY=240` sim seconds (4 min per day at 1×; ▶▶ is 3×), `MAXG=60`. `migrateSave` converts 18×26 and 34×46 saves (offsets keep the clubhouse in place; coastal settings fill the outer sea side with water); feature counts scale by `AF`, camera fit by `MK`; terrain `SUB=3`, `YD=25` yards per tile, `DAY=40`, `MAXG=30`, tile types `T`, `TOOLS`, `UPKEEP`, `ALL_TOOLS`, `NATIVE_STYLE`, `LIEVAL`, `LEVELS`, name pools, `COUNTRIES`, `EVENTS`, `SHIRTS`, helpers (`clamp`, `lerp`, `gauss`, `fmt`, `rng`, `hash`, `pick`) |
 | `state` | Grid `G` (Uint8Array), state object `S`, save/load (`saveGame`, `store`), `tile()`, `at()`, cart access map `NEAR` / `hasCart()` |
 | `map generation` | `genMap(L)` seeded terrain per setting (coast, creek, trees, flowers, ponds, waste, sand, rocks, clubhouse) |
 | `hole analysis` | `holeInfo(h)` (yards, par, quality, notes, cart), `recompute()` (course stars) |

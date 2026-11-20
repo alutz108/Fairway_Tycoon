@@ -289,6 +289,13 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .windlbl{position:absolute;right:6px;top:calc(30% - 62px);width:52px;padding:4px 0;border-radius:12px;background:rgba(14,34,22,.78);color:#fff;text-align:center;font-size:.8rem;line-height:1.1;pointer-events:none}
 .windlbl .warr{display:block;font-size:1.2rem;transition:transform .3s}
 .windlbl small{display:block;font-size:.62rem;opacity:.8}
+#toast.show{pointer-events:auto;cursor:pointer}
+#toast.show::after{content:'  📰';opacity:.7}
+.hud .day{cursor:pointer}
+.newsitem{margin:4px 0;padding:6px 0;border-bottom:1px solid var(--line);line-height:1.4}
+.edgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.edgrid .btn{padding:12px 8px}
+.btn.danger{color:#c0392b}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
@@ -303,7 +310,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
     <div class="row">
       <div class="day"><span id="dayLbl">Day 1</span><div class="daybar"><i id="dayFill"></i></div></div>
       <div class="group" aria-label="Green fee"><button id="feeDown" aria-label="Lower green fee">−</button><span id="feeLbl">Fee $30</span><button id="feeUp" aria-label="Raise green fee">+</button></div>
-      <div class="group" id="speed" aria-label="Game speed"><button data-s="0" aria-label="Pause">❚❚</button><button data-s="1" aria-label="Play">▶</button><button data-s="4" aria-label="Fast">▶▶</button></div>
+      <div class="group" id="speed" aria-label="Game speed"><button data-s="0" aria-label="Pause">❚❚</button><button data-s="1" aria-label="Play">▶</button><button data-s="3" aria-label="Fast, 3 times speed">▶▶</button></div>
     </div>
   </header>
   <main id="stage"><canvas id="gl" aria-hidden="true"></canvas><canvas id="map" aria-label="Golf course map"></canvas><div class="zoom"><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="rotL" aria-label="Rotate left">⟲</button><button id="rotR" aria-label="Rotate right">⟳</button><button id="zFit" class="fit" aria-label="Show whole course">Fit</button></div><div class="undoBox hidden" id="undoBox"><button id="undoBtn" aria-label="Undo, refunds the cost">↶</button><button id="redoBtn" aria-label="Redo">↷</button></div><div id="playUI" class="hidden">
@@ -402,6 +409,24 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <div class="btns"><button class="btn" id="backupCopy">Copy backup code</button><button class="btn alt" id="backupRestore">Restore from code</button><button class="btn alt" id="backupClose">Close</button></div>
 </div></div>
 
+<div id="land" class="overlay hidden"><div class="card">
+  <h2>🗺️ Buy land</h2>
+  <div id="landBody"></div>
+  <div class="btns"><button class="btn" id="landClose">Back to the course</button></div>
+</div></div>
+
+<div id="holeEd" class="overlay hidden"><div class="card">
+  <h2 id="holeEdTitle">Edit hole</h2>
+  <div id="holeEdBody"></div>
+  <div class="btns"><button class="btn" id="holeEdClose">Done</button></div>
+</div></div>
+
+<div id="news" class="overlay hidden"><div class="card">
+  <h2>📰 Club news</h2>
+  <div id="newsBody"></div>
+  <div class="btns"><button class="btn" id="newsClose">Back to the course</button></div>
+</div></div>
+
 <div id="sc" class="overlay hidden"><div class="card wide">
   <h2 id="scTitle">On the course</h2>
   <div id="scBody"></div>
@@ -438,15 +463,16 @@ body{overflow:hidden;-webkit-touch-callout:none}
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
-const COLS = 34, ROWS = 46, YD = 25, DAY = 40, MAXG = 30;
+const COLS = 50, ROWS = 62, BX0 = 8, BY0 = 8, BW = 34, BH = 46, YD = 25, DAY = 240, MAXG = 60;
 const T = { ROUGH:0, FAIR:1, GREEN:2, TEE:3, SAND:4, WATER:5, TREES:6, HOUSE:7, FLOWERS:8, ROCK:9, NATIVE:10, PATH:11, POT:12, WASTE:13, GBUNK:14, FCUT:15, DEEP:16, FESCUE:17, SHRUB:18 };
 const SPEC = ['', 'round', 'pine', 'palm', 'blossom', 'willow', 'autumn', 'cypress'];
 const isBunker = t => t === T.SAND || t === T.POT || t === T.GBUNK || t === T.WASTE;
 const rollOf = (t, gr = .2) => t === T.FAIR || t === T.TEE ? .45 : t === T.GREEN ? gr : t === T.FCUT ? .3 : t === T.WASTE ? .15 : t === T.ROUGH ? .08 : 0;
-const CHX = Math.floor(COLS/2) - 1, CHY = ROWS - 2, AF = COLS*ROWS/468, MK = Math.hypot(COLS, ROWS)/31.6;
+const CHX = BX0 + 16, CHY = BY0 + 44, AF = COLS*ROWS/468, MK = Math.hypot(COLS, ROWS)/31.6;
 const DOOR = { x: CHX + 2.4, y: CHY + 1 };
 const TOOLS = {
   move:    { name:'Move',    cost:0,   icon:'✋' },
+  edit:    { name:'Edit hole', cost:0, icon:'✏️' },
   hole:    { name:'Hole',    cost:200, icon:'⛳' },
   fairway: { name:'Fairway', cost:30,  paint:T.FAIR,  sw:'#7fc25a' },
   green:   { name:'Green',   cost:60,  paint:T.GREEN, sw:'#a6e283' },
@@ -594,9 +620,12 @@ const KEY = 'fairway-tycoon-v1';
 function loadStore(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object') return { unlocked: s.unlocked||0, saves: s.saves||{} }; } catch(e){} return { unlocked:0, saves:{} }; }
 let store = loadStore();
 function migrateSave(i, sv){
-  const OC = 18, OR = 26; if (!sv || !sv.grid || sv.grid.length !== OC*OR || !LEVELS[i]) return;
-  const ox = CHX - 8, oy = CHY - 24, L = LEVELS[i], g = genMap(L), e = genElev(L, g), br = new Array(COLS*ROWS).fill(0);
-  for (let y=0; y<OR; y++) for (let x=0; x<OC; x++) { const o = y*OC + x, n = (y+oy)*COLS + (x+ox); g[n] = sv.grid[o]; e[n] = sv.elev ? sv.elev[o] : 0; br[n] = sv.bridges ? sv.bridges[o] : 0; }
+  if (!sv || !sv.grid || sv.grid.length === COLS*ROWS || !LEVELS[i]) return;
+  const len = sv.grid.length, OC = len === 18*26 ? 18 : len === 34*46 ? 34 : 0, OR = OC === 18 ? 26 : 46; if (!OC) return;
+  const ox = OC === 18 ? BX0 + 8 : BX0, oy = OC === 18 ? BY0 + 20 : BY0, L = LEVELS[i], g = genMap(L), e = genElev(L, g), br = new Array(COLS*ROWS).fill(0), sp = new Array(COLS*ROWS).fill(0);
+  for (let y=0; y<OR; y++) for (let x=0; x<OC; x++) { const o = y*OC + x, n = (y+oy)*COLS + (x+ox); g[n] = sv.grid[o]; e[n] = sv.elev ? sv.elev[o] : 0; br[n] = sv.bridges ? sv.bridges[o] : 0; sp[n] = sv.species && sv.species.length === len ? sv.species[o] : 0; }
+  if (L.coast) for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) if ((L.coast.side === 'left' && x < BX0) || (L.coast.side === 'top' && y < BY0)) { g[y*COLS+x] = T.WATER; e[y*COLS+x] = 0; }
+  sv.species = sp;
   const sh = p => p ? { x:p.x + ox, y:p.y + oy } : null;
   sv.grid = Array.from(g); sv.elev = Array.from(e); sv.bridges = br;
   sv.holes = (sv.holes || []).map(h => ({ ...h, tee:sh(h.tee), pin:sh(h.pin), bend:sh(h.bend) }));
@@ -608,7 +637,7 @@ function saveStore(fromCloud){ if (!fromCloud) store.savedAt = Date.now(); try {
 function saveGame(){
   store.saves[S.level] = { species:Array.from(TS), grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
-    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
+    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, parcels:S.parcels || [], news:(S.news || []).slice(0, 40), weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
   saveStore();
 }
 
@@ -628,7 +657,7 @@ function genMap(L){
   if (L.coast) {
     const top = L.coast.side === 'top', len = top ? COLS : ROWS, shore = L.coast.type === 'cliff' ? T.ROCK : T.SAND;
     for (let i=0; i<len; i++) {
-      const edge = 2 + Math.round(1.2*Math.sin(i*.45) + r()*.8);
+      const edge = (top ? BY0 : BX0) + 2 + Math.round(1.2*Math.sin(i*.45) + r()*.8);
       const set = (k,t,ob) => top ? put(i,k,t,ob) : put(k,i,t,ob);
       for (let k=0; k<edge; k++) set(k, T.WATER, false);
       set(edge, shore, true); if (r() < .6) set(edge+1, shore, true);
@@ -649,10 +678,67 @@ function genMap(L){
   for (let i=0; i<Math.round((L.waste||0)*AF); i++) blob(r()*COLS, r()*ROWS*.9, 1.2 + r()*1.8, T.NATIVE, .9);
   for (let i=0; i<Math.round(L.sand*AF); i++) blob(r()*COLS, r()*ROWS*.9, L.potBunkers ? .55 + r()*.4 : .8 + r()*1.1, T.SAND);
   for (let i=0; i<Math.round((L.rocks||0)*AF); i++) blob(r()*COLS, r()*ROWS*.9, .6 + r()*.9, T.ROCK, .8);
-  for (let y=ROWS-6; y<ROWS; y++) for (let x=CHX-4; x<CHX+6; x++) if (Math.hypot(x+.5-(CHX+1), y+.5-(CHY+.5)) < 3.4) g[y*COLS+x] = T.ROUGH;
+  for (let y=CHY-4; y<CHY+3; y++) for (let x=CHX-4; x<CHX+6; x++) if (Math.hypot(x+.5-(CHX+1), y+.5-(CHY+.5)) < 3.4) g[y*COLS+x] = T.ROUGH;
   for (let y=CHY; y<CHY+2; y++) for (let x=CHX; x<CHX+2; x++) g[y*COLS+x] = T.HOUSE;
   return g;
 }
+
+// ---------- land you own (buy parcels around the course) ----------
+const PARCELS = {
+  N:  { name:'North strip', x:BX0, y:0, w:BW, h:BY0 },
+  S:  { name:'South strip', x:BX0, y:BY0+BH, w:BW, h:ROWS-BY0-BH },
+  W:  { name:'West strip',  x:0, y:BY0, w:BX0, h:BH },
+  E:  { name:'East strip',  x:BX0+BW, y:BY0, w:COLS-BX0-BW, h:BH },
+  NW: { name:'Northwest corner', x:0, y:0, w:BX0, h:BY0 },
+  NE: { name:'Northeast corner', x:BX0+BW, y:0, w:COLS-BX0-BW, h:BY0 },
+  SW: { name:'Southwest corner', x:0, y:BY0+BH, w:BX0, h:ROWS-BY0-BH },
+  SE: { name:'Southeast corner', x:BX0+BW, y:BY0+BH, w:COLS-BX0-BW, h:ROWS-BY0-BH }
+};
+const parcelPrice = k => { const p = PARCELS[k]; return Math.round(p.w*p.h*55/500)*500 + (k.length === 1 ? 2000 : 0); };
+function parcelOcean(k){
+  const c = (LEVELS[S.level] || {}).coast; if (!c) return false;
+  return c.side === 'left' ? k.includes('W') : c.side === 'top' ? k.includes('N') : false;
+}
+let OWN = new Uint8Array(COLS*ROWS), OWN_EDGES = [];
+const ownedAt = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && OWN[y*COLS+x] === 1;
+function computeOwn(){
+  OWN = new Uint8Array(COLS*ROWS);
+  const fill = (r) => { for (let y=r.y; y<r.y+r.h; y++) for (let x=r.x; x<r.x+r.w; x++) OWN[y*COLS+x] = 1; };
+  fill({ x:BX0, y:BY0, w:BW, h:BH }); for (const k of S.parcels || []) if (PARCELS[k]) fill(PARCELS[k]);
+  OWN_EDGES = [];
+  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) if (OWN[y*COLS+x]) {
+    if (x > 0 && !OWN[y*COLS+x-1]) OWN_EDGES.push([x, y, x, y+1]);
+    if (x < COLS-1 && !OWN[y*COLS+x+1]) OWN_EDGES.push([x+1, y, x+1, y+1]);
+    if (y > 0 && !OWN[(y-1)*COLS+x]) OWN_EDGES.push([x, y, x+1, y]);
+    if (y < ROWS-1 && !OWN[(y+1)*COLS+x]) OWN_EDGES.push([x, y+1, x+1, y+1]);
+  }
+}
+function drawOwnEdges(){
+  if (!OWN_EDGES.length) return;
+  ctx.beginPath();
+  for (const [x0,y0,x1,y1] of OWN_EDGES) { const a = proj(x0, y0, heightAt(x0, y0) + .04), b = proj(x1, y1, heightAt(x1, y1) + .04); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+  ctx.setLineDash([7,5]); ctx.strokeStyle = 'rgba(255,196,64,.95)'; ctx.lineWidth = 2.2; ctx.stroke(); ctx.setLineDash([]);
+}
+let warnedLand = false;
+function notOwned(){ if (!warnedLand) { warnedLand = true; toast('You don’t own that land yet. Buy it with 🏗️ Build → Buy land.'); setTimeout(() => { warnedLand = false; }, 3000); } }
+function openLand(){
+  let h = `<p class="small muted">Your property is the bright area inside the dashed gold line. Buy the land around it to build more holes. The land comes as it is, trees, ponds and all.</p>`;
+  for (const [k, p] of Object.entries(PARCELS)) {
+    const own = (S.parcels || []).includes(k), ocean = parcelOcean(k), price = parcelPrice(k);
+    h += `<div class="ev${own || ocean ? ' owned' : ''}"><div class="spread" style="margin:0"><h3>${p.name}</h3>` +
+      (own ? `<span class="small" style="color:var(--brand);font-weight:700">Owned ✓</span>` : ocean ? `<span class="small muted">Open water</span>` : `<button class="btn sm" data-land="${k}" ${S.money < price ? 'disabled' : ''}>Buy, ${fmt(price)}</button>`) +
+      `</div><p class="small muted" style="margin:4px 0 0">${p.w}×${p.h} tiles, about ${Math.round(p.w*YD)}×${Math.round(p.h*YD)} yards.</p></div>`;
+  }
+  $('landBody').innerHTML = h; $('land').classList.remove('hidden');
+}
+$('landBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-land]'); if (!b || b.disabled) return; const k = b.dataset.land, price = parcelPrice(k);
+  if (S.money < price) return toast(`That land costs ${fmt(price)}.`);
+  if (!confirm(`Buy the ${PARCELS[k].name} for ${fmt(price)}?`)) return;
+  S.money -= price; book('land', -price); S.parcels = [...(S.parcels || []), k]; computeOwn(); terrainDirty = true; recompute(); saveGame();
+  toast(`You bought the ${PARCELS[k].name}! It’s ready to build on.`, 3500); openLand(); updateHUD();
+});
+$('landClose').addEventListener('click', () => $('land').classList.add('hidden'));
 
 // ---------- hole analysis ----------
 const routeOf = h => [h.tee, ...(h.bend ? [h.bend] : []), h.pin].map(p => ({ x:p.x+.5, y:p.y+.5 }));
@@ -737,7 +823,7 @@ const camera = new TH.PerspectiveCamera(14, 1, 2, 1200);
 const hemi = new TH.HemisphereLight(0xc4dcff, 0x3b5a2b, .5); scene.add(hemi);
 const sun = new TH.DirectionalLight(0xfff1dc, .9);
 sun.position.set(-14, 26, -6); sun.castShadow = true; const SMALLSCREEN = Math.min(screen.width, screen.height) < 600; sun.shadow.mapSize.set(SMALLSCREEN ? 2048 : 4096, SMALLSCREEN ? 2048 : 4096);
-Object.assign(sun.shadow.camera, { left:-44, right:44, top:44, bottom:-44, near:1, far:150 });
+Object.assign(sun.shadow.camera, { left:-58, right:58, top:58, bottom:-58, near:1, far:190 });
 sun.shadow.bias = -.0006; sun.shadow.normalBias = .02;
 scene.add(sun); scene.add(sun.target);
 const W2 = x => x - COLS/2, Z2 = y => y - ROWS/2;
@@ -752,7 +838,7 @@ const GEO = {
 };
 
 // --- terrain (smooth shapes, crisp grid while building) ---
-const SUB = 4, VW = COLS*SUB + 1, VH = ROWS*SUB + 1;
+const SUB = 3, VW = COLS*SUB + 1, VH = ROWS*SUB + 1;
 let HGT = new Float32Array(VW*VH); const NRM = new Float32Array(VW*VH*3);
 const NVT = COLS*ROWS*SUB*SUB*6;
 const tPos = new Float32Array(NVT*3), tNrm = new Float32Array(NVT*3);
@@ -769,7 +855,7 @@ uniform sampler2D uTiles; uniform sampler2D uPal; uniform vec2 uSize;
 varying vec2 vTile;
 float ftH(vec2 p){ p = mod(p, 512.0); return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
 vec4 ftTile(vec2 c){ c = clamp(c, vec2(0.0), uSize - 1.0); return texture2D(uTiles, (c + 0.5)/uSize); }
-float ftIdx(vec4 x, float t){ float pad = floor(x.b*255.0 + 0.5); if (pad > 0.5) return 20.0 + pad; if (x.g > 0.5) return 20.0; return t; }
+float ftIdx(vec4 x, float t){ float pad = floor(x.b*255.0 + 0.5); if (pad > 0.5) return 20.0 + pad; if (x.g > 0.75) return 20.0; return t; }
 vec3 ftPal(float i){ return texture2D(uPal, vec2((i + 0.5)/32.0, 0.25)).rgb; }
 vec4 ftRim(float i){ return texture2D(uPal, vec2((i + 0.5)/32.0, 0.75)); }
 float ftEq(float a, float b){ return step(abs(a - b), 0.5); }
@@ -779,7 +865,7 @@ float ftPat(float t, float pad, float fr, vec2 p){
   if (pad > 1.5 && pad < 2.5 || (pad < 0.5 && ftEq(t, 2.0) > 0.5)) s *= mod(floor(p.x*2.0) + floor(p.y*2.0), 2.0) > 0.5 ? 1.04 : 0.97;
   else if (pad > 0.5 && pad < 1.5) s *= mod(floor(p.y), 2.0) > 0.5 ? 1.06 : 0.95;
   else if (pad > 0.5) s = 0.99;
-  else if (fr > 0.5) s *= 1.0;
+  else if (fr > 0.75) s *= 1.0;
   else if (ftEq(t, 1.0) + ftEq(t, 3.0) > 0.5) s *= mod(floor((p.x - p.y)*0.9), 2.0) > 0.5 ? 1.07 : 0.94;
   else if (ftEq(t, 15.0) > 0.5) s *= mod(floor((p.x + p.y)*0.9), 2.0) > 0.5 ? 1.04 : 0.97;
   else if (ftEq(t, 0.0) > 0.5) s *= mod(floor((p.x + p.y)*0.5), 2.0) > 0.5 ? 1.03 : 0.97;
@@ -819,6 +905,8 @@ const TERRAIN_FRAG_BODY = `
   colB = mix(colB, rim.rgb, (1.0 - smoothstep(0.0, 0.3, m))*rim.a);
   vec3 colS = ftPal(si)*ftPat(sT, floor(sX.b*255.0 + 0.5), sX.g, vTile);
   vec3 ground = mix(colS, colB, 0.5 + 0.5*smoothstep(0.0, 0.03, m));
+  float un = step(0.25, bX.g)*step(bX.g, 0.75);
+  ground = mix(ground, vec3(dot(ground, vec3(0.3, 0.45, 0.25)))*vec3(0.78, 0.82, 0.74), 0.55*un);
   vec4 diffuseColor = vec4( ground, opacity );
 `;
 const terrainMat = new TH.MeshLambertMaterial({ color:0xffffff });
@@ -870,7 +958,7 @@ function rebuildTerrain(){
   const PRI = t => t === T.ROUGH ? 0 : t === T.DEEP ? 1 : t === T.FCUT ? 2 : (t === T.FESCUE || t === T.NATIVE) ? 3 : t === T.FAIR ? 4 : 6;
   for (let idx=0; idx<COLS*ROWS; idx++) {
     const t = G[idx], fo = FO[idx], fac = fo >= 0 && S.facilities[fo] ? S.facilities[fo].type : null, o = idx*4;
-    TILE_DATA[o] = t; TILE_DATA[o+1] = (t === T.ROUGH || t === T.FAIR) && FR[idx] ? 255 : 0;
+    TILE_DATA[o] = t; TILE_DATA[o+1] = (t === T.ROUGH || t === T.FAIR) && FR[idx] ? 255 : OWN[idx] ? 0 : 128;
     TILE_DATA[o+2] = fac ? (fac === 'range' ? 1 : fac === 'putting' ? 2 : 3) : 0; TILE_DATA[o+3] = PRI(t)*20 + (fac ? 120 : 0);
   }
   tileTex.needsUpdate = true;
@@ -1155,7 +1243,7 @@ function panBy(dx, dy){
   if (a && b) { view.tx += b.x - a.x; view.tz += b.z - a.z; clampCam(); }
 }
 function rotateBy(a){ view.yawT += a; }
-function resetView(){ view.tx = 0; view.tz = 0; view.dist = view.fitDist * (SH/SW > 1.1 ? .42 : .62); view.tz = ROWS/2 - 14; clampCam(); clampCam(); }
+function resetView(){ view.tx = W2(BX0 + BW/2); view.dist = view.fitDist * (SH/SW > 1.1 ? .3 : .45); view.tz = Z2(CHY) - 12; clampCam(); clampCam(); }
 function layout(){
   const r = stage.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
   SW = Math.max(100, r.width); SH = Math.max(100, r.height);
@@ -1216,6 +1304,8 @@ function draw(now){
     ctx.setLineDash([]); for (const h of S.holes) if (h.bend) { ringWorld(h.bend.x+.5, h.bend.y+.5, .22); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fill(); }
     ctx.setLineDash([]);
   }
+  if (S.mode === 'build' && (S.tray || !$('land').classList.contains('hidden'))) drawOwnEdges();
+  if (S.mode === 'build' && S.tool === 'edit') S.holes.forEach((h, i) => { const sel = i === editSel || (S.editMove && S.editMove.hole === i); if (!sel) return; for (const p of [h.tee, h.pin]) { ringWorld(p.x+.5, p.y+.5, .7); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.stroke(); } });
   if (S.pendingTee) {
     const t = S.pendingTee, pulse = (Math.sin(now/180)+1)/2;
     ringWorld(t.x+.5, t.y+.5, .5); ctx.fillStyle = `rgba(255,255,255,${.3 + .3*pulse})`; ctx.fill();
@@ -1300,11 +1390,11 @@ function stepGolfer(g, dt){
   if (g.state === 'walk') {
     const sl = g.toTee ? (g.slot || 0) : 0, dtr = !g.leaving && g.detour, tx = g.leaving ? DOOR.x : dtr ? dtr.x : g.bx - .3 - sl*.24, ty = g.leaving ? DOOR.y : dtr ? dtr.y : g.by + .14 + sl*.12;
     const riding = !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
-    const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 11 : 6)*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
+    const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 5.5 : 3.2)*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
     if (d <= step) { g.x = tx; g.y = ty;
       if (g.leaving) { g.done = true; finishRound(g); }
       else if (dtr) { g.detour = null; useFacility(g, dtr.f); }
-      else { g.state = 'address'; g.t = .5; g.atTee = g.toTee; g.toTee = false; }
+      else { g.state = 'address'; g.t = .9; g.atTee = g.toTee; g.toTee = false; }
     } else { g.x += dx/d*step; g.y += dy/d*step; }
   } else if (g.state === 'address') {
     if (g.grp && g.atTee && S.golfers.some(o => o !== g && o.grp === g.grp && !o.done && !o.leaving && (o.hole < g.hole || (o.hole === g.hole && o.toTee)))) { g.t = .5; g.waiting = true; }
@@ -1318,7 +1408,7 @@ function swing(g){
   const px = h.pin.x+.5, py = h.pin.y+.5, lie = lieAt(g.bx, g.by), d = Math.hypot(px-g.bx, py-g.by);
   const putting = lie === T.GREEN || (d < 1.1 && !isBunker(lie) && lie !== T.WATER && lie !== T.TREES && lie !== T.DEEP && lie !== T.FESCUE);
   const res = putting ? putt(g, px, py, d) : fullShot(g, px, py, d, lie);
-  g.fl = { fx:g.bx, fy:g.by, tx:res.x, ty:res.y, t:0, T: putting ? .45 + Math.min(d,2)*.2 : .5 + res.len*.04, apex: putting ? 0 : Math.min(2.4, .4 + res.len*.13), res };
+  g.fl = { fx:g.bx, fy:g.by, tx:res.x, ty:res.y, t:0, T: putting ? .7 + Math.min(d,2)*.3 : .9 + res.len*.07, apex: putting ? 0 : Math.min(2.4, .4 + res.len*.13), res };
   g.state = 'flight'; g.strokes++;
 }
 // Golfer attributes: dr driving, ac accuracy, ch chipping, sd sand, rc recovery, pt putting (0.1-1.1)
@@ -1414,7 +1504,7 @@ function holeOut(g){
   const sc0 = (-diff)*(g.type === 'social' ? 4 : 7);
   g.sat += (sc0 < 0 ? sc0*(1.4 - .8*(g.patience ?? .5)) : sc0) + (h.info.q - 5.5)*1.6 + tz.d;
   const hd = (S.clock || 0) - (g.ht0 ?? 0); g.ht0 = S.clock || 0;
-  if (hd > 14 && (g.patience ?? .5) < .4) { g.sat -= 2; if (!tz.say) tz.say = 'This is taking forever.'; }
+  if (hd > 32 && (g.patience ?? .5) < .4) { g.sat -= 2; if (!tz.say) tz.say = 'This is taking forever.'; }
   if (g.mp) (g.side === 'a' ? g.mp.ca : g.mp.cb).push(sc);
   let text = sc === 1 ? pick(LINES.ace) : diff <= -2 ? pick(LINES.eagle) : diff === -1 ? pick(LINES.birdie) :
     diff === 0 ? (h.info.q >= 7.5 ? pick(LINES.parGreat) : Math.random() < .45 ? pick(LINES.par) : null) : diff === 1 ? (Math.random() < .45 ? pick(LINES.bogey) : null) : diff === 2 ? pick(LINES.double) : pick(LINES.worse);
@@ -1694,8 +1784,8 @@ function courseRatings(){
   r.fairness = clamp(10 - avg(h => h.info.notes.reduce((a,t) => a + (PEN[t] || 0), 0))*1.5, 0, 10);
   r.greens = clamp(avg(h => Math.min(1, (h.info.gs || 0)/9))*4 + S.cond.greens/100*6, 0, 10);
   r.condition = condScore()/10;
-  const spH = S.paceLog && S.paceLog.length ? S.paceLog.reduce((a,b) => a+b, 0)/S.paceLog.length : 7;
-  r.paceMin = Math.round(spH*18*1.57); r.pace = clamp(10 - (spH - 7)*.9, 0, 10);
+  const spH = S.paceLog && S.paceLog.length ? S.paceLog.reduce((a,b) => a+b, 0)/S.paceLog.length : 16;
+  r.paceMin = Math.round(spH*18*.86); r.pace = clamp(10 - (spH - 15)*.45, 0, 10);
   r.satisfaction = (S.recent.length ? S.recent.reduce((a,b) => a+b, 0)/S.recent.length : 50)/10;
   return r;
 }
@@ -1774,7 +1864,7 @@ function ensureEmpire(){
 }
 const owns = i => store.empire.owned.includes(i);
 function propertyValue(){
-  return Math.round((Math.max(10000, LAND[S.level] ?? 30000) + S.holes.length*1500 + S.facilities.reduce((a,f) => a + FACS[f.type].cost*.6, 0) + S.course.stars*S.holes.length*700 + S.members.length*400 + S.prestige*800)/100)*100;
+  return Math.round((Math.max(10000, LAND[S.level] ?? 30000) + (S.parcels || []).reduce((a,k) => a + parcelPrice(k)*.8, 0) + S.holes.length*1500 + S.facilities.reduce((a,f) => a + FACS[f.type].cost*.6, 0) + S.course.stars*S.holes.length*700 + S.members.length*400 + S.prestige*800)/100)*100;
 }
 function savedValue(i){
   const sv = store.saves[i];
@@ -1864,6 +1954,7 @@ function facTap(x, y){
   for (let dy=0; dy<F.h; dy++) for (let dx=0; dx<F.w; dx++) {
     const tx = x0+dx, ty = y0+dy, t = tile(tx, ty);
     if (t < 0) return toast(`The ${F.name} doesn’t fit there.`);
+    if (!ownedAt(tx, ty)) return notOwned();
     if (t === T.WATER || t === T.HOUSE || t === T.TEE || t === T.GREEN || t === T.ROCK) return toast(`The ${F.name} needs a clear ${F.w}×${F.h} spot away from water, tees, greens and buildings.`);
     tiles.push([tx, ty]);
   }
@@ -1979,7 +2070,8 @@ function paintAt(tx, ty){
   if (S.event) { if (!warnedCash) { toast('The course is locked while an event is on'); warnedCash = true; } return; }
   const tool = TOOLS[S.tool], cells = [];
   const r = S.brush === 3 && !tool.thin ? 1 : 0;
-  for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++) cells.push([tx+dx, ty+dy]);
+  for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++) if (ownedAt(tx+dx, ty+dy)) cells.push([tx+dx, ty+dy]);
+  if (!cells.length) return notOwned();
   let changed = false;
   if (S.tool === 'bridge') {
     let water = false;
@@ -2019,6 +2111,7 @@ function paintAt(tx, ty){
 }
 function doglegTap(x, y){
   if (S.event) return toast('The course is locked while an event is on');
+  if (!ownedAt(x, y)) return notOwned();
   const cx = x+.5, cy = y+.5;
   const hb = S.holes.findIndex(h => h.bend && Math.hypot(h.bend.x+.5-cx, h.bend.y+.5-cy) < 1);
   if (hb >= 0) { checkpoint(); S.holes[hb].bend = null; recompute(); terrainDirty = true; toast(`Hole ${hb+1} is straight again. Plays ${S.holes[hb].info.plays} yards.`); updateHint(); return; }
@@ -2068,6 +2161,7 @@ function redo(){
 function holeTap(x, y){
   if (S.event) return toast('The course is locked while an event is on');
   const t = tile(x,y); if (t < 0) return;
+  if (!ownedAt(x, y)) return notOwned();
   if (!S.pendingTee) {
     if (t === T.WATER || t === T.HOUSE || t === T.ROCK) return toast('Tees can’t go on water, rocks or the clubhouse');
     if (S.holes.length >= 18) return toast('18 holes is the limit');
@@ -2791,7 +2885,7 @@ cv.addEventListener('pointerdown', e => {
   if (S.tool === 'move' || e.button === 1) { pend = { kind:'pan', last:p, start:p, moved:0 }; return; }
   warnedCash = false;
   S.cursor = tileAtScreen(p);
-  pend = { kind: S.tool === 'hole' || S.tool === 'dogleg' || TOOLS[S.tool].fac ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
+  pend = { kind: S.tool === 'hole' || S.tool === 'dogleg' || S.tool === 'edit' || TOOLS[S.tool].fac ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
 });
 cv.addEventListener('pointermove', e => {
   if (!ptrs.has(e.pointerId)) { if (S.tray && e.pointerType === 'mouse') S.cursor = tileAtScreen(local(e)); return; }
@@ -2830,7 +2924,7 @@ function endPtr(e, cancel){
   if (S.mode === 'play') { P.drag = null; return; }
   if (!pend) return;
   if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; } }
-  if (pend.kind === 'tap') { if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
+  if (pend.kind === 'tap') { if (S.tool === 'edit') editTap(pend.t.x, pend.t.y); else if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
   else if (pend.kind === 'paint' && !pend.active) { checkpoint(); paintAt(pend.t.x, pend.t.y); }
   pend = null;
 }
@@ -2861,7 +2955,92 @@ window.addEventListener('keydown', e => {
 
 // ---------- UI ----------
 let toastTimer;
-function toast(msg, ms = 2000){ const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), ms); }
+// Messages stay up long enough to read (longer for longer text) and are kept in the news log.
+function toast(msg, ms = 0){
+  const el = $('toast'); el.textContent = msg; el.classList.add('show'); logNews(msg);
+  const dur = clamp(Math.max(ms, 2600 + String(msg).length*60), 2600, 12000);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+function logNews(msg){
+  if (!S.active) return; S.news = S.news || [];
+  if (S.news[0] && S.news[0].text === msg) return;
+  S.news.unshift({ day:S.day, text:msg }); if (S.news.length > 80) S.news.pop();
+}
+function openNews(){
+  const list = S.news || []; let h = '', lastDay = null;
+  if (!list.length) h = '<p class="muted">Nothing yet. Club news shows up here as it happens.</p>';
+  for (const n of list) { if (n.day !== lastDay) { h += `<h3 class="sec">Day ${n.day}</h3>`; lastDay = n.day; } h += `<p class="small newsitem">${esc(n.text)}</p>`; }
+  $('newsBody').innerHTML = h; $('news').classList.remove('hidden');
+}
+$('toast').addEventListener('click', () => { $('toast').classList.remove('show'); openNews(); });
+document.querySelector('.hud .day').addEventListener('click', openNews);
+$('newsClose').addEventListener('click', () => $('news').classList.add('hidden'));
+// ---------- hole editor ----------
+let editSel = -1;
+function editTap(x, y){
+  if (S.event) return toast('The course is locked while an event is on');
+  if (S.editMove) return editMoveTo(x, y);
+  let best = -1, bd = 1.8;
+  S.holes.forEach((h, i) => { for (const p of [h.tee, h.pin, h.bend].filter(Boolean)) { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = i; } } });
+  if (best < 0) return toast('Tap a tee box or a pin to edit that hole.');
+  editSel = best; openHoleEd();
+}
+function openHoleEd(){
+  const h = S.holes[editSel]; if (!h) { $('holeEd').classList.add('hidden'); editSel = -1; return; }
+  const n = S.holes.length;
+  $('holeEdTitle').textContent = `Hole ${editSel+1}: par ${h.info.par}, ${h.info.yards} yards`;
+  $('holeEdBody').innerHTML = `<p class="small muted" style="margin:0 0 8px">Design ${(h.info.q/2).toFixed(1)} ★${h.info.notes.length ? '. ' + esc(h.info.notes.join('. ')) + '.' : '.'}</p>
+    <div class="edgrid">
+      <button class="btn alt" data-ed="tee">⛳ Move tee</button><button class="btn alt" data-ed="pin">🚩 Move pin</button>
+      ${h.bend ? '<button class="btn alt" data-ed="straight">↕️ Straighten dogleg</button>' : ''}
+      <button class="btn alt" data-ed="up" ${editSel === 0 ? 'disabled' : ''}>◀ Play earlier</button><button class="btn alt" data-ed="down" ${editSel >= n-1 ? 'disabled' : ''}>Play later ▶</button>
+      <button class="btn alt danger" data-ed="del">🗑️ Delete hole</button>
+    </div>
+    <p class="small muted">Moving a tee or pin costs $100. Moving the pin off the green adds one green tile there.</p>`;
+  $('holeEd').classList.remove('hidden');
+}
+function swapHoles(a, b){
+  [S.holes[a], S.holes[b]] = [S.holes[b], S.holes[a]];
+  const R = S.records.holes; [R[a], R[b]] = [R[b], R[a]];
+  for (const g of S.golfers) if (!g.leaving) { if (g.hole === a) g.hole = b; else if (g.hole === b) g.hole = a; }
+}
+function editMoveTo(x, y){
+  const mv = S.editMove, h = S.holes[mv.hole]; if (!h) { S.editMove = null; return updateHint(); }
+  const t = tile(x, y);
+  if (!ownedAt(x, y)) return notOwned();
+  if (t < 0 || t === T.WATER || t === T.HOUSE || t === T.ROCK) return toast('Pick a spot without water, rocks or buildings.');
+  const other = mv.which === 'tee' ? h.pin : h.tee, yards = Math.hypot(x - other.x, y - other.y)*YD;
+  if (yards < 100 || yards > 700) return toast(`That makes the hole ${Math.round(yards)} yards. Keep it between 100 and 700.`);
+  const cost = 100 + (mv.which === 'pin' && t !== T.GREEN ? TOOLS.green.cost : 0);
+  if (S.money < cost) return toast(`That move costs ${fmt(cost)}.`);
+  checkpoint(); S.money -= cost; book('build', -cost); spend(cost);
+  if (mv.which === 'tee') {
+    const old = h.tee, shared = S.holes.some(o => o !== h && o.tee.x === old.x && o.tee.y === old.y);
+    if (!shared && tile(old.x, old.y) === T.TEE) setTile(old.x, old.y, T.ROUGH);
+    h.tee = { x, y }; setTile(x, y, T.TEE);
+    for (const g of S.golfers) if (!g.leaving && g.hole === mv.hole && g.toTee) { g.bx = x + .5; g.by = y + .5; }
+  } else {
+    h.pin = { x, y }; if (t !== T.GREEN) setTile(x, y, T.GREEN);
+  }
+  if (h.bend && (Math.hypot(h.bend.x - h.tee.x, h.bend.y - h.tee.y) < 2 || Math.hypot(h.bend.x - h.pin.x, h.bend.y - h.pin.y) < 2)) h.bend = null;
+  S.editMove = null; terrainDirty = true; recompute();
+  toast(`Hole ${mv.hole+1}: ${mv.which === 'tee' ? 'tee' : 'pin'} moved. Now par ${h.info.par}, ${h.info.yards} yards.`);
+  updateHint(); openHoleEd();
+}
+$('holeEdBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-ed]'); if (!b || b.disabled) return; const a = b.dataset.ed, i = editSel, h = S.holes[i]; if (!h) return;
+  if (S.event) return toast('The course is locked while an event is on');
+  if (a === 'tee' || a === 'pin') { S.editMove = { hole:i, which:a }; $('holeEd').classList.add('hidden'); updateHint(); toast(a === 'tee' ? 'Tap where the new tee box goes.' : 'Tap where the new pin goes.'); return; }
+  checkpoint();
+  if (a === 'straight') { h.bend = null; recompute(); toast(`Hole ${i+1} straightened.`); }
+  else if (a === 'up' && i > 0) { swapHoles(i, i-1); editSel = i-1; recompute(); toast(`That hole is now hole ${i}.`); }
+  else if (a === 'down' && i < S.holes.length-1) { swapHoles(i, i+1); editSel = i+1; recompute(); toast(`That hole is now hole ${i+2}.`); }
+  else if (a === 'del') { if (!confirm(`Delete hole ${i+1}? The tee box goes back to rough; your fairway and green stay.`)) return; if (tile(h.tee.x, h.tee.y) === T.TEE) setTile(h.tee.x, h.tee.y, T.ROUGH); removeHole(i); terrainDirty = true; recompute(); $('holeEd').classList.add('hidden'); editSel = -1; updateHint(); return; }
+  openHoleEd();
+});
+$('holeEdClose').addEventListener('click', () => { $('holeEd').classList.add('hidden'); editSel = -1; S.editMove = null; updateHint(); });
+
+
 function updateHint(){
   if (S.mode === 'play') {
     const hl = S.holes[P.hole]; if (!hl) { $('hint').textContent = ''; return; }
@@ -2877,6 +3056,7 @@ function updateHint(){
   }
   let h;
   if (TOOLS[S.tool] && TOOLS[S.tool].fac) { const F = FACS[TOOLS[S.tool].fac]; h = `${F.icon} ${F.name} (${F.w}×${F.h} tiles): ${F.blurb} ${fmt(F.cost)} to build, ${fmt(F.upkeep)} a day.${F.unique ? ' One per course.' : ''} Clear it to sell for half.`; }
+  else if (S.tool === 'edit') h = S.editMove ? `Tap where the new ${S.editMove.which === 'tee' ? 'tee box' : 'pin'} for hole ${S.editMove.hole+1} goes.` : 'Tap a tee box or pin to edit that hole: move it, reorder it or delete it.';
   else if (S.tool === 'dogleg') h = 'Tap near a hole to bend it there, $100. Line the corner with trees or bunkers. Tap a bend again to straighten the hole.';
   else if (S.tool === 'hole') h = S.pendingTee ? 'Now tap where the pin goes, 100 to 700 yards away. Tap the tee again to cancel.' : 'Tap where the tee box goes. A hole costs $200 plus one green tile at the pin. Paint the rest of the green yourself.';
   else if (TOOLS[S.tool].elev) h = `Drag to ${S.tool === 'raise' ? 'raise' : 'lower'} the land one level, ${fmt(TOOLS[S.tool].cost)} a tile. Use the large brush for smooth hills. Water stays flat.`;
@@ -2890,7 +3070,7 @@ function updateHint(){
 }
 const TRAYS = {
   fac:   { icon:'🏛️', name:'Facilities', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
-  build: { icon:'🏗️', name:'Build', tools:['hole','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge'] },
+  build: { icon:'🏗️', name:'Build', tools:['hole','edit','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge'] },
   land:  { icon:'🌳', name:'Landscape', tools:['fcut','deep','fescue','trees','shrubs','flowers','river','water','raise','lower','clear'] },
   trees: { icon:'🌲', name:'Trees', parent:'land', tools:['tree_round','tree_pine','tree_autumn','tree_blossom','tree_willow','tree_palm','tree_cypress'] },
   marks: { icon:'🗼', name:'Landmarks', parent:'land', tools:['f_windmill','f_lighthouse','f_gazebo','f_fountain','f_statue'] }
@@ -2921,9 +3101,9 @@ function buildTools(){
     if (S.tray === 'land') { add('tool', '<span class="ic">🌲</span><span class="nm">Trees ›</span><span class="pr">Pick a kind</span>', () => openTray('trees')); add('tool', '<span class="ic">🗼</span><span class="nm">Landmarks ›</span><span class="pr">Windmill, more</span>', () => openTray('marks')); }
     for (const id of T0.tools) { const t = TOOLS[id].fac ? { ...FACS[TOOLS[id].fac], sw:null } : TOOLS[id];
       add('tool' + (S.tool === id ? ' on' : ''), `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${t.req && S.course.stars < t.req ? '🔒 ' + t.req + '★' : fmt(t.cost)}</span>`,
-        () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; buildTools(); updateHint(); }); }
-    if (S.tray === 'build') add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac'));
-    if (!['hole','dogleg'].includes(S.tool) && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
+        () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; if (id !== 'edit') { S.editMove = null; editSel = -1; } buildTools(); updateHint(); }); }
+    if (S.tray === 'build') { add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac')); add('tool', '<span class="ic">🗺️</span><span class="nm">Buy land</span><span class="pr">Expand</span>', openLand); }
+    if (!['hole','dogleg','edit'].includes(S.tool) && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
   }
   const dock = document.createElement('div'); dock.className = 'dock'; nav.appendChild(dock);
   const mk = (ic, nm, fn, on, extra) => { const b = document.createElement('button'); b.className = 'dockbtn' + (on ? ' on' : ''); b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>${extra || ''}`; b.addEventListener('click', fn); dock.appendChild(b); };
@@ -3045,16 +3225,16 @@ function startLevel(i, cont){
     TS = sv.species && sv.species.length === COLS*ROWS ? Uint8Array.from(sv.species) : new Uint8Array(COLS*ROWS); G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
     S.money = sv.money; S.earned = sv.earned; S.day = sv.day; S.fee = sv.fee; S.recent = sv.recent || []; S.won = !!sv.won;
     S.clubName = sv.clubName || L.name + ' Golf Club'; S.trophy = sv.trophy || 'Founders Cup';
-    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
+    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.parcels = sv.parcels || []; S.news = sv.news || []; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
   } else {
     TS = new Uint8Array(COLS*ROWS); G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.facilities = []; S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
     S.clubName = L.name + ' Golf Club'; S.trophy = 'Founders Cup';
-    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
+    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.parcels = []; S.news = []; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
     delete store.saves[i]; saveStore();
   }
   S.mode = 'build'; P.fl = null; P.drag = null; hist = []; future = []; curAct = null; S.event = null; S.setup = null; S.matches = []; S.matchSetup = null; S.follow = null; $('prof').classList.add('hidden'); scView = null; $('sc').classList.add('hidden'); $('round').classList.add('hidden'); $('club').classList.add('hidden'); $('evDone').classList.add('hidden');
   S.golfers = []; S.dayT = 0; S.spawnT = 2; S.speed = 0; S.pendingTee = null; S.tool = 'move'; S.tray = null; S.dayFees = 0; S.dayGolfers = 0;
-  S.active = true; recompute(); buildTools(); cam.ready = false; layout(); terrainDirty = true; updateSpeed(); updateHUD(); updateHint();
+  S.active = true; computeOwn(); S.editMove = null; editSel = -1; recompute(); buildTools(); cam.ready = false; layout(); terrainDirty = true; updateSpeed(); updateHUD(); updateHint();
   planMembers();
   $('levels').classList.add('hidden');
   if (!sv) { $('helpTitle').textContent = L.name; $('help').classList.remove('hidden'); }
@@ -3296,7 +3476,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 new ResizeObserver(() => layout()).observe(stage);
-G = genMap(LEVELS[0]); layout(); showLevels(); requestAnimationFrame(frame); window.__ftReady = true; $('signinLogo').src = document.querySelector('#levels img.logo').src; startFlow();
+G = genMap(LEVELS[0]); computeOwn(); layout(); showLevels(); requestAnimationFrame(frame); window.__ftReady = true; $('signinLogo').src = document.querySelector('#levels img.logo').src; startFlow();
 })();
 </script>
 </body>
