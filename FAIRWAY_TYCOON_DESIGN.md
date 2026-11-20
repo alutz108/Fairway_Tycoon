@@ -9,6 +9,18 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Tee boxes
+Each hole draws up to three tee sets (`teeSpots`): back = the hole's tee tile (blue markers), middle ~1–1.4 tiles toward the pin/bend (white markers on a tee pad), forward ~2–2.9 tiles (red markers); short holes get fewer, and a set is skipped if it would sit on water, trees, rocks, a building or a green. Golfers pick a set (`pickTeeSet`): tour/event players and your pro play the back tees, grinders and strong players (skill ≥ .78) the back, seniors and beginners (skill < .4) the forward tees, everyone else the middle (`setGolferTee` on arrival, each new hole, edits). Listed yardage is from the back tees.
+
+### Pin positions
+Hole editor → **Pin position on the green**: Front / Middle / Back (relative to the tee) / 🎲 Random, free, using the connected green tiles around the pin (`greenTilesOf`, `setPin`). **Change every pin each morning** (`S.pinDaily`, saved) moves every pin to a random spot on its green at the start of each day (not during events or cups).
+
+### Shaped greens (🏗️ Build → ⛳ Green shapes ›)
+Stamp tools `gs_oval`, `gs_round`, `gs_kidney`, `gs_peanut`, `gs_star`, `gs_heart`, `gs_lshape` (`GSHAPES`, ~10–23 tiles each within a 9×9 area), $60 a tile, owned land only, skipping water, rocks, buildings, tees and existing green. ↻ Rotate turns the stamp in 45° steps (`S.shapeRot`). One undo step per stamp. The smooth terrain shader rounds the tile edges.
+
+### Golfers using facilities
+Visitors who warm up walk to the range and/or putting green first (`g.warm`), stand in a range bay or on the practice green (`practiceSpot`) for 5–8 s, then go to the first tee; members' practice visits do the same for longer. Range balls fly out from the bays toward the targets (`stepRangeBalls`, pooled meshes). Mid-round detours now take time (state `using`): golfers stand at the snack bar or drink stand facing it, sit on benches, and disappear into the restroom for a moment, then carry on.
+
 ### Carts in groups
 Within a group, slots pair up (0+1, 2+3), so a foursome uses at most 2 carts. Only the first player of each pair rents (and pays for) a cart; the partner shares it. The partner rides as a passenger (`g.inCart`, hidden walker, `setPassenger` shows them in the right-hand seat of the driver's cart; driver sits on the left) whenever the driver is riding nearby, then walks the last bit to their own ball.
 
