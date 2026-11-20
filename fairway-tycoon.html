@@ -296,6 +296,13 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .edgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .edgrid .btn{padding:12px 8px}
 .btn.danger{color:#c0392b}
+.fbrow{margin:8px 0}
+.review{border-bottom:1px solid var(--line);padding:8px 0}
+.review .stars{color:var(--gold);letter-spacing:1px}
+.cupteams{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.cupteams ol{padding-left:18px;margin:4px 0}
+.cupscore{display:flex;justify-content:space-between;font-size:1.15rem;font-weight:600;background:var(--chip);border-radius:12px;padding:10px 12px;margin:8px 0}
+.ev.tourev{border:2px solid var(--gold)}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}}
 </style>
 </head>
@@ -336,6 +343,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <h2 id="helpTitle">How to build</h2>
   <ol class="steps">
     <li>Tap <b>🏗️ Build</b>, pick <b>Hole</b>, tap where the tee goes, then tap where the pin goes. A green is built around the pin.</li>
+    <li>Want the clubhouse somewhere else? Use <b>🏗️ Build → 🏠 Clubhouse</b>. It’s free to move until you build your first hole.</li>
     <li>Paint <b>fairway</b> between them so golfers have somewhere good to land.</li>
     <li>Put bunkers, trees and ponds near the landing areas. Golfers love a hole with some danger.</li>
     <li>Press <b>▶</b> to open. Golfers pay the green fee, play your holes and tell you what they think.</li>
@@ -421,6 +429,12 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <div class="btns"><button class="btn" id="holeEdClose">Done</button></div>
 </div></div>
 
+<div id="facEd" class="overlay hidden"><div class="card">
+  <h2 id="facEdTitle">Facility</h2>
+  <div id="facEdBody"></div>
+  <div class="btns"><button class="btn alt" id="facEdClose">Done</button></div>
+</div></div>
+
 <div id="news" class="overlay hidden"><div class="card">
   <h2>📰 Club news</h2>
   <div id="newsBody"></div>
@@ -473,6 +487,8 @@ const DOOR = { x: CHX + 2.4, y: CHY + 1 };
 const TOOLS = {
   move:    { name:'Move',    cost:0,   icon:'✋' },
   edit:    { name:'Edit hole', cost:0, icon:'✏️' },
+  house:   { name:'Clubhouse', cost:0, icon:'🏠' },
+  upgrade: { name:'Upgrade', cost:0, icon:'⬆️' },
   hole:    { name:'Hole',    cost:200, icon:'⛳' },
   fairway: { name:'Fairway', cost:30,  paint:T.FAIR,  sw:'#7fc25a' },
   green:   { name:'Green',   cost:60,  paint:T.GREEN, sw:'#a6e283' },
@@ -530,8 +546,14 @@ const LEVELS = [
   { name:'Desert Canyon', style:'Desert target golf', blurb:'Emerald fairways carved out of desert, cactus and boulders. Miss the short grass and you’re in the scrub, Scottsdale style.',
     seed:33, cash:28000, fee:55, tree:'cactus', desert:true, trees:.15, ponds:1, sand:2, rocks:8, native:'desert', goals:{ holes:6, stars:3, earned:6000 } },
   { name:'Lakeshore Dunes', style:'Great Lakes dunes', blurb:'Rugged dunes, golden fescue and pot bunkers everywhere along a huge freshwater lake, like the Wisconsin lakeshore links.',
-    seed:78, cash:24000, fee:50, tree:'round', trees:.08, ponds:0, sand:16, potBunkers:true, waste:5, native:'fescue', coast:{ side:'top', type:'beach' }, goals:{ holes:9, stars:4, earned:10000 } }
+    seed:78, cash:24000, fee:50, tree:'round', trees:.08, ponds:0, sand:16, potBunkers:true, waste:5, native:'fescue', coast:{ side:'top', type:'beach' }, goals:{ holes:9, stars:4, earned:10000 } },
+  { name:'Oak Hollow Par 3', style:'Par 3 course · parkland', par3:true, blurb:'A cozy short course in a leafy hollow. Every hole is a par 3, so rounds are quick and beginners love it. Cheap to buy and run, but it can’t host pro tours.',
+    seed:101, cash:9000, fee:20, tree:'round', trees:.3, ponds:2, sand:3, flowers:4, goals:{ holes:9, stars:3, earned:4000 } },
+  { name:'Sea Breeze Par 3', style:'Par 3 course · seaside', par3:true, blurb:'A breezy little par 3 course by the bay, with sandy dunes and pot bunkers. Short, fun and affordable, but not a tour venue.',
+    seed:117, cash:10000, fee:22, tree:'palm', trees:.1, ponds:1, sand:8, potBunkers:true, waste:2, native:'fescue', coast:{ side:'left', type:'beach' }, goals:{ holes:9, stars:3, earned:4500 } }
 ];
+const isPar3 = (i = S.level) => !!(LEVELS[i] && LEVELS[i].par3);
+const PAR3_MAX = 250, PAR3_FAC = ['snack','drinks','bench','restroom','putting','proshop'];
 const pick = a => a[Math.floor(Math.random()*a.length)];
 const FIRST = ['James','Maria','Derek','Aisha','Tom','Priya','Luis','Hannah','Marcus','Sofia','Kevin','Grace','Andre','Mei','Ryan','Olivia','Darnell','Elena','Sam','Nina','Jake','Fatima','Connor','Rosa','Ben','Keisha','Raj','Claire','Mateo','Tara','Owen','Lena','Trevor','Yuki','Colin','Imani'];
 const LAST = ['Walker','Okafor','Brennan','Castillo','Nguyen','Hartley','Patel','Duffy','Moreno','Kowalski','Bishop','Tanaka','Reyes','Sullivan','Adeyemi','Fischer','Murphy','Larsen','Coleman','Haas','Ortiz','Kim','Doyle','Mensah','Price','Abbott','Varga','Lindqvist','Romero','Shaw'];
@@ -601,7 +623,7 @@ let TS = new Uint8Array(COLS*ROWS);
 let G = new Uint8Array(COLS*ROWS), E = new Int8Array(COLS*ROWS), BR = new Uint8Array(COLS*ROWS), FR = new Uint8Array(COLS*ROWS), FO = new Int16Array(COLS*ROWS).fill(-1);
 const ELH = .22, EMAX = 8; // one elevation level = 0.22 tiles = about 5.5 yards
 const elevAt = (x, y) => { const xx = Math.floor(x), yy = Math.floor(y); return xx < 0 || yy < 0 || xx >= COLS || yy >= ROWS || G[yy*COLS+xx] === T.WATER ? 0 : E[yy*COLS+xx]; };
-const HILLS = [3, 2, 2, 4, 2, 3, 0, 3, 4];
+const HILLS = [3, 2, 2, 4, 2, 3, 0, 3, 4, 3, 2];
 function genElev(L, g){
   const r = rng(L.seed + 99), e = new Int8Array(COLS*ROWS), n = Math.round((HILLS[LEVELS.indexOf(L)] ?? 2)*AF);
   for (let i=0; i<n; i++) {
@@ -637,7 +659,7 @@ function saveStore(fromCloud){ if (!fromCloud) store.savedAt = Date.now(); try {
 function saveGame(){
   store.saves[S.level] = { species:Array.from(TS), grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
-    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, parcels:S.parcels || [], news:(S.news || []).slice(0, 40), weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
+    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, house:S.house, fb:S.fb, reviews:S.reviews, cupLast:S.cupLast, parcels:S.parcels || [], news:(S.news || []).slice(0, 40), weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
   saveStore();
 }
 
@@ -739,6 +761,43 @@ $('landBody').addEventListener('click', e => {
   toast(`You bought the ${PARCELS[k].name}! It’s ready to build on.`, 3500); openLand(); updateHUD();
 });
 $('landClose').addEventListener('click', () => $('land').classList.add('hidden'));
+
+// --- facility upgrades (levels 1-3) ---
+const FAC_EARN = [1, 1.6, 2.3], FAC_UPK = [1, 1.5, 2.2];
+const facLvOf = f => f.lv || 1;
+const typeLv = t => S.facilities.filter(f => f.type === t).reduce((a, f) => Math.max(a, facLvOf(f)), 0);
+const earnMul = t => FAC_EARN[Math.max(1, typeLv(t)) - 1];
+const upCost = f => { const F = FACS[f.type], lv = facLvOf(f); return lv >= 3 ? 0 : Math.round(F.cost*(lv === 1 ? 1.2 : 2)/50)*50; };
+const LV_FX = {
+  range:'More bays and targets. More golfers warm up, they pay more, and they play a little better.',
+  proshop:'A bigger shop with more stock. More golfers buy, and they spend more.',
+  restaurant:'More tables and a bigger menu. More golfers stay to eat, and they spend more.',
+  snack:'A bigger menu. More sales, and golfers walk over from farther away.',
+  drinks:'More coolers. More sales, and golfers walk over from farther away.',
+  putting:'A bigger practice green. Golfers putt and chip better.',
+  carts:'A bigger fleet. More rentals at a better price.',
+  bench:'A shaded bench. Golfers get more of their energy back.',
+  restroom:'Nicer restrooms. Golfers leave in a better mood.'
+};
+let facSel = -1;
+function openFacEd(fi){
+  const f = S.facilities[fi]; if (!f) return; const F = FACS[f.type];
+  if (F.kind === 'scenery') return toast(`${F.icon} ${F.name}: landmarks don’t have upgrades.`);
+  facSel = fi; const lv = facLvOf(f), cost = upCost(f);
+  $('facEdTitle').textContent = `${F.icon} ${F.name}, level ${lv}`;
+  $('facEdBody').innerHTML = `<div class="moods"><div class="spread" style="margin:0"><span>Earnings and effects</span><b>×${FAC_EARN[lv-1]}</b></div><div class="spread" style="margin:0"><span>Upkeep a day</span><b>${fmt(F.upkeep*FAC_UPK[lv-1])}</b></div></div>` +
+    (lv < 3 ? `<h3 class="sec">Level ${lv+1}</h3><p class="small">${LV_FX[f.type] || ''}</p><p class="small muted">Earnings and effects ×${FAC_EARN[lv]}, upkeep ${fmt(F.upkeep*FAC_UPK[lv])} a day.</p><div class="btns"><button class="btn" data-fu="1" ${S.money < cost ? 'disabled' : ''}>Upgrade for ${fmt(cost)}</button></div>`
+      : `<p class="small" style="color:var(--brand);font-weight:700;margin-top:10px">Fully upgraded ✓</p>`);
+  $('facEd').classList.remove('hidden');
+}
+$('facEdBody').addEventListener('click', e => {
+  if (!e.target.closest('[data-fu]')) return; const f = S.facilities[facSel]; if (!f) return; const cost = upCost(f);
+  if (!cost || S.money < cost) return toast(`That upgrade costs ${fmt(cost)}.`);
+  S.money -= cost; book('build', -cost); spend(cost); f.lv = facLvOf(f) + 1; terrainDirty = true; recompute(); saveGame();
+  toast(`${FACS[f.type].icon} ${FACS[f.type].name} upgraded to level ${f.lv}!`, 3000); openFacEd(facSel); updateHUD();
+});
+$('facEdClose').addEventListener('click', () => { $('facEd').classList.add('hidden'); facSel = -1; });
+function facTapUpgrade(x, y){ const fi = FO[y*COLS+x]; if (fi >= 0 && S.facilities[fi]) openFacEd(fi); else toast('Tap one of your facilities to upgrade it.'); }
 
 // ---------- hole analysis ----------
 const routeOf = h => [h.tee, ...(h.bend ? [h.bend] : []), h.pin].map(p => ({ x:p.x+.5, y:p.y+.5 }));
@@ -997,7 +1056,9 @@ const FOREST = [
   { longleaf:.8, pine:.2 },
   { palm:.75, round:.25 },
   { cactus:1 },
-  { round:.4, pine:.4, autumn:.2 }
+  { round:.4, pine:.4, autumn:.2 },
+  { round:.5, autumn:.25, blossom:.15, willow:.1 },
+  { palm:.6, round:.4 }
 ];
 function pickStyle(mix, h){ let acc = 0; const keys = Object.keys(mix), tot = keys.reduce((a,k) => a + mix[k], 0); for (const k of keys) { acc += mix[k]/tot; if (h <= acc) return k; } return keys[keys.length-1]; }
 const STYLE = {
@@ -1075,7 +1136,7 @@ function buildProps(){
   const byCol = {}; for (const o of tufts) (byCol[o.col] = byCol[o.col] || []).push(o);
   for (const c in byCol) instanced(byCol[c], { g:'cone', c, p:[0,.1,0], s:[.075,.22,.075] });
   // clubhouse
-  const hg = new TH.Group(), base = heightAt(CHX+1, CHY+1);
+  const HS = houseAt(), hg = new TH.Group(), base = heightAt(HS.x+1, HS.y+1);
   const add = (g, c, p, s, r) => { const m = new TH.Mesh(GEO[g], mat(c, g === 'pyr')); m.position.set(...p); m.scale.set(...s); if (r) m.rotation.set(...r); m.castShadow = true; m.receiveShadow = true; hg.add(m); return m; };
   const WALL = '#f3ead6', ROOF = '#8e3a30', WIN = '#9fd3f0', TRIM = '#ffffff', AWN = '#2e6b3e';
   const roof = (w, d, h, x, y, z) => add('pyr', ROOF, [x, y + h/2, z], [w*.78, h, d*.78]);
@@ -1094,7 +1155,8 @@ function buildProps(){
   for (const [x,z,c] of [[1.12,-.6,'#e85d9a'],[1.12,.5,'#f2bd44'],[.3,1.1,'#e85d9a'],[-.7,1.1,'#ffffff']]) { add('box', '#7a5638', [x,.09,z], [.22,.1,.22]); add('sphere', c, [x,.18,z], [.12,.07,.12]); }
   add('cyl', '#f4f4ef', [1.05,.7,.95], [.015,1.4,.015]);
   const fl = new TH.Mesh(new TH.PlaneGeometry(.3,.18), new TH.MeshLambertMaterial({ color:0x1f5c35, side:TH.DoubleSide })); fl.position.set(1.2,1.3,.95); hg.add(fl);
-  hg.position.set(W2(CHX+1), base, Z2(CHY+1)); propGroup.add(hg);
+  hg.position.set(W2(HS.x+1), base, Z2(HS.y+1)); propGroup.add(hg);
+  ensureAnimals();
   spinners = []; for (const f of S.facilities) { const m = facModel(f); if (m.userData.spin) spinners.push(m.userData.spin); propGroup.add(m); }
   holeSig = '';
 }
@@ -1193,8 +1255,8 @@ function syncGolfers(){
     if (!show) { rec.root.visible = false; rec.ball.visible = false; continue; }
     const h = S.holes[g.hole], face = g.state === 'address' && h ? Math.atan2(h.pin.x+.5 - g.bx, h.pin.y+.5 - g.by) : null;
     const follow = g.state === 'flight' && g.fl && g.fl.t < .45 && g.fl.apex > 0;
-    let swingA = 0; if (g.state === 'address') { const k = 1 - clamp(g.t/.5, 0, 1); swingA = k < .6 ? lerp(0, -2.1, k/.6) : lerp(-2.1, 1.7, (k-.6)/.4); } else if (follow) swingA = 1.7;
-    placePerson(rec, g.x, g.y, { cart: g.cart && g.state === 'walk', walking: g.state === 'walk', swing: g.state === 'address' || follow, swingA, face: follow ? rec.head : face });
+    let swingA = 0; if (g.state === 'practice') swingA = g.pf && (g.pf.type === 'range' || g.pf.type === 'putting') ? Math.sin(performance.now()/260 + g.id)*1.8 : 0; else if (g.state === 'address') { const k = 1 - clamp(g.t/.5, 0, 1); swingA = k < .6 ? lerp(0, -2.1, k/.6) : lerp(-2.1, 1.7, (k-.6)/.4); } else if (follow) swingA = 1.7;
+    placePerson(rec, g.x, g.y, { cart: g.cart && g.state === 'walk', walking: g.state === 'walk', swing: g.state === 'address' || follow || (g.state === 'practice' && swingA !== 0), swingA, face: follow ? rec.head : face });
     if (g.cel > 0) { rec.root.position.y += Math.abs(Math.sin(g.cel*11))*.2; rec.legL.rotation.x = -.5; rec.legR.rotation.x = .5; }
     if (g.fl) { const f = g.fl, t = clamp(f.t/f.T, 0, 1); placeBall(rec, true, lerp(f.fx, f.tx, t), lerp(f.fy, f.ty, t), f.apex*4*t*(1-t)*.42); }
     else placeBall(rec, !g.leaving && !g.toTee, g.bx, g.by, 0);
@@ -1210,6 +1272,68 @@ function syncGolfers(){
     if (P.fl) { const f = P.fl, t = clamp(f.t/f.T, 0, 1); placeBall(pr, true, lerp(f.fx, f.tx, t), lerp(f.fy, f.ty, t), f.apex*4*t*(1-t)*.42); }
     else placeBall(pr, P.scores.length <= P.hole, P.bx, P.by, 0);
   } else if (pr) dropPerson('P');
+}
+
+// --- wildlife: ducks on ponds, alligators in warm-climate water, deer near the trees ---
+const WARM_LV = [2, 3, 5, 6, 10], DEER_LV = [0, 1, 3, 4, 5, 8, 9];
+let animals = [];
+function makeAnimal(kind){
+  const g = new TH.Group();
+  const add = (geo, c, p, s, r) => { const m = new TH.Mesh(GEO[geo], mat(c)); m.position.set(...p); m.scale.set(...s); if (r) m.rotation.set(...r); m.castShadow = true; g.add(m); return m; };
+  if (kind === 'duck') { const c = Math.random() < .5 ? '#8a6a4a' : '#f4f4ef'; add('sphere', c, [0,.03,0], [.05,.035,.08]); add('sphere', Math.random() < .5 ? '#1f6a3a' : c, [0,.075,.06], [.028,.028,.028]); add('cone', '#f2a23a', [0,.072,.095], [.012,.03,.012], [Math.PI/2,0,0]); }
+  else if (kind === 'gator') {
+    add('box','#3d4a2c',[0,.01,0],[.13,.05,.42]); add('box','#46552f',[0,.01,.3],[.09,.04,.2]); add('cone','#3d4a2c',[0,0,-.33],[.05,.3,.04],[-Math.PI/2,0,0]);
+    for (const x of [-.03,.03]) add('sphere','#c9c25a',[x,.045,.22],[.013,.013,.013]);
+    for (const [x,z] of [[-.08,.12],[.08,.12],[-.08,-.12],[.08,-.12]]) add('box','#3d4a2c',[x,-.01,z],[.05,.02,.05]);
+  } else {
+    const buck = Math.random() < .35;
+    add('cyl','#9a6a42',[0,.2,0],[.06,.26,.06],[Math.PI/2,0,0]);
+    for (const [x,z] of [[-.035,.09],[.035,.09],[-.035,-.09],[.035,-.09]]) add('cyl','#7a5232',[x,.09,z],[.012,.18,.012]);
+    add('cyl','#9a6a42',[0,.28,.12],[.025,.12,.025],[-.6,0,0]); add('sphere','#8a5a38',[0,.34,.17],[.035,.035,.05]);
+    for (const x of [-.025,.025]) add('cone','#8a5a38',[x,.375,.155],[.012,.03,.008]);
+    add('sphere','#f4f4ef',[0,.22,-.135],[.02,.025,.015]);
+    if (buck) for (const x of [-.02,.02]) add('cyl','#d8c8a8',[x,.41,.16],[.005,.08,.005],[0,0,x*14]);
+  }
+  g.scale.setScalar(1.3); scene.add(g); return g;
+}
+const waterAt = (x, y) => at(x, y) === T.WATER;
+const landOk = (x, y) => { const t = at(x, y); return t >= 0 && t !== T.WATER && t !== T.HOUSE && t !== T.ROCK && t !== T.GREEN && t !== T.TEE; };
+const nearTrees = (x, y) => { for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) if (at(x+dx, y+dy) === T.TREES) return true; return false; };
+const shoreAt = (x, y) => landOk(x, y) && [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => waterAt(x+dx, y+dy));
+function randSpot(pred){ for (let i=0; i<300; i++) { const x = Math.random()*COLS, y = Math.random()*ROWS; if (pred(x, y)) return { x, y }; } return null; }
+function clearAnimals(){ for (const a of animals) scene.remove(a.mesh); animals = []; }
+function ensureAnimals(){
+  if (!S.active) return;
+  let water = 0, trees = 0; for (const t of G) { if (t === T.WATER) water++; else if (t === T.TREES) trees++; }
+  const want = { duck: Math.min(10, Math.floor(water/14)), gator: WARM_LV.includes(S.level) ? Math.min(4, Math.floor(water/40)) : 0, deer: DEER_LV.includes(S.level) && trees > 30 ? Math.min(6, 2 + Math.floor(trees/250)) : 0 };
+  animals = animals.filter(a => { const ok = a.kind === 'deer' ? landOk(a.x, a.y) : waterAt(a.x, a.y) || (a.kind === 'gator' && a.bask && landOk(a.x, a.y)); if (!ok) scene.remove(a.mesh); return ok; });
+  for (const k of Object.keys(want)) {
+    const have = animals.filter(a => a.kind === k);
+    while (have.length > want[k]) { const a = have.pop(); scene.remove(a.mesh); animals.splice(animals.indexOf(a), 1); }
+    for (let i = have.length; i < want[k]; i++) { const p = randSpot(k === 'deer' ? (x,y) => landOk(x,y) && nearTrees(x,y) : waterAt); if (!p) break; animals.push({ kind:k, x:p.x, y:p.y, tx:p.x, ty:p.y, t:Math.random()*5, head:Math.random()*6.28, mesh:makeAnimal(k) }); }
+  }
+}
+function stepAnimals(dt, now){
+  for (const a of animals) {
+    a.t -= dt; if (a.flee > 0) a.flee -= dt;
+    if (a.kind === 'deer' && !(a.flee > 0)) {
+      const g = S.golfers.find(g => Math.hypot(g.x - a.x, g.y - a.y) < 2.4);
+      if (g) { const an = Math.atan2(a.y - g.y, a.x - g.x), nx = a.x + Math.cos(an)*4, ny = a.y + Math.sin(an)*4; if (landOk(nx, ny)) { a.tx = nx; a.ty = ny; a.flee = 2; } }
+    }
+    const d = Math.hypot(a.tx - a.x, a.ty - a.y), sp = a.kind === 'duck' ? .35 : a.kind === 'gator' ? .22 : a.flee > 0 ? 2.4 : .55;
+    if (d > .05) {
+      const st = Math.min(d, sp*dt), nx = a.x + (a.tx - a.x)/d*st, ny = a.y + (a.ty - a.y)/d*st;
+      const ok = a.kind === 'deer' ? landOk(nx, ny) : a.kind === 'duck' ? waterAt(nx, ny) : waterAt(nx, ny) || (a.bask && landOk(nx, ny));
+      if (ok) { a.x = nx; a.y = ny; a.head = Math.atan2(a.tx - a.x, a.ty - a.y); } else { a.tx = a.x; a.ty = a.y; }
+    } else if (a.t <= 0) {
+      const r = a.kind === 'duck' ? 1.5 : a.kind === 'gator' ? 2.5 : 4;
+      a.t = a.kind === 'duck' ? 2 + Math.random()*4 : a.kind === 'gator' ? 6 + Math.random()*12 : 3 + Math.random()*7;
+      if (a.kind === 'gator' && !a.bask && Math.random() < .3) { for (let i=0; i<20; i++) { const x = a.x + (Math.random()-.5)*3, y = a.y + (Math.random()-.5)*3; if (shoreAt(x, y)) { a.tx = x; a.ty = y; a.bask = true; break; } } }
+      else { if (a.bask) a.bask = false; for (let i=0; i<12; i++) { const x = a.x + (Math.random()-.5)*2*r, y = a.y + (Math.random()-.5)*2*r; if (a.kind === 'deer' ? landOk(x, y) : waterAt(x, y)) { a.tx = x; a.ty = y; break; } } }
+    }
+    const wet = a.kind !== 'deer' && waterAt(a.x, a.y), y = wet ? (a.kind === 'duck' ? -.1 + Math.sin(now/480 + a.x*3)*.008 : -.125) : heightAt(a.x, a.y);
+    a.mesh.position.set(W2(a.x), y, Z2(a.y)); a.mesh.rotation.y = a.head;
+  }
 }
 
 // --- camera ---
@@ -1346,7 +1470,7 @@ function nextInterval(){
   const st = S.course.stars, n = S.holes.length;
   const fair = 12 + st*10 + n*2;
   const pf = clamp(1.45 - .55*S.fee/fair, .1, 1.4);
-  const perDay = n*2.5*(.35 + st/5)*pf*(1 + Math.min(S.prestige, 20)*.04)*WX[wx().k].golf;
+  const perDay = n*2.5*(.35 + st/5)*pf*(1 + Math.min(S.prestige, 20)*.04)*WX[wx().k].golf*(isPar3() ? 1.3 : 1);
   return DAY / Math.max(.25, perDay) * (.6 + Math.random()*.8);
 }
 function makeGolfer(o){
@@ -1357,20 +1481,22 @@ function makeGolfer(o){
 }
 function spawn(){
   if (S.golfers.length >= MAXG || !S.holes.length || S.event) return 0;
-  const r = Math.random(), want = r < .25 ? 1 : r < .6 ? 2 : r < .8 ? 3 : 4, n = Math.min(want, MAXG - S.golfers.length), grp = n > 1 ? (S.grpId = (S.grpId || 0) + 1) : 0;
+  const r = Math.random(), want = r < .35 ? 2 : r < .7 ? 3 : 4, n = Math.min(want, MAXG - S.golfers.length), grp = n > 1 ? (S.grpId = (S.grpId || 0) + 1) : 0;
   for (let i=0; i<n; i++) {
     arriveExtras(makeGolfer({ ...visitor(), name: randName(), grp, slot:i }));
     S.money += S.fee; book('fees', S.fee); S.earned += S.fee; S.dayFees += S.fee; S.dayGolfers++;
   }
   return n;
 }
-function say(g, text, force){ if (!text) return; if (!force && g.quiet > 0) return; g.thought = { text, t:2.4 }; g.quiet = 3; (g.log = g.log || []).push(text); if (g.log.length > 5) g.log.shift(); }
+function say(g, text, force){ if (!text) return; noteFeedback(text); if (!force && g.quiet > 0) return; g.thought = { text, t:2.4 }; g.quiet = 3; (g.log = g.log || []).push(text); if (g.log.length > 5) g.log.shift(); }
 function goHome(g){ g.leaving = true; g.state = 'walk'; g.fl = null; }
 function finishRound(g){
-  if (!g.ep && hasFac('restaurant') && Math.random() < .35 + .4*(g.spend ?? .5) + (g.hunger > 40 ? .2 : 0)) { earnFac('food', Math.round(15 + (g.spend ?? .5)*30), g); g.sat += 5; }
+  if (g.practice) { const m = g.mid && S.members.find(x => x.id === g.mid); if (m) m.practice = (m.practice || 0) + 1; return; }
+  if (!g.ep && hasFac('restaurant') && Math.random() < .35 + .4*(g.spend ?? .5) + (g.hunger > 40 ? .2 : 0) + .1*(typeLv('restaurant') - 1)) { earnFac('food', Math.round((15 + (g.spend ?? .5)*30)*earnMul('restaurant')), g); g.sat += 5; }
   S.dayRounds = (S.dayRounds || 0) + 1;
   const nh = (g.card || []).length; if (nh && !g.ep) { (S.paceLog = S.paceLog || []).push(((S.clock || 0) - g.t0)/nh); if (S.paceLog.length > 25) S.paceLog.shift(); }
   const sat = clamp(g.sat, 0, 100);
+  leaveReview(g, sat);
   S.recent.push(sat); if (S.recent.length > 25) S.recent.shift();
   recordRound(g.card || [], g.name || `Guest #${g.id}`, golferKind(g), g.country);
   if (g.type && !g.ep) { const a = S.typeSat[g.type] = S.typeSat[g.type] || []; a.push(Math.round(sat)); if (a.length > 12) a.shift(); }
@@ -1378,7 +1504,7 @@ function finishRound(g){
   if (m && !g.ep) { m.sat = clamp(m.sat*.6 + sat*.4, 0, 100); m.rounds = (m.rounds || 0) + 1; }
   if (m && S.holes.length && (g.card || []).length === S.holes.length) { const c = cardStats(g); if (m.best == null || c.toPar < m.best) m.best = c.toPar; }
   if (g.ep) { g.ep.done = true; g.ep.sat = sat; }
-  if (g.mp) { g.mp.done[g.side] = true; if (g.mp.done.a && g.mp.done.b) finishMatch(g.mp); }
+  if (g.mp) { g.mp.done[g.side] = true; if (g.mp.done.a && g.mp.done.b) (g.mp.cup ? finishCupMatch(g.mp) : finishMatch(g.mp)); }
 }
 
 function stepGolfer(g, dt){
@@ -1386,16 +1512,19 @@ function stepGolfer(g, dt){
   g.quiet -= dt;
   if (g.cel > 0) g.cel -= dt;
   if (g.pendingSay) { g.pendingSay.t -= dt; if (g.pendingSay.t <= 0) { say(g, g.pendingSay.text, true); g.pendingSay = null; } }
-  if (!g.leaving && !S.holes[g.hole]) goHome(g);
+  if (!g.leaving && !g.practice && !S.holes[g.hole]) goHome(g);
   if (g.state === 'walk') {
     const sl = g.toTee ? (g.slot || 0) : 0, dtr = !g.leaving && g.detour, tx = g.leaving ? DOOR.x : dtr ? dtr.x : g.bx - .3 - sl*.24, ty = g.leaving ? DOOR.y : dtr ? dtr.y : g.by + .14 + sl*.12;
     const riding = !!((g.mid || g.rented) && !g.ep && hasCart(g.x, g.y) && hasCart(tx, ty)); g.cart = riding;
     const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy), step = (riding ? 5.5 : 3.2)*(staffN('marshal') ? 1.12 : 1)*(wx().k === 'rain' ? .85 : 1)*dt;
     if (d <= step) { g.x = tx; g.y = ty;
       if (g.leaving) { g.done = true; finishRound(g); }
+      else if (dtr && g.practice) { g.state = 'practice'; g.t = 7 + Math.random()*6; g.pf = dtr.f; g.detour = null; }
       else if (dtr) { g.detour = null; useFacility(g, dtr.f); }
       else { g.state = 'address'; g.t = .9; g.atTee = g.toTee; g.toTee = false; }
     } else { g.x += dx/d*step; g.y += dy/d*step; }
+  } else if (g.state === 'practice') {
+    g.t -= dt; if (g.t <= 0) { practiceUse(g, g.pf); const nx = g.practice.shift(); if (nx) { const c = facCenter(nx); g.detour = { x:c.x + .1, y:c.y + FACS[nx.type].h/2 + .3, f:nx }; g.state = 'walk'; } else goHome(g); }
   } else if (g.state === 'address') {
     if (g.grp && g.atTee && S.golfers.some(o => o !== g && o.grp === g.grp && !o.done && !o.leaving && (o.hole < g.hole || (o.hole === g.hole && o.toTee)))) { g.t = .5; g.waiting = true; }
     else { g.waiting = false; if (g.atTee && g.slot) { g.t -= dt*.6; if (g.t <= 0) { g.x = g.bx - .3; g.y = g.by + .14; g.atTee = false; swing(g); } } else { g.t -= dt; if (g.t <= 0) { g.atTee = false; swing(g); } } }
@@ -1480,7 +1609,7 @@ function land(g){
   if (t < 0 || t === T.HOUSE || t === T.ROCK) {
     g.strokes++; g.sat -= 3; say(g, 'Out of bounds!', true); x = f.fx; y = f.fy;
   } else if (t === T.WATER) {
-    g.strokes++; g.sat -= g.type === 'casual' ? 4 : 2; say(g, 'Splash…', true);
+    g.strokes++; g.sat -= g.type === 'casual' ? 4 : 2; say(g, animals.some(a => a.kind === 'gator' && Math.hypot(a.x - x, a.y - y) < 3.5) ? 'Not going in after that one. Gator!' : 'Splash…', true);
     let k = 0; while (at(x,y) === T.WATER && k < 60) { x = lerp(x, f.fx, .08); y = lerp(y, f.fy, .08); k++; }
     if (at(x,y) === T.WATER) { x = f.fx; y = f.fy; }
   } else if (t === T.POT && Math.random() < .7) say(g, 'A pot bunker. Ugh.');
@@ -1505,7 +1634,7 @@ function holeOut(g){
   g.sat += (sc0 < 0 ? sc0*(1.4 - .8*(g.patience ?? .5)) : sc0) + (h.info.q - 5.5)*1.6 + tz.d;
   const hd = (S.clock || 0) - (g.ht0 ?? 0); g.ht0 = S.clock || 0;
   if (hd > 32 && (g.patience ?? .5) < .4) { g.sat -= 2; if (!tz.say) tz.say = 'This is taking forever.'; }
-  if (g.mp) (g.side === 'a' ? g.mp.ca : g.mp.cb).push(sc);
+  if (g.mp) { (g.side === 'a' ? g.mp.ca : g.mp.cb).push(sc); if (g.mp.cup) cupCheckDecided(g.mp); }
   let text = sc === 1 ? pick(LINES.ace) : diff <= -2 ? pick(LINES.eagle) : diff === -1 ? pick(LINES.birdie) :
     diff === 0 ? (h.info.q >= 7.5 ? pick(LINES.parGreat) : Math.random() < .45 ? pick(LINES.par) : null) : diff === 1 ? (Math.random() < .45 ? pick(LINES.bogey) : null) : diff === 2 ? pick(LINES.double) : pick(LINES.worse);
   if (diff >= 0 && h.info.q < 4 && Math.random() < .5) text = pick(LINES.boring);
@@ -1516,6 +1645,8 @@ function holeOut(g){
   else if (w.k === 'sunny') { g.sat += .4; if (!text && Math.random() < .12) text = pick(LINES.sunny); }
   if (w.mph >= 14 && diff >= 1 && !text && Math.random() < .35) text = pick(LINES.windy);
   if (!text && landmarksNear(h) && Math.random() < .3) { text = pick(LINES.view); g.sat += 1; }
+  if (!text && !g.sawDeer && Math.random() < .5 && animals.some(a => a.kind === 'deer' && Math.hypot(a.x - g.x, a.y - g.y) < 5)) { g.sawDeer = true; text = 'Look, deer!'; g.sat += 1.5; }
+  else if (!text && !g.sawDuck && Math.random() < .15 && animals.some(a => a.kind === 'duck' && Math.hypot(a.x - g.x, a.y - g.y) < 4)) { g.sawDuck = true; text = 'Aww, ducks!'; g.sat += .5; }
   if (h.info.notes.includes('Needs more fairway') && Math.random() < .5) text = 'Where’s the fairway?';
   g.energy = Math.max(0, (g.energy ?? 100) - (g.cart ? 2 : 5)); g.hunger = Math.min(100, (g.hunger || 0) + 6); g.thirst = Math.min(100, (g.thirst || 0) + 7);
   if (g.hunger > 75 || g.thirst > 75) { g.sat -= 1.5; if (!text && Math.random() < .4) text = g.thirst >= g.hunger ? 'I could really use a drink.' : 'I’m getting hungry.'; }
@@ -1532,10 +1663,11 @@ function holeOut(g){
   say(g, text, sc === 1 || diff <= -1);
 }
 function endDay(){
-  let up = 0; for (let i=0; i<G.length; i++) up += UPKEEP[G[i]] || 0; for (const f of S.facilities) up += FACS[f.type].upkeep; up = Math.round(up);
+  let up = 0; for (let i=0; i<G.length; i++) up += UPKEEP[G[i]] || 0; for (const f of S.facilities) up += FACS[f.type].upkeep*FAC_UPK[facLvOf(f) - 1]; up = Math.round(up);
   S.money -= up; book('upkeep', -up);
   const mt = maintDay(), lm = loanDay(), news = clubDay();
   toast(`Day ${S.day}: ${S.dayGolfers} golfer${S.dayGolfers===1?'':'s'}, +${fmt(S.dayFees)} fees, −${fmt(up + mt.total)} upkeep, staff and bills. Condition ${Math.round(condScore())}%.` + (mt.warn ? ' ' + mt.warn : '') + (lm ? ' ' + lm : '') + (news ? ' ' + news : '') + ` Tomorrow: ${WX[(S.forecast || wx()).k].icon} ${WX[(S.forecast || wx()).k].name}.`, 4200);
+  if (S.fb) for (const k in S.fb) { S.fb[k] *= .8; if (S.fb[k] < .3) delete S.fb[k]; }
   S.day++; S.dayFees = 0; S.dayGolfers = 0; S.dayRounds = 0; S.weather = S.forecast || rollWeather(); S.forecast = rollWeather(); planMembers();
   recompute(); checkGoals();
   if (S.money < -2000) { S.active = false; delete store.saves[S.level]; if (store.empire.owned.length > 1) store.empire.owned = store.empire.owned.filter(i => i !== S.level); saveStore(); $('broke').classList.remove('hidden'); return; }
@@ -1545,11 +1677,12 @@ function sim(dt){
   S.clock = (S.clock || 0) + dt;
   S.dayT += dt; if (S.dayT >= DAY) { S.dayT -= DAY; endDay(); if (!S.active) return; }
   if (S.event) eventStep(dt);
+  else if (S.cup) cupStep(dt);
   else if (S.holes.length) {
     S.spawnT -= dt; if (S.spawnT <= 0) { const n = spawn(); S.spawnT = nextInterval()*Math.max(1, n); }
     while (S.memberQueue.length && S.memberQueue[0].t <= S.dayT) {
       const q = S.memberQueue.shift(), m = S.members.find(m => m.id === q.mid);
-      if (m && !busy(m.id) && S.golfers.length < MAXG) arriveExtras(makeGolfer(memberGolfer(m)));
+      if (m && !busy(m.id) && S.golfers.length < MAXG) { if (q.practice) startPractice(m); else arriveExtras(makeGolfer({ ...memberGolfer(m), grp:q.grp || 0, slot:q.slot || 0 })); }
     }
   }
   for (const g of S.golfers) stepGolfer(g, dt);
@@ -1617,6 +1750,47 @@ function mateSay(g, good){
   const mates = S.golfers.filter(o => o !== g && o.grp === g.grp && !o.leaving && !o.done);
   if (!mates.length) return;
   const m = pick(mates); m.pendingSay = { text: pick((good ? LINES.mateGood : LINES.mateBad)(firstName(g))), t: .9 };
+}
+
+// ---------- golfer feedback ----------
+const FBK = {};
+const fbk = (sent, label, tip, lines) => lines.forEach(l => { FBK[l] = { sent, label, tip }; });
+fbk(-1, 'Fairways too narrow or missing', 'Paint wider fairways on par 4s and 5s.', ['Where’s the fairway?', 'These fairways are so narrow.']);
+fbk(-1, 'Holes feel boring', 'Put bunkers, water and trees near landing areas and greens.', [...LINES.boring, 'Too easy. Make it tougher.']);
+fbk(-1, 'Greens in poor shape', 'Hire a greenskeeper or buy a greens roller (Club → Staff).', ['These greens are bumpy.']);
+fbk(-1, 'Fairways need mowing', 'Hire more groundskeepers (Club → Staff).', ['The fairways need a mow.']);
+fbk(-1, 'Bunkers not raked', 'Hire a greenskeeper.', ['Nobody raked these bunkers.']);
+fbk(-1, 'Long walks, no cart paths', 'Start each hole near the last green and add cart paths.', ['Long walk to the next tee.', 'No cart path out here?', 'Wish I had a cart path here.', 'That one’s a long haul.']);
+fbk(-1, 'Slow pace of play', 'Hire a marshal and add cart paths.', ['This is taking forever.']);
+fbk(-1, 'Hungry and thirsty', 'Add a snack bar or drink stand out on the course.', ['I could really use a drink.', 'I’m getting hungry.']);
+fbk(-1, 'Tired out', 'Add benches and cart paths.', ['I’m worn out.']);
+fbk(1, 'Beautiful scenery', '', [...LINES.view]);
+fbk(1, 'Great hole design', '', [...LINES.parGreat, 'Love a risk-reward hole.', 'Driver, baby!']);
+fbk(1, 'Course in great shape', '', ['Course is in perfect shape!']);
+fbk(1, 'Handy facilities', '', ['Just what I needed.', 'Ahh, a cold drink!', 'Nice spot to rest.', 'Picked up a new glove.']);
+fbk(1, 'Wildlife', '', ['Look, deer!', 'Not going in after that one. Gator!', 'Aww, ducks!']);
+fbk(1, 'Loved their round', '', [...LINES.goodEnd]);
+function noteFeedback(text){ const f = FBK[text]; if (!f || !S.active) return; S.fb = S.fb || {}; S.fb[f.label] = (S.fb[f.label] || 0) + 1; }
+function leaveReview(g, sat){
+  if (g.ep) return;
+  const stars = clamp(Math.round(sat/20 + .4), 1, 5), want = stars >= 3 ? 1 : -1, log = (g.log || []).slice().reverse();
+  const quote = log.find(t => FBK[t] && FBK[t].sent === want) || log.find(t => FBK[t]) || (stars >= 4 ? pick(LINES.goodEnd) : stars <= 2 ? pick(LINES.badEnd) : 'Decent course. Might be back.');
+  const c = cardStats(g);
+  S.reviews = S.reviews || []; S.reviews.unshift({ day:S.day, name:g.name || `Guest #${g.id}`, kind:(TYPES[g.type] && TYPES[g.type].name) || golferKind(g), stars, quote, score: c.thru ? `${c.tot} (${toParStr(c.toPar)}) over ${c.thru}` : '' });
+  if (S.reviews.length > 30) S.reviews.pop();
+}
+function feedbackHtml(){
+  const R = S.reviews || [], fb = Object.entries(S.fb || {}).filter(([,v]) => v >= .5);
+  const byLabel = l => Object.values(FBK).find(f => f.label === l) || {};
+  const neg = fb.filter(([l]) => byLabel(l).sent < 0).sort((a,b) => b[1]-a[1]).slice(0, 5), pos = fb.filter(([l]) => byLabel(l).sent > 0).sort((a,b) => b[1]-a[1]).slice(0, 5);
+  const mx = Math.max(1, ...fb.map(([,v]) => v));
+  const row = ([l, v], c) => `<div class="fbrow"><div class="spread" style="margin:0"><span>${esc(l)}</span><b>${Math.round(v)}</b></div><div class="rbar"><i style="width:${Math.round(v/mx*100)}%;background:${c}"></i></div>${byLabel(l).tip ? `<span class="small muted">💡 ${esc(byLabel(l).tip)}</span>` : ''}</div>`;
+  let h = '';
+  if (R.length) { const avg = R.reduce((a,r) => a + r.stars, 0)/R.length; h += `<div class="recbox"><span class="small muted">Average review</span><b>${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))} ${avg.toFixed(1)}</b><span class="small">from the last ${R.length} golfers</span></div>`; }
+  h += `<h3 class="sec">👎 Top complaints this week</h3>` + (neg.length ? neg.map(r => row(r, '#e2483d')).join('') : '<p class="small muted">No complaints lately.</p>');
+  h += `<h3 class="sec">👍 What they love</h3>` + (pos.length ? pos.map(r => row(r, '#4fbf5a')).join('') : '<p class="small muted">Nothing yet. Scenery, great holes and good facilities get noticed.</p>');
+  h += `<h3 class="sec">💬 Recent reviews</h3>` + (R.length ? R.slice(0, 15).map(r => `<div class="review"><div class="spread" style="margin:0"><b>${esc(r.name)}</b><span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span></div><p style="margin:3px 0">“${esc(r.quote)}”</p><span class="small muted">${esc(r.kind)}${r.score ? ', shot ' + esc(r.score) : ''}, day ${r.day}</span></div>`).join('') : '<p class="small muted">Golfers leave a review when they finish their round.</p>');
+  return h;
 }
 
 // ---------- goals ----------
@@ -1779,7 +1953,7 @@ function courseRatings(){
   r.beauty = clamp(avg(h => Math.min(1, (h.info.scen || 0)/12)*7 + (h.info.drop >= 2 ? 1 : 0)) + Math.min(2, flowers/20) + Math.min(2.5, marks*.7), 0, 10);
   const pars = new Set(H.map(h => h.info.par)).size, dogs = H.filter(h => h.info.dog).length/n, elev = H.filter(h => Math.abs(h.info.drop || 0) >= 1).length/n;
   const mean = avg(h => h.info.plays), spread = Math.sqrt(avg(h => (h.info.plays - mean)**2));
-  r.variety = clamp((pars-1)*2.5 + Math.min(1, dogs/.3)*2 + Math.min(1, elev/.3)*1.5 + Math.min(1.5, spread/120), 0, 10);
+  r.variety = isPar3() ? clamp(4 + Math.min(1, elev/.3)*2.5 + Math.min(3.5, spread/25), 0, 10) : clamp((pars-1)*2.5 + Math.min(1, dogs/.3)*2 + Math.min(1, elev/.3)*1.5 + Math.min(1.5, spread/120), 0, 10);
   const PEN = { 'Needs more fairway':2, 'Crosses another hole':3, 'Pin is off the green':3, 'Very long':1, 'Very short':1 };
   r.fairness = clamp(10 - avg(h => h.info.notes.reduce((a,t) => a + (PEN[t] || 0), 0))*1.5, 0, 10);
   r.greens = clamp(avg(h => Math.min(1, (h.info.gs || 0)/9))*4 + S.cond.greens/100*6, 0, 10);
@@ -1842,8 +2016,8 @@ function recordBook(){
 }
 
 // ---------- golf empire ----------
-const LAND   = [0, 15000, 40000, 30000, 45000, 15000, 25000, 30000, 35000];
-const UNLOCK = [0, 15000, 50000, 35000, 70000, 20000, 30000, 40000, 60000];
+const LAND   = [0, 15000, 40000, 30000, 45000, 15000, 25000, 30000, 35000, 3000, 5000];
+const UNLOCK = [0, 15000, 50000, 35000, 70000, 20000, 30000, 40000, 60000, 0, 0];
 const priceOf = i => (LAND[i] ?? 30000) + LEVELS[i].cash;
 const LOAN_RATE = .15, LOAN_DAYS = 60;
 function parseNameLine(line){
@@ -1864,7 +2038,7 @@ function ensureEmpire(){
 }
 const owns = i => store.empire.owned.includes(i);
 function propertyValue(){
-  return Math.round((Math.max(10000, LAND[S.level] ?? 30000) + (S.parcels || []).reduce((a,k) => a + parcelPrice(k)*.8, 0) + S.holes.length*1500 + S.facilities.reduce((a,f) => a + FACS[f.type].cost*.6, 0) + S.course.stars*S.holes.length*700 + S.members.length*400 + S.prestige*800)/100)*100;
+  return Math.round((Math.max(10000, LAND[S.level] ?? 30000) + (S.parcels || []).reduce((a,k) => a + parcelPrice(k)*.8, 0) + S.holes.length*1500 + S.facilities.reduce((a,f) => a + FACS[f.type].cost*.6*FAC_EARN[facLvOf(f) - 1], 0) + S.course.stars*S.holes.length*700 + S.members.length*400 + S.prestige*800)/100)*100;
 }
 function savedValue(i){
   const sv = store.saves[i];
@@ -1901,7 +2075,6 @@ function buyProperty(i, from){
   const price = priceOf(i), src = store.saves[from];
   if (!src) return toast('Pick a course with money to pay from.');
   if ((src.money || 0) < price) return toast(`${src.clubName || LEVELS[from].name} only has ${fmt(src.money || 0)}.`);
-  if (empireValue() < UNLOCK[i]) return toast(`Grow your empire to ${fmt(UNLOCK[i])} first.`);
   src.money -= price; src.books = src.books || {}; src.books.land = (src.books.land || 0) - price;
   store.empire.owned.push(i); store.empire.owned.sort((a,b) => a-b); saveStore();
   toast(`You bought ${LEVELS[i].name}! It comes with a ${fmt(LEVELS[i].cash)} build budget.`, 3000); showLevels();
@@ -1948,6 +2121,7 @@ function earnFac(cat, amt, g){ amt = Math.round(amt*(cat === 'shop' && staffN('c
 function facTap(x, y){
   if (S.event) return toast('The course is locked while an event is on');
   const ft = TOOLS[S.tool].fac, F = FACS[ft];
+  if (isPar3() && !PAR3_FAC.includes(ft) && F.kind !== 'scenery') return toast(`A par 3 course doesn’t have room for a ${F.name}.`);
   if (F.req && S.course.stars < F.req) return toast(`The ${F.name} unlocks at a ${F.req}-star rating. You’re at ${S.course.stars.toFixed(1)}.`);
   if (F.unique && hasFac(ft)) return toast(`You already have a ${F.name}. Clear it to move it.`);
   const x0 = x - Math.floor((F.w-1)/2), y0 = y - Math.floor((F.h-1)/2), tiles = [];
@@ -1974,10 +2148,10 @@ function removeFacility(fi){
 function arriveExtras(g){
   if (!g || g.ep) return;
   const sp = g.spend ?? .5;
-  if (hasFac('carts') && S.hasPath && !g.mid && Math.random() < (g.type === 'senior' ? .85 : .2 + .35*sp + (staffN('cartie') ? .15 : 0))) { g.rented = true; earnFac('carts', 15, g); }
-  if (hasFac('range') && Math.random() < .3 + .35*sp) { earnFac('range', 8, g); g.bonus = { ...(g.bonus || {}), dr:.02, ac:.03 }; g.sat += 2; }
-  if (hasFac('putting') && Math.random() < .5) { g.bonus = { ...(g.bonus || {}), pt:.04, ch:.02 }; g.sat += 1; }
-  if (hasFac('proshop') && Math.random() < .25 + .45*sp) { earnFac('shop', Math.round(10 + sp*50), g); g.sat += 2; if (Math.random() < .3) say(g, 'Picked up a new glove.'); }
+  if (hasFac('carts') && S.hasPath && !g.mid && Math.random() < (g.type === 'senior' ? .85 : .2 + .35*sp + (staffN('cartie') ? .15 : 0) + .1*(typeLv('carts') - 1))) { g.rented = true; earnFac('carts', Math.round(15*earnMul('carts')), g); }
+  if (hasFac('range') && Math.random() < .3 + .35*sp + .1*(typeLv('range') - 1)) { const lv = typeLv('range'); earnFac('range', Math.round(8*earnMul('range')), g); g.bonus = { ...(g.bonus || {}), dr:.02*lv, ac:.03*lv }; g.sat += 1 + lv; }
+  if (hasFac('putting') && Math.random() < .5 + .1*(typeLv('putting') - 1)) { const lv = typeLv('putting'); g.bonus = { ...(g.bonus || {}), pt:.04*lv, ch:.02*lv }; g.sat += lv; }
+  if (hasFac('proshop') && Math.random() < .25 + .45*sp + .08*(typeLv('proshop') - 1)) { earnFac('shop', Math.round((10 + sp*50)*earnMul('proshop')), g); g.sat += 2; if (Math.random() < .3) say(g, 'Picked up a new glove.'); }
 }
 function planDetour(g, prev, n){
   if (g.ep || !S.facilities.length) return;
@@ -1987,16 +2161,17 @@ function planDetour(g, prev, n){
     const want = f.type === 'snack' ? (g.hunger > 35 || g.thirst > 35) : f.type === 'drinks' ? g.thirst > 35 : f.type === 'bench' ? g.energy < 75 : f.type === 'restroom' ? (!g.wc && Math.random() < .5) : false;
     if (!want) continue;
     const c = facCenter(f), d = Math.min(Math.hypot(c.x - prev.pin.x - .5, c.y - prev.pin.y - .5), Math.hypot(c.x - n.tee.x - .5, c.y - n.tee.y - .5));
-    if (d <= F.range && d < bd) { bd = d; best = f; }
+    if (d <= F.range + (facLvOf(f) - 1)*1.5 && d < bd) { bd = d; best = f; }
   }
   if (best) { const c = facCenter(best); g.detour = { x:c.x + .1, y:c.y + FACS[best.type].h/2 + .3, f:best }; }
 }
 function useFacility(g, f){
   const sp = g.spend ?? .5;
-  if (f.type === 'snack') { earnFac('food', Math.round(6 + sp*10), g); g.hunger = 5; g.thirst = Math.min(g.thirst, 10); g.sat += 3; say(g, 'Just what I needed.', true); }
-  else if (f.type === 'drinks') { earnFac('food', Math.round(4 + sp*3), g); g.thirst = 0; g.sat += 2; say(g, 'Ahh, a cold drink!', true); }
-  else if (f.type === 'bench') { g.energy = Math.min(100, g.energy + 25); g.sat += 1; say(g, 'Nice spot to rest.'); }
-  else if (f.type === 'restroom') { g.wc = true; g.sat += 3; }
+  const mul = FAC_EARN[facLvOf(f) - 1];
+  if (f.type === 'snack') { earnFac('food', Math.round((6 + sp*10)*mul), g); g.hunger = 5; g.thirst = Math.min(g.thirst, 10); g.sat += 3; say(g, 'Just what I needed.', true); }
+  else if (f.type === 'drinks') { earnFac('food', Math.round((4 + sp*3)*mul), g); g.thirst = 0; g.sat += 2; say(g, 'Ahh, a cold drink!', true); }
+  else if (f.type === 'bench') { g.energy = Math.min(100, g.energy + 25*mul); g.sat += 1; say(g, 'Nice spot to rest.'); }
+  else if (f.type === 'restroom') { g.wc = true; g.sat += 3*mul; }
 }
 function signMesh(text, bg){
   const c = document.createElement('canvas'); c.width = 256; c.height = 72; const x = c.getContext('2d');
@@ -2048,6 +2223,7 @@ function facModel(f){
     case 'carts': add('box','#a33b2f',[0,.3,-.15],[1.6,.6,1.2]); add('pyr','#6b7a88',[0,.82,-.15],[1.35,.44,1.05]); add('box','#f4f4ef',[0,.25,.452],[.8,.42,.01]);
       for (const x of [-.45,.45]) { add('box','#f4f4ef',[x,.12,.75],[.24,.12,.4]); add('box','#1f5c35',[x,.42,.75],[.27,.02,.42]); } break;
   }
+  const lv = facLvOf(f); if (lv > 1 && FACS[f.type].kind !== 'scenery') { g.scale.setScalar(1 + .1*(lv - 1)); const F = FACS[f.type]; for (let i=0; i<lv-1; i++) { const px = F.w/2 - .1 - i*.18, pz = -F.h/2 + .12; add('cyl', '#d8d8d2', [px, .55, pz], [.012, 1.1, .012]); const fl = new TH.Mesh(flagGeo, new TH.MeshLambertMaterial({ color:0xf2bd44, side:TH.DoubleSide })); fl.position.set(px, 1.02, pz); fl.scale.setScalar(.8); g.add(fl); } }
   const c = facCenter(f); g.position.set(W2(c.x), heightAt(c.x, c.y), Z2(c.y)); return g;
 }
 
@@ -2110,6 +2286,7 @@ function paintAt(tx, ty){
   if (changed) { terrainDirty = true; recompute(); checkGoals(); if ([T.FAIR, T.GREEN, T.FCUT, T.SAND, T.POT, T.GBUNK, T.TEE].includes(tool.paint)) crewCheckAfterPaint(); }
 }
 function doglegTap(x, y){
+  if (isPar3()) return toast('Par 3 holes play straight at the green, so there are no doglegs here.');
   if (S.event) return toast('The course is locked while an event is on');
   if (!ownedAt(x, y)) return notOwned();
   const cx = x+.5, cy = y+.5;
@@ -2173,6 +2350,7 @@ function holeTap(x, y){
   const yards = Math.hypot(x-tee.x, y-tee.y)*YD;
   if (yards < 100) return toast(`That’s ${Math.round(yards)} yards. Pins need to be at least 100 yards out.`);
   if (yards > 700) return toast(`That’s ${Math.round(yards)} yards. Keep holes under 700.`);
+  if (isPar3() && yards > PAR3_MAX) return toast(`That’s ${Math.round(yards)} yards. On a par 3 course every hole is 100 to ${PAR3_MAX} yards.`);
   const greens = tile(x, y) === T.GREEN ? [] : [[x, y]];
   const cost = TOOLS.hole.cost + greens.length*TOOLS.green.cost;
   if (S.money < cost) return toast(`This hole costs ${fmt(cost)}. You have ${fmt(S.money)}.`);
@@ -2219,7 +2397,7 @@ function autoAim(){
   return Math.atan2(ty - P.by, tx - P.bx);
 }
 function autoClub(){
-  if (onGreenP()) return PUTTER;
+  if (onGreenP()) return PUTTER - 1;
   const p = pinOf(), d = Math.hypot(p.x-P.bx, p.y-P.by) + (elevAt(p.x,p.y) - elevAt(P.bx,P.by))*ELH;
   for (let i = PUTTER-1; i >= 0; i--) if (clubMaxP(i) >= d*1.02) return i;
   return 0;
@@ -2304,7 +2482,14 @@ function landP(){
   } else if (!f.putting && Math.hypot(p.x-x, p.y-y)*75 < 1.5) { P.bx = p.x; P.by = p.y; return holeOutP(); }
   P.bx = x; P.by = y; P.busy = false;
   if (P.strokes >= h.info.par + 5) { toast('That’s the max for this hole. Picking up.'); return holeOutP(); }
+  if (onGreenP()) return autoPutt();
   resetShot();
+}
+// On the green, putting is automatic: by distance, 1, 2 or 3 putts.
+function autoPutt(){
+  const p = pinOf(), ft = Math.round(Math.hypot(p.x - P.bx, p.y - P.by)*75), n = ft <= 6 ? 1 : ft <= 35 ? 2 : 3;
+  P.strokes += n; P.bx = p.x; P.by = p.y; P.puttNote = `${n === 1 ? 'One putt' : n === 2 ? 'Two putts' : 'Three putts'} from ${ft} ft. `;
+  holeOutP();
 }
 function holeOutP(){
   const h = S.holes[P.hole], diff = P.strokes - h.info.par; P.scores.push(P.strokes); P.busy = true;
@@ -2312,7 +2497,7 @@ function holeOutP(){
   const name = P.strokes === 1 ? 'Hole in one!' : diff <= -3 ? 'Albatross!' : diff === -2 ? 'Eagle!' : diff === -1 ? 'Birdie!' : diff === 0 ? 'Par.' : diff === 1 ? 'Bogey.' : diff === 2 ? 'Double bogey.' : `${diff} over.`;
   const c = P.strokes === 1 ? 15 : diff <= -2 ? 6 : diff === -1 ? 3 : diff === 0 ? 1 : 0;
   P.coins += c; S.coins += c; if (c) saveGame();
-  toast(`${name} ${P.strokes} on hole ${P.hole+1}.${c ? ` +${c} 🪙` : ''}`, 1600);
+  toast(`${P.puttNote || ''}${name} ${P.strokes} on hole ${P.hole+1}.${c ? ` +${c} 🪙` : ''}`, 2600); P.puttNote = '';
   setTimeout(() => { if (S.mode !== 'play') return; if (P.hole + 1 < S.holes.length) teeUp(P.hole + 1); else showCard(); }, 1500);
 }
 function showCard(){
@@ -2399,7 +2584,16 @@ function newMember(name, extra){
 }
 function planMembers(){
   S.memberQueue = [];
-  for (const m of S.members) if (Math.random() < .35*clamp(m.sat/65, .3, 1.4)) S.memberQueue.push({ t: 2 + Math.random()*(DAY-6), mid:m.id });
+  const play = [], canPractice = S.facilities.some(f => PRACTICE_FAC.includes(f.type));
+  for (const m of S.members) {
+    if (Math.random() < .35*clamp(m.sat/65, .3, 1.4)) play.push(m);
+    else if (canPractice && Math.random() < .3) S.memberQueue.push({ t: 2 + Math.random()*(DAY-6), mid:m.id, practice:true });
+  }
+  play.sort(() => Math.random() - .5);
+  while (play.length) {   // members tee off in groups of 2-4
+    const n = Math.min(play.length, play.length <= 4 ? play.length : 2 + Math.floor(Math.random()*3)), t = 2 + Math.random()*(DAY*.7), grp = n > 1 ? (S.grpId = (S.grpId || 0) + 1) : 0;
+    play.splice(0, n).forEach((m, slot) => S.memberQueue.push({ t: t + slot*.5, mid:m.id, grp, slot }));
+  }
   S.memberQueue.sort((a,b) => a.t - b.t);
 }
 function clubDay(){
@@ -2421,7 +2615,7 @@ function clubDay(){
 function matchStatus(mt){ const n = Math.min(mt.ca.length, mt.cb.length); let up = 0; for (let i=0; i<n; i++) up += Math.sign(mt.cb[i] - mt.ca[i]); return { n, up }; }
 function matchText(mt){ const { n, up } = matchStatus(mt); if (!n) return 'On the first tee'; return up === 0 ? `All square thru ${n}` : `${nameOf(up > 0 ? mt.a : mt.b)} ${Math.abs(up)} up thru ${n}`; }
 function startMatch(a, b){
-  if (S.event) return toast('Matches can’t start during an event');
+  if (S.event || S.cup) return toast('Matches can’t start during an event');
   if (!S.holes.length) return toast('Build a hole first');
   if (!a || !b || a === b) return toast('Pick two different members');
   if (busy(a) || busy(b)) return toast('One of them is already out on the course');
@@ -2441,6 +2635,234 @@ function finishMatch(mt){
   const text = up === 0 ? `${nameOf(mt.a)} and ${nameOf(mt.b)} halved their match` : `${nameOf(up > 0 ? mt.a : mt.b)} beat ${nameOf(up > 0 ? mt.b : mt.a)} ${Math.abs(up)} up`;
   S.matchLog.unshift({ day:S.day, text }); if (S.matchLog.length > 20) S.matchLog.pop();
   toast(text + '.', 3200); saveGame();
+}
+
+// ---------- team cups (Ryder Cup-style match play) ----------
+const RIVALS = ['Willow Creek Country Club', 'Stonebridge Golf Club', 'Harbor Pines Club', 'Old Mill Golf Club', 'Cedar Hollow Country Club', 'Fox Run Golf Club', 'Granite Ridge Club', 'Lakeview Golf Club', 'Briar Patch Golf Club', 'Copper Kettle Country Club'];
+const TEAM_COL = ['#2f6fd6', '#e2483d'];
+const otherClubs = () => store.empire.owned.filter(i => i !== S.level && store.saves[i] && (store.saves[i].members || []).length >= 4);
+const CUPS = {
+  club:  { name:'Members’ Team Cup', icon:'🏆', blurb:'Ryder Cup–style match play inside your club. Your members split into two teams and play head to head; each match won is a point.', need: () => [[S.members.length >= 8, '8 members'], [S.holes.length >= 9, '9 holes']] },
+  inter: { name:'Inter-club Cup',    icon:'🤝', blurb:'Your members host the members of another course you own, Ryder Cup–style.', need: () => [[S.holes.length >= 18, '18 holes'], [S.members.length >= 4, '4 members'], [otherClubs().length > 0, 'another course you own with 4+ members']] },
+  rival: { name:'Challenge Cup',     icon:'⚔️', blurb:'Your best members take on a rival club from the county, Ryder Cup–style.', need: () => [[S.holes.length >= 18, '18 holes'], [S.members.length >= 4, '4 members']] }
+};
+const CUP_COOLDOWN = 7;
+const cupCool = k => { const l = (S.cupLast || {})[k]; return l == null ? 0 : Math.max(0, CUP_COOLDOWN - (S.day - l)); };
+const ptsTxt = p => (Math.floor(p) || (p % 1 ? '' : '0')) + (p % 1 ? '½' : '');
+const bySkill = arr => arr.slice().sort((a, b) => (b.skill || 0) - (a.skill || 0));
+function cupTeams(cs){
+  const n = cs.size;
+  if (cs.kind === 'club') { const top = bySkill(S.members).slice(0, n*2), a = [], b = []; top.forEach((m, i) => ((i % 4 === 0 || i % 4 === 3) ? a : b).push(m)); return [a.slice(0, n), b.slice(0, n)]; }
+  const home = bySkill(S.members).slice(0, n);
+  if (cs.kind === 'inter') { const sv = store.saves[cs.opp]; return [home, bySkill((sv.members || []).map(fixMember)).slice(0, n)]; }
+  if (!cs.away || cs.away.length !== n) { const avg = home.reduce((a, m) => a + (m.skill || .6), 0)/home.length; cs.away = Array.from({ length:n }, () => { const s = clamp(avg + (Math.random() - .45)*.16, .25, 1); return { name: randName(), skill:s, at: Object.fromEntries(ATTRS.map(([k]) => [k, clamp(s + (Math.random() - .5)*.16, .1, 1.05)])), type: pickType() }; }); }
+  return [home, cs.away];
+}
+function cupSetupOpen(kind){
+  const opp = kind === 'inter' ? otherClubs()[0] : null, maxN = cupMax({ kind, opp });
+  S.cupSetup = { kind, opp, size: Math.min(maxN, 6), names: kind === 'club' ? ['Team Blue', 'Team Red'] : [S.clubName, kind === 'inter' ? (store.saves[opp].clubName || LEVELS[opp].name) : pick(RIVALS)] };
+}
+function cupMax(cs){ const home = cs.kind === 'club' ? Math.floor(S.members.length/2) : S.members.length, away = cs.kind === 'inter' && cs.opp != null ? (store.saves[cs.opp].members || []).length : 99; return Math.max(2, Math.min(8, home, away)); }
+function cupSetupHtml(){
+  const cs = S.cupSetup, C = CUPS[cs.kind], [A, B] = cupTeams(cs), maxN = cupMax(cs);
+  let h = `<h3 style="margin:4px 0">${C.icon} ${C.name}</h3><p class="small muted">${C.blurb} The course is closed to the public during the cup.</p>`;
+  if (cs.kind === 'inter') h += `<label class="small muted" for="cupOpp">Opponent</label><select class="big" id="cupOpp" data-cupopp="1">${otherClubs().map(i => `<option value="${i}"${i === cs.opp ? ' selected' : ''}>${esc(store.saves[i].clubName || LEVELS[i].name)}</option>`).join('')}</select>`;
+  h += `<div class="spread"><span>Players per team</span><div class="chips">${[2,3,4,5,6,7,8].filter(n => n <= maxN).map(n => `<button class="chip${n === cs.size ? ' on' : ''}" data-act="cupSize" data-n="${n}">${n}</button>`).join('')}</div></div>`;
+  h += `<div class="cupteams">` + [A, B].map((T0, i) => `<div><input class="namebox" data-cupname="${i}" value="${esc(cs.names[i])}" ${cs.kind !== 'club' && i === 1 && cs.kind === 'inter' ? '' : ''} maxlength="32" style="border-color:${TEAM_COL[i]}"><ol class="small">${T0.map(p => `<li>${esc(p.name)} <span class="muted">Hcp ${hcp(p.skill || .6)}</span></li>`).join('')}</ol></div>`).join('') + `</div>`;
+  h += `<div class="btns"><button class="btn" data-act="cupGo">Tee off</button><button class="btn alt" data-act="cupCancel">Cancel</button></div>`;
+  return h;
+}
+function startCup(){
+  const cs = S.cupSetup; if (!cs) return;
+  if (S.event) return toast('Wait for the current event to finish.');
+  const [A, B] = cupTeams(cs);
+  const cupName = cs.kind === 'club' ? `${S.clubName} Team Cup` : cs.kind === 'inter' ? `${cs.names[0]} vs ${cs.names[1]} Cup` : `${cs.names[0]} Challenge Cup`;
+  const matches = A.map((p, i) => ({ id:++S.matchId, pa:p, pb:B[i], ca:[], cb:[], done:{}, cup:true, res:null }));
+  S.cup = { kind:cs.kind, name:cupName, opp:cs.opp, teams:[cs.names[0], cs.names[1]], matches, next:0, spawnT:0, pts:[0, 0] };
+  S.cupSetup = null; (S.cupLast = S.cupLast || {})[cs.kind] = S.day;
+  if (cs.kind === 'club') { S.money -= 400; book('events', -400); }
+  if (S.speed === 0) { S.speed = 1; updateSpeed(); }
+  closeClub(); toast(`🏆 The ${cupName} is underway: ${S.cup.teams[0]} vs ${S.cup.teams[1]}. The course is closed to the public until it ends.`, 4000); updateHUD();
+}
+function cupGolfer(p, side, mt){
+  const m = p.id && S.members.find(x => x.id === p.id && x === p);
+  const base = m ? memberGolfer(m) : { name:p.name, skill:p.skill, at:p.at, type:p.type || 'grinder' };
+  return makeGolfer({ ...base, color:TEAM_COL[side === 'a' ? 0 : 1], mp:mt, side, x: DOOR.x + (side === 'b' ? .4 : 0) });
+}
+function cupStep(dt){
+  const c = S.cup; c.spawnT -= dt;
+  if (c.next < c.matches.length && c.spawnT <= 0 && S.golfers.length < MAXG - 2) { const mt = c.matches[c.next++]; cupGolfer(mt.pa, 'a', mt); cupGolfer(mt.pb, 'b', mt); c.spawnT = 6; }
+}
+function cupCheckDecided(mt){
+  if (mt.closed || mt.ca.length !== mt.cb.length || !mt.ca.length) return;
+  const { n, up } = matchStatus(mt), rem = S.holes.length - n;
+  if (Math.abs(up) > rem) { mt.closed = rem ? `${Math.abs(up)}&${rem}` : `${Math.abs(up)} up`; for (const g of S.golfers) if (g.mp === mt && !g.leaving) goHome(g); }
+}
+function cupMatchText(mt){
+  const { n, up } = matchStatus(mt);
+  if (mt.res) return mt.res;
+  if (!n) return 'On the first tee';
+  return up === 0 ? `All square thru ${n}` : `${up > 0 ? mt.pa.name : mt.pb.name} ${Math.abs(up)} up thru ${n}`;
+}
+function finishCupMatch(mt){
+  const c = S.cup; if (!c || mt.res) return;
+  const { up } = matchStatus(mt), how = mt.closed || `${Math.abs(up)} up`;
+  if (up > 0) { c.pts[0] += 1; mt.res = `${mt.pa.name} won ${how}`; } else if (up < 0) { c.pts[1] += 1; mt.res = `${mt.pb.name} won ${how}`; } else { c.pts[0] += .5; c.pts[1] += .5; mt.res = 'Halved'; }
+  toast(`${c.name}: ${mt.res}. ${c.teams[0]} ${ptsTxt(c.pts[0])}, ${c.teams[1]} ${ptsTxt(c.pts[1])}.`, 3500);
+  if (c.matches.every(m => m.res)) finishCup();
+}
+function finishCup(){
+  const c = S.cup; S.cup = null;
+  const w = c.pts[0] > c.pts[1] ? 0 : c.pts[1] > c.pts[0] ? 1 : -1, score = `${ptsTxt(c.pts[0])}–${ptsTxt(c.pts[1])}`;
+  const income = c.kind === 'club' ? 0 : Math.round((c.kind === 'inter' ? 1500 : 2500) + S.course.stars*(c.kind === 'inter' ? 600 : 700));
+  if (income) { S.money += income; book('events', income); }
+  S.prestige += c.kind === 'club' ? .75 : 1.5;
+  for (const mt of c.matches) for (const [p, side] of [[mt.pa, 0], [mt.pb, 1]]) { const m = S.members.find(x => x === p); if (m) m.sat = Math.min(100, m.sat + (w === side ? 8 : 3)); }
+  const winner = w < 0 ? 'Tied' : c.teams[w];
+  S.history.unshift({ name:c.name, day:S.day, winner, score }); if (S.history.length > 30) S.history.pop();
+  if (c.kind === 'inter' && store.saves[c.opp]) { const sv = store.saves[c.opp]; (sv.history = sv.history || []).unshift({ name:c.name, day:sv.day, winner, score }); }
+  $('evDoneTitle').textContent = w < 0 ? `The ${c.name} is tied ${score}` : `${winner} wins the ${c.name}, ${score}`;
+  $('evDoneText').textContent = (income ? `You earned ${fmt(income)} from hosting. ` : '') + `Prestige is now ${S.prestige.toFixed(1)}, and the course is open again.`;
+  $('evDoneTable').innerHTML = `<table><thead><tr><th style="color:${TEAM_COL[0]}">${esc(c.teams[0])}</th><th>Result</th><th style="color:${TEAM_COL[1]}">${esc(c.teams[1])}</th></tr></thead><tbody>` +
+    c.matches.map(mt => `<tr><td>${esc(mt.pa.name)}</td><td class="small">${esc(mt.res || '')}</td><td>${esc(mt.pb.name)}</td></tr>`).join('') + '</tbody></table>';
+  $('evDone').classList.remove('hidden'); recompute(); saveGame(); updateHUD();
+}
+function cupsHtml(){
+  let h = `<h3 class="sec">Team cups</h3><p class="small muted">Ryder Cup–style match play between two teams of members. Each match is worth a point, a halved match half a point.</p>`;
+  for (const [k, C] of Object.entries(CUPS)) {
+    const miss = C.need().filter(([ok]) => !ok).map(([, l]) => l), cd = cupCool(k), ok = !miss.length && !cd && !S.event;
+    h += `<div class="ev${ok ? '' : ' off'}"><h3>${C.icon} ${C.name}</h3><p class="small" style="margin:4px 0">${C.blurb}</p><p class="meta">${miss.length ? 'Needs ' + miss.join(', ') + '.' : cd ? `Available again in ${cd} day${cd === 1 ? '' : 's'}.` : 'Ready to play.'}</p><button class="btn" data-act="cupSetup" data-kind="${k}" ${ok ? '' : 'disabled'}>Set up</button></div>`;
+  }
+  return h;
+}
+function cupLiveHtml(){
+  const c = S.cup;
+  return `<h3 style="margin:4px 0">${esc(c.name)} (live)</h3><div class="cupscore"><span style="color:${TEAM_COL[0]}">${esc(c.teams[0])} <b>${ptsTxt(c.pts[0])}</b></span><span style="color:${TEAM_COL[1]}"><b>${ptsTxt(c.pts[1])}</b> ${esc(c.teams[1])}</span></div>` +
+    `<table><tbody>${c.matches.map(mt => `<tr><td style="color:${TEAM_COL[0]}">${esc(mt.pa.name)}</td><td class="small">${esc(cupMatchText(mt))}</td><td style="color:${TEAM_COL[1]}">${esc(mt.pb.name)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// --- members' practice visits: range, putting green, shop, food; no round ---
+const PRACTICE_FAC = ['range', 'putting', 'proshop', 'restaurant', 'snack', 'drinks'];
+function practicePlan(){
+  const fs = S.facilities.filter(f => PRACTICE_FAC.includes(f.type)).sort((a, b) => PRACTICE_FAC.indexOf(a.type) - PRACTICE_FAC.indexOf(b.type));
+  const keep = fs.filter((f, i) => i < 2 || Math.random() < .5).slice(0, 3);
+  return keep;
+}
+function startPractice(m){
+  const plan = practicePlan(); if (!plan.length) return null;
+  const g = makeGolfer({ ...memberGolfer(m), practice:plan.slice(1) });
+  const f = plan[0], c = facCenter(f); g.detour = { x:c.x + .1, y:c.y + FACS[f.type].h/2 + .3, f };
+  return g;
+}
+function practiceUse(g, f){
+  const m = g.mid && S.members.find(x => x.id === g.mid), lv = facLvOf(f), mul = FAC_EARN[lv - 1], sp = g.spend ?? .5;
+  const boost = (keys, amt) => { if (!m) return; for (const k of keys) if (m.at && m.at[k] != null) m.at[k] = Math.min(1, m.at[k] + amt*lv); };
+  if (f.type === 'range') { earnFac('range', Math.round(10*mul), g); boost(['dr','ac','ir'], .003); say(g, pick(['Working on my driver.', 'Grooving my swing.', 'Hitting it pure today.']), true); }
+  else if (f.type === 'putting') { boost(['pt','ch'], .003); say(g, pick(['Rolling a few putts.', 'Dialed in on the greens.']), true); }
+  else if (f.type === 'proshop') { earnFac('shop', Math.round((10 + sp*50)*mul), g); say(g, 'Picked up some new gear.', true); }
+  else { earnFac('food', Math.round((8 + sp*20)*mul), g); say(g, 'Lunch at the club!', true); }
+  if (m) m.sat = Math.min(100, m.sat + 2);
+}
+
+// ---------- your own golf tour ----------
+const TOUR_TIERS = [
+  { need:4, name:'Regional Tour', skill:[.82, 1.0],  field:24, base:15000, gate:60,  prestige:3, purse:60000 },
+  { need:6, name:'National Tour', skill:[.9, 1.08],  field:30, base:30000, gate:90,  prestige:4, purse:150000 },
+  { need:8, name:'World Tour',    skill:[.96, 1.15], field:36, base:60000, gate:130, prestige:6, purse:400000 }
+];
+const TOUR_STARS = 3.5;
+const TOUR_PTS = [500, 300, 190, 135, 110, 100, 90, 85, 80, 75, 70, 65, 60, 56, 52, 48, 45, 42, 40, 38];
+const tourQual = () => store.empire.owned.filter(i => { if (isPar3(i)) return false; const sv = store.saves[i]; return sv && (sv.holes || []).length >= 18 && (sv.stars || 0) >= TOUR_STARS; });
+const tourTierFor = n => n >= 8 ? 2 : n >= 6 ? 1 : n >= 4 ? 0 : -1;
+function tourPlayers(tier, keep){
+  const T = TOUR_TIERS[tier], out = (keep || []).filter(p => p.id === 'pro' || Math.random() < .85).map(p => ({ ...p, pts:0, skill: clamp(Math.max(p.skill, T.skill[0]) + (Math.random() - .5)*.04, T.skill[0], T.skill[1]) }));
+  const used = new Set(out.map(p => p.name));
+  const mine = ((store.names && store.names.pros) || []).map(parseNameLine).filter(n => n.name && !used.has(n.name));
+  while (out.filter(p => p.id !== 'pro').length < 48) {
+    const pn = mine.shift(), country = (pn && pn.country) || pickCountry('pro'), name = pn ? pn.name : randName(country);
+    if (used.has(name)) continue; used.add(name);
+    out.push({ id:'t' + Math.random().toString(36).slice(2, 8), name, country, skill: lerp(T.skill[0], T.skill[1], Math.random()), pts:0, wins:0, money:0 });
+  }
+  return out;
+}
+function tourSchedule(){ return tourQual().slice(0, 8).map(i => ({ course:i, done:false, winner:null, score:null })); }
+function startTour(name){
+  const q = tourQual(), tier = tourTierFor(q.length); if (tier < 0) return;
+  store.tour = { name: (name || 'Fairways Tour').trim().slice(0, 32) || 'Fairways Tour', tier, season:1, sched: tourSchedule(), players: tourPlayers(tier), history:[] };
+  saveStore(); toast(`🏌️ The ${store.tour.name} is born! Season 1 has ${store.tour.sched.length} events, one at each of your top courses.`, 5000); showLevels();
+}
+function endTourSeason(){
+  const t = store.tour, champ = t.players.slice().sort((a, b) => b.pts - a.pts)[0];
+  t.history.unshift({ season:t.season, tier:t.tier, champion:champ.name, country:champ.country, pts:champ.pts });
+  const newTier = Math.max(t.tier, tourTierFor(tourQual().length));
+  const up = newTier > t.tier; t.tier = newTier; t.season++; t.sched = tourSchedule(); t.players = tourPlayers(t.tier, t.players);
+  return `🏆 ${champ.name} is the season ${t.season - 1} champion of the ${t.name} with ${champ.pts} points!` + (up ? ` Your tour moves up to ${TOUR_TIERS[t.tier].name} level.` : '') + ` Season ${t.season} has ${t.sched.length} events.`;
+}
+// Keep this course's tour stop in its invitations list.
+function syncTourOffer(){
+  S.offers = (S.offers || []).filter(o => !o.tour);
+  const t = store.tour; if (!t) return;
+  const stop = t.sched.find(e => e.course === S.level && !e.done); if (!stop) return;
+  const T = TOUR_TIERS[t.tier];
+  S.offers.unshift({ id:`tour-${t.season}-${S.level}`, tour:true, tier:'major', name:`${S.clubName} Classic`, org:`${t.name} (${T.name}), season ${t.season}`,
+    blurb:`Your own tour comes to town. The best players on the ${t.name} chase season points, and TV and sponsors pay big.`,
+    field:T.field, skill:T.skill, prestige:T.prestige, purse:T.purse, pro:true, base:T.base, gate:T.gate, reqs:[['holes', 18], ['stars', TOUR_STARS]], expires:1e9 });
+}
+function tourField(t){
+  const tr = store.tour, ps = tr.players.filter(p => p.id !== 'pro').sort((a, b) => b.pts - a.pts || b.skill - a.skill);
+  const top = ps.slice(0, Math.ceil(t.field*.6)), rest = ps.slice(top.length).sort(() => Math.random() - .5).slice(0, t.field - top.length);
+  return [...top, ...rest].map(p => ({ name:p.name, country:p.country, skill:p.skill, tid:p.id, type:'grinder' }));
+}
+function tourResult(ev, board){
+  const tr = store.tour; if (!tr) return '';
+  board.forEach((r, i) => { for (const p of r.ps) {
+    let tp = p.isPro ? tr.players.find(x => x.id === 'pro') : tr.players.find(x => x.id === p.tid);
+    if (!tp && p.isPro) { tp = { id:'pro', name:S.pro.name, country:S.pro.country, skill:S.pro.skill || .9, pts:0, wins:0, money:0 }; tr.players.push(tp); }
+    if (!tp) continue; tp.pts += TOUR_PTS[i] ?? Math.max(5, 36 - i); if (i === 0) tp.wins = (tp.wins || 0) + 1;
+  } });
+  const stop = tr.sched.find(e => e.course === S.level && !e.done); if (stop) { stop.done = true; stop.winner = board[0].p.name; stop.score = toParStr(board[0].toPar); }
+  let msg = ` Tour points awarded: ${board[0].p.name} +${TOUR_PTS[0]}.`;
+  if (tr.sched.every(e => e.done)) msg += ' ' + endTourSeason();
+  saveStore(); return msg;
+}
+function tourHtml(){
+  const q = tourQual(), t = store.tour, tierNow = tourTierFor(q.length);
+  let h = `<h3 class="sec">🏌️ Your golf tour</h3>`;
+  if (!t) {
+    h += `<p class="small muted">Run your own professional tour across your courses. Courses count once they have <b>18 holes and a ${TOUR_STARS}★ rating</b> (par 3 courses don’t count). ${TOUR_TIERS.map(T => `${T.need} courses: ${T.name}`).join(' · ')}.</p>`;
+    h += `<div class="estat"><b>${q.length} of 4</b><span>Courses ready for a tour</span></div>`;
+    if (tierNow >= 0) h += `<label class="small muted" for="tourName">Name your tour</label><input id="tourName" class="namebox" maxlength="32" value="Fairways Tour"><div class="btns"><button class="btn" id="tourStart">Start the ${TOUR_TIERS[tierNow].name}</button></div>`;
+    return h;
+  }
+  const T = TOUR_TIERS[t.tier], next = TOUR_TIERS[t.tier + 1];
+  h += `<div class="recbox"><span class="small muted">${esc(T.name)} level · season ${t.season}</span><b>${esc(t.name)}</b><span class="small">${t.sched.filter(e => e.done).length} of ${t.sched.length} events played${next ? ` · ${next.name} at ${next.need} ready courses (you have ${q.length})` : ' · top level'}</span></div>`;
+  h += `<p class="small muted" style="margin:6px 0">Open a course on the schedule and host its event from 🏆 Club → Events.</p>`;
+  h += `<table><thead><tr><th>Event</th><th>Winner</th></tr></thead><tbody>${t.sched.map(e => { const sv = store.saves[e.course]; return `<tr><td>${esc((sv && sv.clubName) || LEVELS[e.course].name)} Classic</td><td class="small">${e.done ? `🏆 ${esc(e.winner)} (${esc(e.score)})` : '<span class="muted">Not played yet</span>'}</td></tr>`; }).join('')}</tbody></table>`;
+  const top = t.players.slice().sort((a, b) => b.pts - a.pts).slice(0, 10);
+  h += `<h3 class="sec">Season standings</h3><table><thead><tr><th>#</th><th>Player</th><th>Points</th><th>Wins</th></tr></thead><tbody>${top.map((p, i) => `<tr${p.id === 'pro' ? ' class="cur"' : ''}><td>${i + 1}</td><td>${p.id === 'pro' ? '🏌️ ' : ''}${esc((p.country ? flagTxt(p.country) + ' ' : '') + p.name)}</td><td>${p.pts}</td><td>${p.wins || 0}</td></tr>`).join('')}</tbody></table>`;
+  if (t.history.length) h += `<h3 class="sec">Tour champions</h3>` + t.history.map(r => `<p class="small" style="margin:3px 0">Season ${r.season} (${TOUR_TIERS[r.tier].name}): 🏆 ${esc(r.champion)}, ${r.pts} pts</p>`).join('');
+  return h;
+}
+
+// ---------- clubhouse location ----------
+const houseAt = () => S.house || { x:CHX, y:CHY };
+function setDoor(){ const h = houseAt(); DOOR.x = h.x + 2.4; DOOR.y = h.y + 1; }
+function houseTap(x, y){
+  if (S.event || S.cup) return toast('Wait until the event is over to move the clubhouse.');
+  const old = houseAt(), x0 = x, y0 = y, cost = S.holes.length ? 2500 : 0;
+  for (let dy=0; dy<2; dy++) for (let dx=0; dx<3; dx++) {
+    const tx = x0 + dx, ty = y0 + dy, t = tile(tx, ty), mine = tx >= old.x && tx < old.x + 2 && ty >= old.y && ty < old.y + 2;
+    if (!ownedAt(tx, ty)) return notOwned();
+    if (dx < 2 && !mine && (t < 0 || t === T.WATER || t === T.HOUSE || t === T.TEE || t === T.GREEN || t === T.ROCK)) return toast('The clubhouse needs a clear 2×2 spot away from water, tees, greens and buildings.');
+    if (dx === 2 && (t === T.WATER || t === T.HOUSE && !mine)) return toast('Leave room for the front door on the right side.');
+  }
+  if (S.money < cost) return toast(`Moving the clubhouse costs ${fmt(cost)}.`);
+  if (cost && !confirm(`Move the clubhouse here for ${fmt(cost)}?`)) return;
+  S.money -= cost; if (cost) { book('build', -cost); spend(cost); }
+  for (let dy=0; dy<2; dy++) for (let dx=0; dx<2; dx++) setTile(old.x + dx, old.y + dy, T.ROUGH);
+  for (let dy=0; dy<2; dy++) for (let dx=0; dx<2; dx++) { setTile(x0 + dx, y0 + dy, T.HOUSE); TS[(y0+dy)*COLS + x0 + dx] = 0; }
+  S.house = { x:x0, y:y0 }; setDoor(); terrainDirty = true; recompute();
+  toast(cost ? `Clubhouse moved for ${fmt(cost)}.` : 'Clubhouse moved. It’s free to move until you build your first hole.', 3000);
 }
 
 // --- tournaments & invitations ---
@@ -2468,7 +2890,7 @@ function makeOffer(tierId){
 }
 function newOffer(){
   const h = S.holes.length, st = S.course.stars;
-  const w = { amateur:1, college: h >= 3 ? .8 : .3, senior: h >= 4 ? .6 : .2, pro: st >= 2.5 ? .6 : .15, major: S.prestige >= 3 && h >= 6 ? .45 : .05 };
+  const w = isPar3() ? { amateur:1, college:0, senior:0, pro:0, major:0 } : { amateur:1, college: h >= 3 ? .8 : .3, senior: h >= 4 ? .6 : .2, pro: st >= 2.5 ? .6 : .15, major: S.prestige >= 3 && h >= 6 ? .45 : .05 };
   let r = Math.random()*Object.values(w).reduce((a,b) => a+b, 0);
   for (const id of TIER_IDS) { r -= w[id]; if (r <= 0) return makeOffer(id); }
   return makeOffer('amateur');
@@ -2490,11 +2912,13 @@ function openSetup(id){
     const country = pickCountry('amateur'), type = pickType(), s = lerp(.3, .7, Math.random());
     S.setup.players.push({ name:randName(country), country, guest:true, team:i, type, skill:s, ...abilities(s, .2, 1) });
   });
+  else if (t.tour && store.tour) { S.setup.players = tourField(t); S.setup.withPro = true; }
   else { for (let i=0; i<t.field; i++) S.setup.players.push(proPlayer(t)); S.setup.withPro = t.pro; }
 }
 function proPlayer(t){ const pn = poolPick('pros'), country = (pn && pn.country) || pickCountry(TIERS[t.tier] ? TIERS[t.tier].country : 'pro'), s = lerp(t.skill[0], t.skill[1], Math.random()); return { name: pn ? pn.name : randName(country), country, type:t.type, skill:s, ...abilities(s, .12) }; }
 function teeOff(){
-  const st = S.setup; if (!st) return; const t = defOf(st.type);
+  const st = S.setup; if (!st) return;
+  if (S.cup) return toast('Wait for the cup to finish first.'); const t = defOf(st.type);
   if (!t) { S.setup = null; return toast('That invitation is no longer available'); }
   const errs = eventReq(t); if (errs.length) return toast('This event needs ' + errs.join(', '));
   const teams = new Set(st.players.map(p => p.team)).size;
@@ -2547,6 +2971,7 @@ function finishEvent(){
       newMember(p.name, { country:p.country, type:p.type, pow:p.pow, acc:p.acc, put:p.put }); joined.push(p.name);
     }
   }
+  const tourMsg = t.tour ? tourResult(ev, board) : '';
   const pi = board.findIndex(r => r.ps.some(p => p.isPro));
   if (pi >= 0) {
     const r = board[pi], pos = 1 + board.filter(x => x.toPar < r.toPar).length, tied = board.filter(x => x.toPar === r.toPar).length > 1;
@@ -2562,7 +2987,7 @@ function finishEvent(){
   if (S.history.length > 30) S.history.pop();
   $('evDoneTitle').textContent = `${win.ps.some(p => p.isPro) ? '🏆 ' : ''}${who(win.p)} win${win.ps.length > 1 ? '' : 's'} the ${ev.name}`;
   $('evDoneText').textContent = `${toParStr(win.toPar)} (${win.tot} strokes) over ${S.holes.length} holes.` + proTxt +
-    (inc ? ` You earned ${fmt(inc)} from the hosting fee and ticket sales.` : ' Your members loved it.') +
+    (inc ? ` You earned ${fmt(inc)} from the hosting fee and ticket sales.` : ' Your members loved it.') + tourMsg +
     (joined.length ? ` ${joined.join(' and ')} enjoyed it so much they joined the club.` : '') + ` Prestige is now ${S.prestige.toFixed(1)}, and the course is open again.`;
   $('evDoneTable').innerHTML = table;
   $('evDone').classList.remove('hidden'); recompute(); saveGame(); updateHUD();
@@ -2623,7 +3048,9 @@ function renderClub(){
   } else if (clubTab === 'staff') {
     h += staffTab();
   } else if (clubTab === 'events') {
-    if (S.event) {
+    if (S.cup) h += cupLiveHtml();
+    else if (S.cupSetup) h += cupSetupHtml();
+    else if (S.event) {
       h += `<h3 style="margin:4px 0">${esc(S.event.name)} (live)</h3><p class="small muted">${S.event.players.filter(p => p.done).length} of ${S.event.players.length} players finished.</p>` + boardTable(standings(S.event));
     } else if (S.matchSetup) {
       const ms = S.matchSetup, A = S.members.find(m => m.id === ms.a), hh = A && A.h2h[ms.b];
@@ -2654,14 +3081,15 @@ function renderClub(){
       if (!S.offers.length) h += `<p class="small muted">No invitations right now. Tours and associations reach out every few days, and bigger ones call as your course improves.</p>`;
       for (const o of S.offers) {
         const rl = reqList(o), ok = rl.every(r => r.ok), left = o.expires - S.day;
-        h += `<div class="ev"><h3>${esc(o.name)}</h3><p class="meta">${o.org}. Field of ${o.field} players. Expires in ${left} day${left === 1 ? '' : 's'}.</p><p class="small" style="margin:4px 0">${o.blurb}</p>` +
+        h += `<div class="ev${o.tour ? ' tourev' : ''}"><h3>${o.tour ? '🏌️ ' : ''}${esc(o.name)}</h3><p class="meta">${o.org}. Field of ${o.field} players. ${o.tour ? 'Your own tour stop: it waits until you’re ready.' : `Expires in ${left} day${left === 1 ? '' : 's'}.`}</p><p class="small" style="margin:4px 0">${o.blurb}</p>` +
           `<p class="meta">Pays about ${fmt(eventIncome(o))} to host.${o.pro ? ` Your pro can enter for a share of the ${fmt(o.purse)} purse.` : ''}</p>` +
           `<ul class="reqs">${rl.map(r => `<li class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} ${r.label}${!r.ok && r.have != null ? ` <span class="muted">(${r.have} now)</span>` : ''}</li>`).join('')}</ul>` +
-          `<div class="btns" style="margin-top:6px"><button class="btn" data-act="setup" data-type="${o.id}" ${ok ? '' : 'disabled'}>${ok ? 'Accept and set up' : 'Requirements not met'}</button><button class="btn alt" data-act="decline" data-type="${o.id}">Decline</button></div></div>`;
+          `<div class="btns" style="margin-top:6px"><button class="btn" data-act="setup" data-type="${o.id}" ${ok ? '' : 'disabled'}>${ok ? 'Accept and set up' : 'Requirements not met'}</button>${o.tour ? '' : `<button class="btn alt" data-act="decline" data-type="${o.id}">Decline</button>`}</div></div>`;
       }
       h += `<h3 class="sec">Member matches</h3><div class="ev"><p class="small" style="margin:0 0 6px">Head-to-head match play between two members. Results build each member’s record. The course stays open while they play.</p>`;
       for (const mt of S.matches) h += `<p class="meta">⛳ ${esc(nameOf(mt.a))} vs ${esc(nameOf(mt.b))}: ${esc(matchText(mt))}</p>`;
       h += `<button class="btn" data-act="matchSetup" ${S.members.length < 2 ? 'disabled' : ''}>Set up a match</button>${S.members.length < 2 ? '<p class="meta">Needs 2 members.</p>' : ''}</div>`;
+      h += cupsHtml();
       h += `<h3 class="sec">Club events</h3>`;
       for (const t of EVENTS) {
         const rl = reqList(t), cd = cooldownLeft(t), ok = rl.every(r => r.ok) && !cd;
@@ -2710,6 +3138,10 @@ $('clubBody').addEventListener('click', e => {
   else if (a === 'matchSetup') { const free = S.members.filter(m => !busy(m.id)); S.matchSetup = { a:(free[0] || S.members[0]).id, b:(free[1] || S.members[1]).id }; }
   else if (a === 'startMatch') { startMatch(S.matchSetup.a, S.matchSetup.b); if (!$('club').classList.contains('hidden')) renderClub(); return; }
   else if (a === 'cancelMatch') S.matchSetup = null;
+  else if (a === 'cupSetup') cupSetupOpen(b.dataset.kind);
+  else if (a === 'cupCancel') S.cupSetup = null;
+  else if (a === 'cupSize' && S.cupSetup) { S.cupSetup.size = +b.dataset.n; S.cupSetup.away = null; }
+  else if (a === 'cupGo') { startCup(); return; }
   else if (a === 'setup') openSetup(b.dataset.type);
   else if (a === 'rmPlayer') S.setup.players.splice(+b.dataset.pid, 1);
   else if (a === 'rmTeam') S.setup.players = S.setup.players.filter(p => p.team !== +b.dataset.team);
@@ -2724,6 +3156,8 @@ $('clubBody').addEventListener('input', e => {
   if (el.dataset.names) { store.names[el.dataset.names] = el.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 300); return; }
   if (el.dataset.sendto) { S.sendTo = +el.value; return; }
   if (el.dataset.lsel && S.lessonSetup) { S.lessonSetup.mid = +el.value; return; }
+  if (el.dataset.cupname != null && S.cupSetup) { S.cupSetup.names[+el.dataset.cupname] = el.value; return; }
+  if (el.dataset.cupopp && S.cupSetup) { S.cupSetup.opp = +el.value; S.cupSetup.names[1] = store.saves[S.cupSetup.opp].clubName || LEVELS[S.cupSetup.opp].name; S.cupSetup.size = Math.min(S.cupSetup.size, cupMax(S.cupSetup)); renderClub(); return; }
   if (el.dataset.msel && S.matchSetup) { S.matchSetup[el.dataset.msel] = +el.value; renderClub(); return; }
   if (el.dataset.pidc != null && S.setup) { const p = S.setup.players[+el.dataset.pidc]; if (p) p.country = el.value; return; }
   if (el.dataset.pid != null && S.setup) {
@@ -2820,7 +3254,7 @@ function nameTag(x, y, text, ev, pro){
 // ---------- scorecards ----------
 let scView = null, scTick = 0;
 const golferLabel = g => g.name ? who(g) : `Guest #${g.id}`;
-const golferKind = g => g.isPro ? 'Your club pro' : g.ep ? (S.event ? S.event.name : 'Event player') : g.mp ? 'Member match' : g.mid ? 'Member' : 'Visitor';
+const golferKind = g => g.practice ? 'Member, practicing' : g.isPro ? 'Your club pro' : g.ep ? (S.event ? S.event.name : 'Event player') : g.mp ? 'Member match' : g.mid ? 'Member' : 'Visitor';
 function cardStats(g){ const card = g.card || [], par = S.holes.slice(0, card.length).reduce((a,h) => a + h.info.par, 0), tot = card.reduce((a,b) => a+b, 0); return { thru:card.length, tot, toPar: tot - par }; }
 function golferAt(p){
   if (S.mode !== 'build') return null;
@@ -2832,12 +3266,14 @@ function openScores(id){ scView = id ? { mode:'card', id } : { mode:'list' }; re
 function renderScores(){
   if (!scView) return;
   const body = $('scBody'), btns = $('scBtns');
+  const tabs = `<div class="tabs"><button data-sct="list" class="${scView.mode === 'list' ? 'on' : ''}">On the course</button><button data-sct="fb" class="${scView.mode === 'fb' ? 'on' : ''}">💬 Feedback</button></div>`;
+  if (scView.mode === 'fb') { $('scTitle').textContent = 'Golfer feedback'; body.innerHTML = tabs + feedbackHtml(); btns.innerHTML = '<button class="btn" data-sc="close">Back to the course</button>'; return; }
   if (scView.mode === 'list') {
     $('scTitle').textContent = 'On the course';
     const gs = S.golfers.filter(g => !g.done);
-    body.innerHTML = gs.length ? `<p class="small muted">Tap anyone for their full scorecard. You can also tap golfers right on the map.</p><table><thead><tr><th>Golfer</th><th>Type</th><th>Thru</th><th>To par</th></tr></thead><tbody>` +
+    body.innerHTML = tabs + (gs.length ? `<p class="small muted">Tap anyone for their full scorecard. You can also tap golfers right on the map.</p><table><thead><tr><th>Golfer</th><th>Type</th><th>Thru</th><th>To par</th></tr></thead><tbody>` +
       gs.map(g => { const c = cardStats(g); return `<tr data-gid="${g.id}"><td><u>${esc(golferLabel(g))}</u></td><td>${esc(golferKind(g))}</td><td>${g.leaving ? 'F' : c.thru}</td><td>${c.thru ? toParStr(c.toPar) : '–'}</td></tr>`; }).join('') + '</tbody></table>'
-      : '<p class="muted">Nobody is on the course right now. Press ▶ to open for golfers.</p>';
+      : '<p class="muted">Nobody is on the course right now. Press ▶ to open for golfers.</p>');
     btns.innerHTML = '<button class="btn" data-sc="close">Back to the course</button>';
     return;
   }
@@ -2858,7 +3294,7 @@ function renderScores(){
     `<div class="thoughts">${(g.log || []).slice().reverse().map((t,i) => `<p class="${i ? 'muted' : ''}">${esc(t)}</p>`).join('') || '<p class="muted">Lining up the next shot…</p>'}</div></div>`;
   btns.innerHTML = '<button class="btn" data-sc="follow">Follow on the map</button><button class="btn alt" data-sc="list">Everyone on the course</button><button class="btn alt" data-sc="close">Close</button>';
 }
-$('scBody').addEventListener('click', e => { const tr = e.target.closest('[data-gid]'); if (tr) { scView = { mode:'card', id:+tr.dataset.gid }; renderScores(); } });
+$('scBody').addEventListener('click', e => { const tb = e.target.closest('[data-sct]'); if (tb) { scView = { mode: tb.dataset.sct }; renderScores(); return; } const tr = e.target.closest('[data-gid]'); if (tr) { scView = { mode:'card', id:+tr.dataset.gid }; renderScores(); } });
 $('scBtns').addEventListener('click', e => {
   const b = e.target.closest('[data-sc]'); if (!b) return; const a = b.dataset.sc;
   if (a === 'close') { $('sc').classList.add('hidden'); scView = null; }
@@ -2885,7 +3321,7 @@ cv.addEventListener('pointerdown', e => {
   if (S.tool === 'move' || e.button === 1) { pend = { kind:'pan', last:p, start:p, moved:0 }; return; }
   warnedCash = false;
   S.cursor = tileAtScreen(p);
-  pend = { kind: S.tool === 'hole' || S.tool === 'dogleg' || S.tool === 'edit' || TOOLS[S.tool].fac ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
+  pend = { kind: ['hole','dogleg','edit','house','upgrade'].includes(S.tool) || TOOLS[S.tool].fac ? 'tap' : 'paint', start:p, last:p, t:tileAtScreen(p), key:null, active:false };
 });
 cv.addEventListener('pointermove', e => {
   if (!ptrs.has(e.pointerId)) { if (S.tray && e.pointerType === 'mouse') S.cursor = tileAtScreen(local(e)); return; }
@@ -2924,7 +3360,7 @@ function endPtr(e, cancel){
   if (S.mode === 'play') { P.drag = null; return; }
   if (!pend) return;
   if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; } }
-  if (pend.kind === 'tap') { if (S.tool === 'edit') editTap(pend.t.x, pend.t.y); else if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
+  if (pend.kind === 'tap') { if (S.tool === 'house') houseTap(pend.t.x, pend.t.y); else if (S.tool === 'upgrade') facTapUpgrade(pend.t.x, pend.t.y); else if (S.tool === 'edit') { const fi = FO[pend.t.y*COLS + pend.t.x]; if (fi >= 0 && S.facilities[fi] && !S.editMove) openFacEd(fi); else editTap(pend.t.x, pend.t.y); } else if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
   else if (pend.kind === 'paint' && !pend.active) { checkpoint(); paintAt(pend.t.x, pend.t.y); }
   pend = null;
 }
@@ -2943,7 +3379,7 @@ window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (S.mode === 'play') {
     if (k === ' ') swingTap(); else if (k === 'arrowleft') { P.aim -= .03; updatePlayUI(); } else if (k === 'arrowright') { P.aim += .03; updatePlayUI(); }
-    else if (k === 'arrowup') { P.club = Math.max(0, P.club - 1); updatePlayUI(); } else if (k === 'arrowdown') { P.club = Math.min(PUTTER, P.club + 1); updatePlayUI(); } else return;
+    else if (k === 'arrowup') { P.club = Math.max(0, P.club - 1); updatePlayUI(); } else if (k === 'arrowdown') { P.club = Math.min(PUTTER - 1, P.club + 1); updatePlayUI(); } else return;
     e.preventDefault(); return;
   }
   if (k === 'q') rotateBy(Math.PI/4); else if (k === 'e') rotateBy(-Math.PI/4);
@@ -3010,7 +3446,8 @@ function editMoveTo(x, y){
   if (!ownedAt(x, y)) return notOwned();
   if (t < 0 || t === T.WATER || t === T.HOUSE || t === T.ROCK) return toast('Pick a spot without water, rocks or buildings.');
   const other = mv.which === 'tee' ? h.pin : h.tee, yards = Math.hypot(x - other.x, y - other.y)*YD;
-  if (yards < 100 || yards > 700) return toast(`That makes the hole ${Math.round(yards)} yards. Keep it between 100 and 700.`);
+  const ymax = isPar3() ? PAR3_MAX : 700;
+  if (yards < 100 || yards > ymax) return toast(`That makes the hole ${Math.round(yards)} yards. Keep it between 100 and ${ymax}.`);
   const cost = 100 + (mv.which === 'pin' && t !== T.GREEN ? TOOLS.green.cost : 0);
   if (S.money < cost) return toast(`That move costs ${fmt(cost)}.`);
   checkpoint(); S.money -= cost; book('build', -cost); spend(cost);
@@ -3051,14 +3488,16 @@ function updateHint(){
     const ph = P.meter.phase;
     if (ph === 'power') txt = 'Tap anywhere to set your power. Above the white line is an overswing.';
     else if (ph === 'acc') txt = 'Tap when the marker drops into the green zone. Early pushes right, late pulls left.';
-    else if (!P.busy) txt += ' Aim with ◀ ▶ or drag, pick a club, then tap Swing. Tap anywhere to set power, then again when the marker drops into the green.';
+    else if (!P.busy) txt += ' Aim with ◀ ▶ or drag, pick a club, then tap Swing. Tap anywhere to set power, then again when the marker drops into the green. On the green, putts are automatic.';
     $('hint').textContent = txt; return;
   }
   let h;
   if (TOOLS[S.tool] && TOOLS[S.tool].fac) { const F = FACS[TOOLS[S.tool].fac]; h = `${F.icon} ${F.name} (${F.w}×${F.h} tiles): ${F.blurb} ${fmt(F.cost)} to build, ${fmt(F.upkeep)} a day.${F.unique ? ' One per course.' : ''} Clear it to sell for half.`; }
+  else if (S.tool === 'house') h = `Tap where the clubhouse should go (2×2, front door on the right). ${S.holes.length ? 'Moving it costs $2,500.' : 'Free until you build your first hole.'}`;
+  else if (S.tool === 'upgrade') h = 'Tap a facility to upgrade it. Upgraded facilities look bigger, earn more and cost more to run.';
   else if (S.tool === 'edit') h = S.editMove ? `Tap where the new ${S.editMove.which === 'tee' ? 'tee box' : 'pin'} for hole ${S.editMove.hole+1} goes.` : 'Tap a tee box or pin to edit that hole: move it, reorder it or delete it.';
   else if (S.tool === 'dogleg') h = 'Tap near a hole to bend it there, $100. Line the corner with trees or bunkers. Tap a bend again to straighten the hole.';
-  else if (S.tool === 'hole') h = S.pendingTee ? 'Now tap where the pin goes, 100 to 700 yards away. Tap the tee again to cancel.' : 'Tap where the tee box goes. A hole costs $200 plus one green tile at the pin. Paint the rest of the green yourself.';
+  else if (S.tool === 'hole') h = S.pendingTee ? `Now tap where the pin goes, 100 to ${isPar3() ? PAR3_MAX : 700} yards away. Tap the tee again to cancel.` : `Tap where the tee box goes. A hole costs $200 plus one green tile at the pin. Paint the rest of the green yourself.${isPar3() ? ` Par 3 course: holes are 100 to ${PAR3_MAX} yards.` : ''}`;
   else if (TOOLS[S.tool].elev) h = `Drag to ${S.tool === 'raise' ? 'raise' : 'lower'} the land one level, ${fmt(TOOLS[S.tool].cost)} a tile. Use the large brush for smooth hills. Water stays flat.`;
   else if (S.tool === 'move' && !S.tray) h = 'Drag to look around, pinch to zoom. Tap a golfer for their card, or open 🏗️ Build to design.';
   else if (S.tool === 'move') h = 'Drag to move around. Pinch, scroll or use + and − to zoom.';
@@ -3069,8 +3508,8 @@ function updateHint(){
   $('hint').textContent = h;
 }
 const TRAYS = {
-  fac:   { icon:'🏛️', name:'Facilities', tools:['f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
-  build: { icon:'🏗️', name:'Build', tools:['hole','edit','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge'] },
+  fac:   { icon:'🏛️', name:'Facilities', tools:['upgrade','f_snack','f_drinks','f_bench','f_restroom','f_proshop','f_putting','f_range','f_carts','f_restaurant'] },
+  build: { icon:'🏗️', name:'Build', tools:['hole','edit','dogleg','fairway','green','sand','pot','gbunk','waste','path','bridge','house'] },
   land:  { icon:'🌳', name:'Landscape', tools:['fcut','deep','fescue','trees','shrubs','flowers','river','water','raise','lower','clear'] },
   trees: { icon:'🌲', name:'Trees', parent:'land', tools:['tree_round','tree_pine','tree_autumn','tree_blossom','tree_willow','tree_palm','tree_cypress'] },
   marks: { icon:'🗼', name:'Landmarks', parent:'land', tools:['f_windmill','f_lighthouse','f_gazebo','f_fountain','f_statue'] }
@@ -3099,11 +3538,11 @@ function buildTools(){
     if (S.tray === 'fac') add('tool', '<span class="ic">🏗️</span><span class="nm">‹ Build</span><span class="pr">Back</span>', () => openTray('build'));
     if (T0.parent) add('tool', `<span class="ic">${TRAYS[T0.parent].icon}</span><span class="nm">‹ ${TRAYS[T0.parent].name}</span><span class="pr">Back</span>`, () => openTray(T0.parent));
     if (S.tray === 'land') { add('tool', '<span class="ic">🌲</span><span class="nm">Trees ›</span><span class="pr">Pick a kind</span>', () => openTray('trees')); add('tool', '<span class="ic">🗼</span><span class="nm">Landmarks ›</span><span class="pr">Windmill, more</span>', () => openTray('marks')); }
-    for (const id of T0.tools) { const t = TOOLS[id].fac ? { ...FACS[TOOLS[id].fac], sw:null } : TOOLS[id];
+    for (const id of T0.tools) { if (isPar3() && (id === 'dogleg' || (TOOLS[id].fac && !PAR3_FAC.includes(TOOLS[id].fac) && FACS[TOOLS[id].fac].kind !== 'scenery'))) continue; const t = TOOLS[id].fac ? { ...FACS[TOOLS[id].fac], sw:null } : TOOLS[id];
       add('tool' + (S.tool === id ? ' on' : ''), `<span class="ic" ${t.sw ? `style="background:${t.sw}"` : ''}>${t.icon || ''}</span><span class="nm">${t.name}</span><span class="pr">${t.req && S.course.stars < t.req ? '🔒 ' + t.req + '★' : fmt(t.cost)}</span>`,
         () => { S.tool = id; if (id !== 'hole') S.pendingTee = null; if (id !== 'edit') { S.editMove = null; editSel = -1; } buildTools(); updateHint(); }); }
     if (S.tray === 'build') { add('tool', '<span class="ic">🏛️</span><span class="nm">Facilities ›</span><span class="pr">Shops, range</span>', () => openTray('fac')); add('tool', '<span class="ic">🗺️</span><span class="nm">Buy land</span><span class="pr">Expand</span>', openLand); }
-    if (!['hole','dogleg','edit'].includes(S.tool) && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
+    if (!['hole','dogleg','edit','house','upgrade'].includes(S.tool) && !TOOLS[S.tool].fac && !TOOLS[S.tool].thin) add('tool', `<span class="ic" style="font-size:.8rem;font-weight:700">${S.brush === 3 ? '3×3' : '1×1'}</span><span class="nm">Brush</span><span class="pr">${S.brush === 3 ? 'Large' : 'Small'}</span>`, () => { S.brush = S.brush === 3 ? 1 : 3; buildTools(); });
   }
   const dock = document.createElement('div'); dock.className = 'dock'; nav.appendChild(dock);
   const mk = (ic, nm, fn, on, extra) => { const b = document.createElement('button'); b.className = 'dockbtn' + (on ? ' on' : ''); b.innerHTML = `<span class="di">${ic}</span><span>${nm}</span>${extra || ''}`; b.addEventListener('click', fn); dock.appendChild(b); };
@@ -3140,7 +3579,11 @@ function updateHUD(){
   const met = goalState().filter(g => g.met).length;
   $('goalMini').textContent = `Goals ${met} of 3`;
   const chip = $('eventChip');
-  if (S.event) {
+  if (S.cup) {
+    chip.textContent = `🏆 ${S.cup.teams[0]} ${ptsTxt(S.cup.pts[0])} – ${ptsTxt(S.cup.pts[1])} ${S.cup.teams[1]}`;
+    chip.classList.remove('hidden');
+    if (clubTab === 'events' && !$('club').classList.contains('hidden')) renderClub();
+  } else if (S.event) {
     const b = standings(S.event)[0];
     chip.textContent = `🏆 ${S.event.name}: ` + (b && b.thru ? `${who(b.p)} leads at ${toParStr(b.toPar)}` : 'teeing off');
     chip.classList.remove('hidden');
@@ -3190,7 +3633,7 @@ function showLevels(){
     if (own && sv) h += `<p class="small" style="margin:4px 0"><b>${esc(sv.clubName || L.name)}</b>, day ${sv.day}</p><p class="small" style="margin:4px 0">${(sv.holes || []).length} holes, ★ ${(sv.stars ?? 0).toFixed(1)}, ${fmt(sv.money || 0)} cash, worth ${fmt(sv.value ?? savedValue(i))}${sv.loan ? `, owes ${fmt(sv.loan.balance)}` : ''}</p>`;
     else h += `<p class="muted small" style="margin:4px 0">${L.blurb}</p>`;
     if (own && !sv) h += `<p class="small" style="margin:4px 0">Ready to build with a ${fmt(L.cash)} budget. Challenge: ${L.goals.holes} holes, ${L.goals.stars} stars, ${fmt(L.goals.earned)} in fees.</p>`;
-    if (!own) { const locked = ev < UNLOCK[i];
+    if (!own) { const locked = false;
       h += `<p class="small" style="margin:4px 0">Price <b>${fmt(priceOf(i))}</b>, which includes a ${fmt(L.cash)} build budget.</p>`;
       if (locked) h += `<p class="small" style="margin:4px 0;color:var(--flag)">🔒 Goes on sale when your empire is worth ${fmt(UNLOCK[i])}. You’re at ${fmt(ev)}.</p>`; }
     info.innerHTML = h;
@@ -3200,7 +3643,7 @@ function showLevels(){
       const s2 = document.createElement('button'); s2.className = sv ? 'btn alt' : 'btn'; s2.textContent = sv ? 'Start over' : 'Build here';
       s2.onclick = () => { if (sv && !confirm(`Start ${L.name} over? Your saved course will be erased.`)) return; startLevel(i, false); };
       btns.appendChild(s2);
-    } else if (ev >= UNLOCK[i]) {
+    } else {
       if (!payers.length) btns.innerHTML = '<span class="small muted">Start one of your courses to earn money first.</span>';
       else {
         const sel = document.createElement('select'); sel.className = 'big'; sel.setAttribute('aria-label', 'Pay from');
@@ -3215,7 +3658,8 @@ function showLevels(){
     d.appendChild(preview(L, sv ? sv.grid : genMap(L))); d.appendChild(info); list.appendChild(d);
   };
   head('Your properties'); owned.forEach(card);
-  const sale = LEVELS.map((_,i) => i).filter(i => !owns(i)).sort((a,b) => UNLOCK[a] - UNLOCK[b]);
+  { const tw = document.createElement('div'); tw.innerHTML = tourHtml(); list.appendChild(tw); const sb = tw.querySelector('#tourStart'); if (sb) sb.onclick = () => startTour(tw.querySelector('#tourName').value); }
+  const sale = LEVELS.map((_,i) => i).filter(i => !owns(i)).sort((a,b) => priceOf(a) - priceOf(b));
   if (sale.length) { head('Land for sale'); sale.forEach(card); }
   $('levels').classList.remove('hidden'); renderAcct();
 }
@@ -3225,16 +3669,17 @@ function startLevel(i, cont){
     TS = sv.species && sv.species.length === COLS*ROWS ? Uint8Array.from(sv.species) : new Uint8Array(COLS*ROWS); G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); BR = sv.bridges ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0 }));
     S.money = sv.money; S.earned = sv.earned; S.day = sv.day; S.fee = sv.fee; S.recent = sv.recent || []; S.won = !!sv.won;
     S.clubName = sv.clubName || L.name + ' Golf Club'; S.trophy = sv.trophy || 'Founders Cup';
-    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.parcels = sv.parcels || []; S.news = sv.news || []; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
+    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.house = sv.house || { x:CHX, y:CHY }; S.fb = sv.fb || {}; S.reviews = sv.reviews || []; S.cupLast = sv.cupLast || {}; S.parcels = sv.parcels || []; S.news = sv.news || []; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
   } else {
     TS = new Uint8Array(COLS*ROWS); G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.facilities = []; S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
     S.clubName = L.name + ' Golf Club'; S.trophy = 'Founders Cup';
-    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.parcels = []; S.news = []; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
+    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.house = { x:CHX, y:CHY }; S.fb = {}; S.reviews = []; S.cupLast = {}; S.parcels = []; S.news = []; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
     delete store.saves[i]; saveStore();
   }
   S.mode = 'build'; P.fl = null; P.drag = null; hist = []; future = []; curAct = null; S.event = null; S.setup = null; S.matches = []; S.matchSetup = null; S.follow = null; $('prof').classList.add('hidden'); scView = null; $('sc').classList.add('hidden'); $('round').classList.add('hidden'); $('club').classList.add('hidden'); $('evDone').classList.add('hidden');
+  clearAnimals(); S.cup = null; S.cupSetup = null; facSel = -1;
   S.golfers = []; S.dayT = 0; S.spawnT = 2; S.speed = 0; S.pendingTee = null; S.tool = 'move'; S.tray = null; S.dayFees = 0; S.dayGolfers = 0;
-  S.active = true; computeOwn(); S.editMove = null; editSel = -1; recompute(); buildTools(); cam.ready = false; layout(); terrainDirty = true; updateSpeed(); updateHUD(); updateHint();
+  S.active = true; setDoor(); computeOwn(); syncTourOffer(); S.editMove = null; editSel = -1; recompute(); buildTools(); cam.ready = false; layout(); terrainDirty = true; updateSpeed(); updateHUD(); updateHint();
   planMembers();
   $('levels').classList.add('hidden');
   if (!sv) { $('helpTitle').textContent = L.name; $('help').classList.remove('hidden'); }
@@ -3248,7 +3693,7 @@ for (const [id, dir] of [['aimL', -1], ['aimR', 1]]) {
   for (const ev of ['pointerup','pointerleave','pointercancel']) b.addEventListener(ev, () => clearInterval(aimHold));
 }
 $('clubPrev').addEventListener('click', () => { if (P.meter.phase === 'idle') { P.club = Math.max(0, P.club - 1); updatePlayUI(); } });
-$('clubNext').addEventListener('click', () => { if (P.meter.phase === 'idle') { P.club = Math.min(PUTTER, P.club + 1); updatePlayUI(); } });
+$('clubNext').addEventListener('click', () => { if (P.meter.phase === 'idle') { P.club = Math.min(PUTTER - 1, P.club + 1); updatePlayUI(); } });
 $('swingBtn').addEventListener('click', swingTap);
 $('viewBtn').addEventListener('click', () => {
   P.overview = !P.overview;
@@ -3471,6 +3916,7 @@ function frame(now){
     if (!g || S.mode !== 'build') S.follow = null;
     else { view.tx += (W2(g.x) - view.tx)*.12; view.tz += (Z2(g.y) - view.tz)*.12; clampCam(); }
   }
+  if (S.active) stepAnimals(Math.min(dt, .05)*Math.max(1, S.speed), now);
   if (S.speed > 0 || S.mode === 'play' || S.follow || !S.active || now - lastInteract < 1500 || (++idleN % 4) === 0) draw(now);
   hudT += dt; if (hudT > .2) { hudT = 0; if (S.active) updateHUD(); if (scView && ++scTick % 5 === 0) renderScores(); }
   requestAnimationFrame(frame);

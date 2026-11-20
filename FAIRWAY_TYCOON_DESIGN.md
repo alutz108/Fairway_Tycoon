@@ -9,6 +9,36 @@ A SimGolf-style golf game: design courses, run a golf club, host tournaments and
 ### Branding
 Game name **Fairways Tycoon**. The logo (golf ball, flag, clubhouse, striped fairway) is embedded on the start screen as a base64 JPEG (`img.logo`) and used for the home-screen icons (apple-touch-icon 180, 192, 512, maskable 512 on green, favicon 32). The save key stays `fairway-tycoon-v1` and the file name stays fairway-tycoon.html.
 
+### Par 3 courses (LEVELS 9 and 10, `par3:true`, `isPar3()`)
+**Oak Hollow Par 3** (parkland, $12,000 incl. $9,000 build budget, $20 fee) and **Sea Breeze Par 3** (seaside, pot bunkers, $15,000 incl. $10,000, $22 fee). Rules: every hole 100–250 yards (`PAR3_MAX`, also when moving tees/pins), no doglegs (tool hidden), facilities limited to snack bar, drink stand, bench, restroom, pro shop and putting green (`PAR3_FAC`; landmarks still allowed; no range, restaurant or cart barn). Only local amateur invitations. Never count toward the golf tour (`tourQual`). Variety rating uses length spread and elevation instead of par mix; quick rounds bring 30% more golfers. Deer at Oak Hollow, gators at Sea Breeze.
+
+### Your own golf tour (empire screen → 🏌️ Your golf tour)
+Courses qualify with 18 holes and ≥3.5★ (`tourQual`, uses each save's stored `stars`). Tiers (`TOUR_TIERS`): 4 courses Regional Tour, 6 National Tour, 8 World Tour (the top level). Start it from the empire screen (name it). `store.tour` (empire-wide, saved and cloud-synced) = { name, tier, season, sched:[{course, done, winner, score}], players:[48 tour pros + your club pro once he plays], history }. Name lists' tour pros are used first. Each scheduled course gets a never-expiring gold invitation in Club → Events (`syncTourOffer` on course load): field 24/30/36 from the tour (season leaders + random), your pro can enter, hosting pays tier base ($15k/$30k/$60k) + gate, purse $60k/$150k/$400k, prestige 3/4/6. Results award season points (`TOUR_PTS`: 500, 300, 190…, `tourResult`); when every stop is played, the points leader is crowned, history saved, and the next season starts — moving up a tier if you now have more qualifying courses.
+
+### Members: groups and practice visits
+Visitors always arrive in groups of 2–4. Members who play tee off in groups of 2–4 too (`planMembers`). Other members (30% of non-players, if you have a range, putting green, pro shop or food) come just to practice (`startPractice`, state `practice`): they visit 1–3 facilities (range and putting green first), swing or putt there for a while, pay (range balls, shop, food, scaled by facility level), get slightly better (range: driving/accuracy/irons; putting green: putting/chipping) and happier, then go home. Shown as "Member, practicing" in Golfers.
+
+### Play mode putting
+No putting: when your ball stops on the green (or within 1.1 tiles of the pin off a bunker/water/trees), `autoPutt()` adds 1 putt (≤6 ft), 2 putts (≤35 ft) or 3 putts and finishes the hole ("Two putts from 19 ft."). The putter is no longer in the club list.
+
+### Clubhouse location
+Build tray → 🏠 **Clubhouse** (`houseTap`): tap the top-left of a clear 2×2 spot on owned land (with room for the door on the right). Free until the first hole exists, then $2,500. Saved as `S.house` (default `CHX, CHY`); `DOOR` and the clubhouse model follow it (`houseAt`, `setDoor`).
+
+### Golfer feedback (📋 Golfers → 💬 Feedback)
+Remarks are mapped to topics in `FBK` (complaints with a fix tip, praise); `say()` tallies them in `S.fb` (decays 20% a day). Every finished golfer leaves a review (`leaveReview`: 1–5 stars from mood, a quote from their own remarks, score) in `S.reviews` (last 30). The tab shows average stars, top complaints with tips, what golfers love, and recent reviews.
+
+### Wildlife
+Ephemeral animals (`animals`, `ensureAnimals` after each prop rebuild, `stepAnimals` every frame): ducks paddling on water (any setting), alligators in water on warm settings (Coastal Links, Azalea National, Sandhills, Lagoon Isles) that sometimes bask on the bank, deer near trees on Meadow Run, Pine Barrens, Azalea, Cliffside, Sandhills and Lakeshore that graze and run from golfers. Golfers react ("Look, deer!", "Aww, ducks!", "Not going in after that one. Gator!"), which counts as Wildlife praise.
+
+### Facility upgrades
+Facilities tray → ⬆️ **Upgrade** (or tap a facility with ✏️ Edit): levels 1–3 (`f.lv`). Upgrade cost: 1.2× then 2× the build price. Earnings and effects ×1 / ×1.6 / ×2.3 (`FAC_EARN`; more customers, higher spend, bigger range/putting skill boosts, snack/drink stands draw from farther away), upkeep ×1 / ×1.5 / ×2.2 (`FAC_UPK`). Upgraded buildings are drawn bigger with gold pennants. Landmarks don't upgrade.
+
+### Team cups (Ryder Cup–style match play) — Club → Events → Team cups
+- **Members’ Team Cup** (8 members, 9 holes): members split into two balanced teams (snake draft by skill), default Team Blue vs Team Red; costs $400.
+- **Inter-club Cup** (18 holes, 4 members, another owned course with 4+ members): your members host that course's members; result also lands in the other course's Honors.
+- **Challenge Cup** (18 holes, 4 members): your best members vs a fictional rival club (`RIVALS`) with similar skill.
+Setup: team names editable, 2–8 players a side. Singles match play over every hole; matches end early when decided ("won 3&2", `cupCheckDecided`); a win = 1 point, halved = ½. Teams wear blue and red. Course closed to the public during the cup; live score on the event chip and in Events. Results go to Honors and a results sheet; prestige +0.75 / +1.5; hosting income for inter-club and challenge cups. 7-day cooldown each (`S.cupLast`).
+
 ### Pace, messages and news
 Days last 240 sim seconds; golfers walk 3.2 tiles/s (carts 5.5), pre-shot routine 0.9s, longer ball flights, so an 18-hole round fits in a day (~16 s per hole). Pace rating and "taking forever" thresholds are calibrated to that. Toasts stay up 2.6–12 s depending on length, show a 📰 icon, and every message goes into `S.news` (saved, last 40). Tap a message or the day label to open **📰 Club news**, grouped by day.
 
@@ -117,7 +147,7 @@ Golfers walk to "need" facilities between holes (`planDetour`, `g.detour`, `useF
 ### Golf empire (start screen = empire screen)
 The 9 course settings are **properties**. `store.empire.owned` (in the main save store) lists owned indexes; Meadow Run is owned free, and any setting with a save is owned (old players keep everything). Each property keeps fully independent saves: money, staff, members, facilities, rating, loan.
 - **Empire screen** (`showLevels`): stats (rank, properties owned, empire value, cash on hand), "Your properties" (club name, day, holes, stars, cash, value, loan; Continue / Build here / Start over), "Land for sale" sorted by unlock value.
-- **Buying land:** price = land cost (`LAND`) + the setting's build budget (`LEVELS[i].cash`), paid from any started property's cash (pick in the card). A property goes on sale once empire value ≥ `UNLOCK[i]` ($15k Pine Barrens/… up to $70k Cliffside). The buyer's books record "Land purchases".
+- **Buying land:** price = land cost (`LAND`) + the setting's build budget (`LEVELS[i].cash`), paid from any started property's cash (pick in the card). Every property is for sale from the start; you just need the cash in one of your clubs (`UNLOCK` is no longer used; sale list sorted by price). The buyer's books record "Land purchases".
 - **Values:** `propertyValue()` = land (min $10k) + $1,500/hole + 60% of facility cost + stars × holes × $700 + $400/member + $800/prestige; saved as `value` and `stars` with each save. Empire value = Σ (value + cash − loan). Ranks: Course Owner, Club Group (2), Golf Company (3+, $120k), Golf Resorts Group (5+, $300k), Golf Empire (7+, $600k).
 - **Loans** (Club → Club tab): borrow $10k/$25k/$50k up to 50% of property value; repay 115% over 60 days in daily payments (`S.loan = {balance, daily}`, `loanDay()`), or pay off early.
 - **Send money** between started properties (Club tab), recorded as "Sent to other courses".
