@@ -365,6 +365,41 @@ body{overflow:hidden;-webkit-touch-callout:none}
 .mvs{font-size:.72rem;color:var(--muted)}
 .rival{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
 .rival .mi{flex:1;display:flex;flex-direction:column;min-width:0}
+.vmeter{display:none !important}
+.smeter{position:absolute;left:8px;right:56px;bottom:62px;background:rgba(14,34,22,.82);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:8px 10px 6px;color:#fff;pointer-events:none;transition:opacity .2s}
+.smeter.busy{opacity:.55}
+.sm-row{display:flex;align-items:center;gap:8px;margin:2px 0}
+.sm-tag{font-size:.68rem;font-weight:700;opacity:.75;width:38px;flex:0 0 auto}
+.sm-pow,.sm-acc{position:relative;flex:1;height:18px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}
+.sm-acc{height:16px}
+.sm-pow .sm-over{position:absolute;top:0;bottom:0;left:90.91%;right:0;background:rgba(226,72,61,.35)}
+.sm-pow .sm-full{position:absolute;top:0;bottom:0;left:90.91%;width:2px;background:#fff}
+.sm-pow b{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,#f2bd44,#ffd76a);border-radius:9px}
+.sm-pow b.red{background:linear-gradient(90deg,#f2bd44,#e2483d)}
+.sm-target{position:absolute;top:-2px;bottom:-2px;width:3px;margin-left:-1px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.sm-target::after{content:'🎯';position:absolute;top:-1px;left:4px;font-size:.62rem;line-height:18px}
+.sm-target.far{background:#e2483d}
+.sm-last{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:#4fbf5a}
+.sm-acc i{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%)}
+.sm-good{background:rgba(255,255,255,.28)}
+.sm-great{background:#4fbf5a}
+.sm-perf{background:#f2bd44}
+#smNeedle{position:absolute;top:-1px;bottom:-1px;width:4px;margin-left:-2px;background:#fff;border-radius:2px;box-shadow:0 0 6px rgba(0,0,0,.8)}
+.sm-lastacc{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:#fff;transform:none !important}
+.sm-lastacc.miss{background:#e2483d}
+.sm-yds{font-size:.76rem;text-align:center;margin:1px 0 3px;min-height:1em}
+.sm-yds .red{color:#ff8a7a;font-weight:700}
+.sm-mode{pointer-events:auto;display:block;margin:4px auto 0;background:none;border:0;color:#cfe3d2;font:inherit;font-size:.68rem;text-decoration:underline;padding:2px 6px}
+.sm-res{position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);font-family:'Lilita One','Arial Rounded MT Bold',sans-serif;font-size:1.7rem;white-space:nowrap;text-shadow:0 2px 6px rgba(0,0,0,.7);pointer-events:none;animation:smpop .35s ease-out}
+.sm-res.perf{color:#ffd23f;font-size:2.1rem}.sm-res.great{color:#7ee28a}.sm-res.good{color:#fff}.sm-res.miss{color:#ff8a7a}
+@keyframes smpop{from{transform:translateX(-50%) scale(.6);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+#swingBtn{touch-action:none;-webkit-user-select:none;user-select:none}
+@media (orientation: landscape) and (max-height: 520px){.smeter{left:auto;right:60px;width:min(420px,55%);bottom:60px}}
+@media (prefers-reduced-motion: reduce){.sm-res{animation:none}}
+.crow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.crow .ci{flex:1;display:flex;flex-direction:column;min-width:0}
+.crow.here{background:var(--chip);border-radius:12px;padding:8px;border-bottom:0;margin:2px 0}
+.cpv .pv{width:36px;height:52px}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}.fc-eyes{animation:none}}
 </style>
 </head>
@@ -384,6 +419,11 @@ body{overflow:hidden;-webkit-touch-callout:none}
   </header>
   <main id="stage"><canvas id="gl" aria-hidden="true"></canvas><canvas id="map" aria-label="Golf course map"></canvas><div class="zoom"><button id="qSave" aria-label="Save now">💾</button><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="rotL" aria-label="Rotate left">⟲</button><button id="rotR" aria-label="Rotate right">⟳</button><button id="zFit" class="fit" aria-label="Show whole course">Fit</button></div><div class="undoBox hidden" id="undoBox"><button id="undoBtn" aria-label="Undo, refunds the cost">↶</button><button id="redoBtn" aria-label="Redo">↷</button></div><div id="playUI" class="hidden">
   <button id="liveScore" class="livescore" aria-label="Open scoreboard"></button>
+  <div id="smeter" class="smeter"><div id="smRes" class="sm-res hidden"></div>
+    <div class="sm-row"><span class="sm-tag">Power</span><div class="sm-pow"><i class="sm-over"></i><i class="sm-full"></i><b id="smFill"></b><i id="smTarget" class="sm-target"></i><i id="smLastPow" class="sm-last hidden"></i></div></div>
+    <div class="sm-yds" id="smYds"></div>
+    <div class="sm-row" id="smAccRow"><span class="sm-tag">Aim</span><div class="sm-acc"><i id="smGood" class="sm-good"></i><i id="smGreat" class="sm-great"></i><i id="smPerf" class="sm-perf"></i><span id="smNeedle" class="hidden"></span><i id="smLastAcc" class="sm-lastacc hidden"></i></div></div>
+    <button id="smMode" class="sm-mode"></button></div>
   <div class="vmeter" aria-hidden="true"><i class="over" id="meterOver"></i><i id="meterSweet" class="sweet"></i><i id="meterFull" class="full"></i><b id="meterFill"></b><i id="markPow" class="markpow hidden"></i><i id="markAcc" class="markacc hidden"></i><span id="meterMark" class="hidden"></span><em id="meterLbl" class="hidden"></em></div>
   <div class="windlbl" id="windLbl"></div>
   <button class="pbtn view" id="viewBtn" aria-label="Switch view">🗺️</button>
@@ -420,7 +460,7 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <div id="goalList"></div>
   <h2 style="margin-top:16px;font-size:1.2rem">Your holes</h2>
   <div id="holeTable"></div>
-  <div class="btns"><button class="btn" id="goalsClose">Back to the course</button><button class="btn alt" id="toLevels">Your empire</button><button class="btn alt" id="showRating">Rating breakdown</button><button class="btn alt" id="playRound">Play a round</button><button class="btn alt" id="showHelp">How to build</button></div>
+  <div class="btns"><button class="btn" id="goalsClose">Back to the course</button><button class="btn alt" id="toCourses">🗺️ Switch or buy courses</button><button class="btn alt" id="toLevels">Your empire</button><button class="btn alt" id="showRating">Rating breakdown</button><button class="btn alt" id="playRound">Play a round</button><button class="btn alt" id="showHelp">How to build</button></div>
 </div></div>
 
 <div id="done" class="overlay hidden"><div class="card">
@@ -490,6 +530,12 @@ body{overflow:hidden;-webkit-touch-callout:none}
   <h2 id="holeEdTitle">Edit hole</h2>
   <div id="holeEdBody"></div>
   <div class="btns"><button class="btn" id="holeEdClose">Done</button></div>
+</div></div>
+
+<div id="courses" class="overlay hidden"><div class="card wide">
+  <h2>🗺️ Courses</h2>
+  <div id="coursesBody"></div>
+  <div class="btns"><button class="btn" id="coursesClose">Back to the course</button></div>
 </div></div>
 
 <div id="pinsAll" class="overlay hidden"><div class="card">
@@ -1564,7 +1610,8 @@ function draw(now){
   const showTags = cam.z > cam.fit*1.7;
   const leaders = S.event ? new Set(standings(S.event).filter(r => r.thru).slice(0,3).flatMap(r => r.ps)) : null;
   for (const g of crowd) if (g.name && (showTags || g.isPro || (g.ep && leaders.has(g.ep)))) { const p = toScreen(g.x, g.y, 25); nameTag(p.x, p.y, (g.isPro ? '🏌️ ' : '') + who(g), !!g.ep, !!g.isPro); }
-  for (const g of crowd) if (g.thought) { const p = toScreen(g.x, g.y, 26); drawThought(p.x, p.y, g.thought.text); }
+  { const drawn = [], list = crowd.filter(g => g.thought).sort((a, b) => (b.thought.big ? 1 : 0) - (a.thought.big ? 1 : 0));
+    for (const g of list) { const p = toScreen(g.x, g.y, 26); if (chatter() !== 'all' && drawn.some(d => Math.abs(d.x - p.x) < 120 && Math.abs(d.y - p.y) < 28)) continue; drawn.push(p); drawThought(p.x, p.y, g.thought.text); } }
   if (S.mode === 'play' && !P.fl && S.holes[P.hole]) {
     const p = toScreen(P.bx-.3, P.by+.14, 27), b = Math.sin(now/250)*2;
     ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
@@ -1598,7 +1645,25 @@ function spawn(){
   }
   return n;
 }
-function say(g, text, force){ if (!text) return; noteFeedback(text); if (!force && g.quiet > 0) return; g.thought = { text, t:2.4 }; g.quiet = 3; (g.log = g.log || []).push(text); if (g.log.length > 5) g.log.shift(); }
+// Comment bubbles: everything still counts toward Feedback, but only some of it pops up on the map.
+const BIG_SAY = /hole in one|albatross|eagle|birdie|erupt|gator|splash|out of bounds|not coming back|what a round|brutal|course record|watch out for the sheep/i;
+const chatter = () => (store.opts && store.opts.chatter) || 'some';
+let lastBubble = 0;
+function say(g, text, force){
+  if (!text) return; noteFeedback(text);
+  (g.log = g.log || []).push(text); if (g.log.length > 5) g.log.shift();
+  if (!force && g.quiet > 0) return;
+  const big = BIG_SAY.test(text), mode = chatter(), now = S.day*DAY + S.dayT, followed = S.follow === g.id;
+  g.quiet = 3;
+  if (!followed) {
+    if (mode === 'off' || (mode === 'big' && !big)) return;
+    if (mode === 'some') {
+      const n = S.golfers.length, shown = S.golfers.reduce((a, o) => a + (o.thought ? 1 : 0), 0), cap = clamp(Math.round(6 - n/10), 2, 5);
+      if (big ? shown > cap : (shown >= cap || now - lastBubble < 1.1 || Math.random() > clamp(10/Math.max(10, n), .2, 1))) return;
+    }
+  }
+  g.thought = { text, t: big ? 2.6 : 2, big }; lastBubble = now;
+}
 function goHome(g){ g.leaving = true; g.state = 'walk'; g.fl = null; }
 function finishRound(g){
   if (g.practice) { const m = g.mid && S.members.find(x => x.id === g.mid); if (m) m.practice = (m.practice || 0) + 1; return; }
@@ -2626,22 +2691,35 @@ function autoClub(){
   return 0;
 }
 function resetShot(){ P.aim = autoAim(); P.club = autoClub(); P.meter = { phase:'idle', v:0, power:0 }; updateHint(); updatePlayUI(); }
-function swingTap(){
-  if (P.meter && P.meter.phase === 'idle' && !P.busy && !P.fl) { P.lastPow = null; P.lastAcc = null; }
+// ---------- swing: hold for power, let go, tap the needle for accuracy ----------
+const ACC_A = .32;   // the accuracy needle runs from +ACC_A (early, pushed) to -ACC_A (late, pulled)
+const swingEasy = () => !!(store.opts && store.opts.easySwing);
+function swingDown(){
   if (S.mode !== 'play' || P.busy || P.fl) return;
   const m = P.meter;
-  if (m.phase === 'idle') { m.phase = 'power'; m.v = 0; }
-  else if (m.phase === 'power') { m.power = m.v; m.phase = 'acc'; P.lastPow = m.v; }
+  if (m.phase === 'idle') { P.lastPow = null; P.lastAcc = null; m.phase = 'power'; m.v = 0; m.dir = 1; m.t0 = performance.now(); m.held = true; $('smRes').classList.add('hidden'); }
+  else if (m.phase === 'power' && !m.held) lockPower();
   else if (m.phase === 'acc') hitP(m.v);
   updateHint(); updatePlayUI();
 }
+function swingUp(){
+  const m = P.meter; if (!m || m.phase !== 'power' || !m.held) return;
+  m.held = false; if (performance.now() - m.t0 > 220) { lockPower(); updateHint(); updatePlayUI(); }   // a quick tap means tap mode: tap again to set power
+}
+function lockPower(){
+  const m = P.meter; m.power = Math.max(.02, m.v); P.lastPow = m.power;
+  if (swingEasy()) { const sw = sweetW(); hitP(gauss()*sw*.5*(1.3 - .6*clamp(shotSkill(), .3, 1.1))); return; }
+  m.phase = 'acc'; m.v = ACC_A;
+}
+function swingTap(){ const was = P.meter && P.meter.phase; swingDown(); if (was === 'idle' && P.meter.phase === 'power') P.meter.held = false; }
 function stepMeter(dt){
   const m = P.meter; if (!m || S.mode !== 'play') return;
   const mt = meterTimes();
-  if (m.phase === 'power') { m.v += dt/mt.up; if (m.v >= 1.1) { m.v = 1.1; m.power = 1.1; m.phase = 'acc'; updateHint(); } }
-  else if (m.phase === 'acc') { m.v -= dt/mt.down; if (m.v <= -.15) { m.v = -.15; hitP(-.15); } }
+  if (m.phase === 'power') { m.v += m.dir*dt/mt.up; if (m.v >= 1.1) { m.v = 1.1; m.dir = -1; } else if (m.v <= 0 && m.dir < 0) { m.v = 0; m.dir = 1; } }
+  else if (m.phase === 'acc') { const over = Math.max(0, m.power - 1); m.v -= dt*(2*ACC_A)/(mt.down*.85)*(1 + over*4); if (m.v <= -ACC_A) { m.v = -ACC_A; hitP(-ACC_A); } }
   if (m.phase !== 'idle') updatePlayUI();
 }
+function showSwingResult(txt, cls){ const el = $('smRes'); el.textContent = txt; el.className = 'sm-res ' + cls; clearTimeout(showSwingResult.t); showSwingResult.t = setTimeout(() => el.classList.add('hidden'), 1500); }
 function shotSkill(){ const putt = CLUBS[P.club].putter, p = pinOf(), d = Math.hypot(p.x-P.bx, p.y-P.by), chip = !putt && d < 2.5; return A(S.pro, putt ? 'pt' : chip ? 'ch' : d < 8 ? 'ir' : 'ac'); }
 function sweetW(){ return .02 + .075*clamp(shotSkill(), .2, 1.1); }
 // Better players get a calmer meter: up to ~25% slower.
@@ -2650,9 +2728,9 @@ function hitP(acc){
   const putting = CLUBS[P.club].putter, lie = playLie(), p = pinOf(), m = P.meter, dToPin = Math.hypot(p.x-P.bx, p.y-P.by);
   const chip = !putting && dToPin < 2.5, sk = putting ? A(S.pro,'pt') : chip ? A(S.pro,'ch') : A(S.pro, dToPin < 8 ? 'ir' : 'ac');
   const lieErr = putting ? 1 : lieAdj(lie, S.pro).err, sw = sweetW(), over = Math.max(0, m.power - 1);
-  const off = Math.sign(acc)*Math.max(0, Math.abs(acc) - sw/2);
-  const ang = P.aim + off*(putting ? .45 : 1.1)*lieErr + gauss()*(putting ? .005 + .01*(1-sk) : (.008 + .02*Math.max(0, 1-sk))*lieErr) + (over ? gauss()*over*.7 : 0);
-  const dd = Math.max(.05, clubMaxP()*Math.min(m.power, 1.1)*(1 + gauss()*(putting ? .025 + .03*(1-sk) : (.02 + .03*Math.max(0, 1-sk))*lieErr)));
+  const off = Math.sign(acc)*Math.max(0, Math.abs(acc) - sw/2), pf = Math.abs(acc) <= sw*.18 ? .4 : Math.abs(acc) <= sw/2 ? .75 : 1;
+  const ang = P.aim + off*(putting ? .45 : 1.1)*lieErr + pf*gauss()*(putting ? .005 + .01*(1-sk) : (.008 + .02*Math.max(0, 1-sk))*lieErr) + (over ? gauss()*over*.7 : 0);
+  const dd = Math.max(.05, clubMaxP()*Math.min(m.power, 1.1)*(1 + pf*gauss()*(putting ? .025 + .03*(1-sk) : (.02 + .03*Math.max(0, 1-sk))*lieErr)));
   let x = P.bx + Math.cos(ang)*dd, y = P.by + Math.sin(ang)*dd, holed = false;
   if (!putting) { const d2 = Math.max(.05, dd - (elevAt(x,y) - elevAt(P.bx,P.by))*ELH); x = P.bx + Math.cos(ang)*d2; y = P.by + Math.sin(ang)*d2; const wd = windDrift(d2, A(S.pro,'cm')); x += wd.x; y += wd.y; }
   if (putting) {
@@ -2663,10 +2741,10 @@ function hitP(acc){
     const lt = at(x,y), roll = rollOf(lt, .15)*(wx().k === 'rain' ? .5 : 1);
     x += Math.cos(ang)*roll*Math.min(1, m.power); y += Math.sin(ang)*roll*Math.min(1, m.power);
   }
-  const q = Math.abs(acc) <= sw/2 ? (over ? 'Big swing!' : 'Pure strike!') : acc > 0 ? 'Pushed it right.' : 'Pulled it left.';
-  if (!putting) toast(q, 1100);
+  const aa = Math.abs(acc), tier = aa <= sw*.18 ? ['PERFECT!', 'perf'] : aa <= sw/2 ? [over ? 'Great! Big swing!' : 'Great!', 'great'] : aa <= sw ? ['Good', 'good'] : [acc > 0 ? 'Pushed right' : 'Pulled left', 'miss'];
+  if (!putting) showSwingResult(swingEasy() && tier[1] !== 'miss' ? (over ? 'Big swing!' : 'Nice swing!') : tier[0], tier[1]);
   P.fl = { fx:P.bx, fy:P.by, tx:x, ty:y, t:0, T: putting ? .45 + dd*.2 : .5 + dd*.04, apex: putting ? 0 : Math.min(2.4, .4 + dd*.13), holed, putting };
-  P.lastPow = m.power; P.lastAcc = acc; P.lastSw = sw; P.lastWord = Math.abs(acc) <= sw/2 ? (over ? 'Big swing!' : 'Pure!') : acc > 0 ? 'Pushed right' : 'Pulled left';
+  P.lastPow = m.power; P.lastAcc = acc; P.lastSw = sw; P.lastWord = tier[0];
   P.meter = { phase:'idle', v:0, power:0 }; P.strokes++; P.busy = true; updateHint(); updatePlayUI();
 }
 function updatePlayUI(){
@@ -2690,7 +2768,21 @@ function updatePlayUI(){
   if (P.lastAcc != null) { ma.style.bottom = Y(P.lastAcc); ma.classList.toggle('miss', Math.abs(P.lastAcc) > (P.lastSw || sw)/2); ma.classList.remove('hidden'); } else ma.classList.add('hidden');
   { const done = P.scores.length, par = S.holes.slice(0, done).reduce((a, h) => a + h.info.par, 0), tot = P.scores.reduce((a, b) => a + b, 0), tp = tot - par;
     $('liveScore').innerHTML = P.match ? `<b>Hole ${P.hole + 1}</b> · vs ${esc(P.match.name.split(' ')[0])} · <b>${matchTxt(P.match.up)}</b> <span class="lsi">📋</span>` : `<b>Hole ${P.hole + 1}</b> · ${done ? `<span class="${tp < 0 ? 'under' : tp > 0 ? 'over' : ''}">${toParStr(tp)}</span> thru ${done}` : 'E'} · Stroke ${P.strokes + (P.fl ? 0 : 1)} <span class="lsi">📋</span>`; }
-  $('swingBtn').textContent = m.phase === 'idle' ? 'Swing' : m.phase === 'power' ? 'Set power' : 'Hit!';
+  { const PX = v => (clamp(v, 0, 1.1)/1.1*100).toFixed(2) + '%', AX = v => ((ACC_A - clamp(v, -ACC_A, ACC_A))/(2*ACC_A)*100).toFixed(2) + '%';
+    const pw = m.phase === 'power' ? m.v : m.phase === 'acc' ? m.power : (P.lastPow ?? 0), dPin = Math.hypot(p.x - P.bx, p.y - P.by), need = dPin/Math.max(.1, clubMaxP());
+    $('smFill').style.width = PX(pw); $('smFill').classList.toggle('red', pw > 1);
+    const tg = $('smTarget'); tg.style.left = PX(Math.min(1.1, need)); tg.classList.toggle('far', need > 1.1);
+    const lp = $('smLastPow'); if (m.phase === 'idle' && P.lastPow != null) { lp.style.left = PX(P.lastPow); lp.classList.remove('hidden'); } else lp.classList.add('hidden');
+    const dist = v => c.putter ? Math.round(clubMaxP()*v*75) + ' ft' : Math.round(clubMaxP()*v*YD) + ' yds', pinTxt = c.putter ? Math.round(dPin*75) + ' ft' : Math.round(dPin*YD) + ' yds';
+    $('smYds').innerHTML = m.phase === 'power' ? `<b>${dist(Math.min(m.v, 1.1))}</b> · 🎯 pin ${pinTxt}${m.v > 1 ? ' · <span class="red">overswing</span>' : ''}` : m.phase === 'acc' ? `<b>Tap when the needle hits the middle!</b>` : `🎯 Pin ${pinTxt}${need > 1.1 ? ' · out of range, swing away' : ` · about ${Math.round(Math.min(1, need)*100)}% power`}`;
+    const ez = swingEasy(); $('smAccRow').classList.toggle('hidden', ez);
+    const sw = sweetW(), W = v => (v/(2*ACC_A)*100).toFixed(2) + '%';
+    $('smGood').style.width = W(sw*2); $('smGreat').style.width = W(sw); $('smPerf').style.width = W(sw*.36);
+    const nd = $('smNeedle'); if (m.phase === 'acc') { nd.style.left = AX(m.v); nd.classList.remove('hidden'); } else nd.classList.add('hidden');
+    const la = $('smLastAcc'); if (m.phase === 'idle' && P.lastAcc != null && !ez) { la.style.left = AX(P.lastAcc); la.classList.toggle('miss', Math.abs(P.lastAcc) > sw); la.classList.remove('hidden'); } else la.classList.add('hidden');
+    $('smMode').textContent = ez ? '😌 Easy swing · tap for Pro' : '🎯 Pro swing · tap for Easy';
+    $('smeter').classList.toggle('busy', !!(P.busy || P.fl) && m.phase === 'idle'); }
+  $('swingBtn').textContent = m.phase === 'idle' ? 'Hold to swing' : m.phase === 'power' ? (m.held ? 'Let go!' : 'Tap to set') : 'TAP!';
   $('swingBtn').disabled = !!(P.busy || P.fl);
   { const w = wx(), el = $('windLbl'); if (w.mph >= 2) { const rel = (w.dir - P.aim)*180/Math.PI; el.innerHTML = `<span class="warr" style="transform:rotate(${rel.toFixed(0)}deg)">⬆</span><b>${w.mph}</b><small>mph</small>`; el.classList.remove('hidden'); } else el.classList.add('hidden'); }
   $('viewBtn').textContent = P.overview ? '🏌️' : '🗺️'; $('viewBtn').setAttribute('aria-label', P.overview ? 'Golfer view' : 'Hole view');
@@ -3885,6 +3977,61 @@ function stepBevs(dt){
 }
 function syncBevs(){ for (const c of bevs) { c.mesh.visible = S.mode !== 'play' || true; c.mesh.position.set(W2(c.x), heightAt(c.x, c.y), Z2(c.y)); c.mesh.rotation.y = c.head; } }
 
+// ---------- switch or buy courses without leaving the game ----------
+function openCourses(){
+  if (!S.active) return;
+  saveGame(); ensureEmpire();
+  const owned = store.empire.owned, payers = owned.filter(i => i === S.level || store.saves[i]);
+  const moneyOf = i => i === S.level ? S.money : (store.saves[i].money || 0);
+  let h = `<p class="small muted">Jump between your courses or buy a new one. This course saves first.</p><h3 class="sec">Your courses</h3>`;
+  for (const i of owned) {
+    const L = LEVELS[i], sv = store.saves[i], here = i === S.level;
+    h += `<div class="crow${here ? ' here' : ''}"><span class="cpv" data-pv="${i}"></span><span class="ci"><b>${esc(here ? (S.clubName || L.name) : sv ? (sv.clubName || L.name) : L.name)}</b>` +
+      `<span class="small muted">${here ? `You’re here · day ${S.day} · ${S.holes.length} hole${S.holes.length === 1 ? '' : 's'} · ★ ${S.course.stars.toFixed(1)} · ${fmt(S.money)}` : sv ? `Day ${sv.day} · ${(sv.holes || []).length} hole${(sv.holes || []).length === 1 ? '' : 's'} · ★ ${(sv.stars ?? 0).toFixed(1)} · ${fmt(sv.money || 0)}` : `Not started · ${fmt(L.cash)} build budget`}</span></span>` +
+      (here ? '<span class="small" style="font-weight:700;color:var(--brand)">Here</span>' : `<button class="btn sm" data-go="${i}">${sv ? 'Go' : 'Build'}</button>`) + `</div>`;
+  }
+  const sale = LEVELS.map((_, i) => i).filter(i => !owns(i)).sort((a, b) => priceOf(a) - priceOf(b));
+  if (sale.length) {
+    const best = payers.slice().sort((a, b) => moneyOf(b) - moneyOf(a))[0] ?? S.level;
+    h += `<h3 class="sec">Buy another course</h3><label class="small muted" for="crsPay">Pay from</label><select id="crsPay" class="big" style="width:100%;margin:4px 0 6px">` +
+      payers.map(p => `<option value="${p}"${p === best ? ' selected' : ''}>${esc(p === S.level ? (S.clubName || LEVELS[p].name) : (store.saves[p].clubName || LEVELS[p].name))} (${fmt(moneyOf(p))})</option>`).join('') + `</select>`;
+    for (const i of sale) {
+      const L = LEVELS[i], pr = priceOf(i);
+      h += `<div class="crow sale"><span class="cpv" data-pv="${i}"></span><span class="ci"><b>${esc(L.name)}</b><span class="small muted">${esc(L.style)} · ${fmt(pr)} (includes a ${fmt(L.cash)} build budget)</span></span><button class="btn alt sm" data-buy="${i}">Buy</button></div>`;
+    }
+  }
+  $('coursesBody').innerHTML = h;
+  $('coursesBody').querySelectorAll('[data-pv]').forEach(el => { const i = +el.dataset.pv, sv = i === S.level ? { grid:G } : store.saves[i]; el.appendChild(preview(LEVELS[i], sv ? sv.grid : genMap(LEVELS[i]))); });
+  $('courses').classList.remove('hidden');
+}
+function buyCourseHere(i, from){
+  const L = LEVELS[i], pr = priceOf(i);
+  if (from === S.level) {
+    if (S.money < pr) return toast(`${S.clubName || LEVELS[S.level].name} has ${fmt(S.money)}. ${L.name} costs ${fmt(pr)}.`);
+    S.money -= pr; book('land', -pr);
+  } else {
+    const src = store.saves[from]; if (!src || (src.money || 0) < pr) return toast(`${src ? src.clubName || LEVELS[from].name : 'That course'} only has ${fmt(src ? src.money || 0 : 0)}.`);
+    src.money -= pr; src.books = src.books || {}; src.books.land = (src.books.land || 0) - pr;
+  }
+  store.empire.owned.push(i); store.empire.owned.sort((a, b) => a - b); saveGame(); updateHUD();
+  toast(`🎉 You bought ${L.name}! Tap Build to start your new course.`, 3200); openCourses();
+}
+$('coursesBody').addEventListener('click', e => {
+  const go = e.target.closest('[data-go]'), buy = e.target.closest('[data-buy]');
+  if (go) {
+    const i = +go.dataset.go;
+    if (S.event || S.cup) return toast('Finish the event here first, then you can switch courses.');
+    if (S.mode === 'play') return toast('Finish or quit your round first.');
+    saveGame(); $('courses').classList.add('hidden'); for (const id of ['club','goals']) $(id).classList.add('hidden');
+    startLevel(i, !!store.saves[i]); toast(`Welcome to ${S.clubName || LEVELS[i].name}.`, 2200);
+  } else if (buy) {
+    const i = +buy.dataset.buy, from = +$('crsPay').value;
+    if (confirm(`Buy ${LEVELS[i].name} for ${fmt(priceOf(i))}?`)) buyCourseHere(i, from);
+  }
+});
+$('coursesClose').addEventListener('click', () => $('courses').classList.add('hidden'));
+$('toCourses').addEventListener('click', () => { $('goals').classList.add('hidden'); openCourses(); });
+
 // ---------- clubhouse location ----------
 const houseAt = () => S.house || { x:CHX, y:CHY };
 function setDoor(){ const h = houseAt(); DOOR.x = h.x + 2.4; DOOR.y = h.y + 1; }
@@ -4049,6 +4196,7 @@ function renderClub(){
   $('clubTitle').textContent = S.clubName || 'The clubhouse';
   let h = '';
   if (clubTab === 'club') {
+    h += `<button class="btn alt" data-courses="1" style="width:100%;margin:0 0 10px">🗺️ Switch courses or buy a new one (${store.empire.owned.length} owned)</button>`;
     h += attentionHtml();
     h += `<button class="mcard" data-act="profile" data-mid="pro"><span class="mavf">${proFace(44)}${S.pro.country ? `<span class="fflag">${flagTxt(S.pro.country)}</span>` : ''}</span><span class="mi"><b>${esc(S.pro.name)}</b><span class="small muted">Your club pro: ${S.pro.starts} start${S.pro.starts === 1 ? '' : 's'}, ${S.pro.wins} win${S.pro.wins === 1 ? '' : 's'}, ${fmt(S.pro.earnings)} won</span></span><span class="chev" aria-hidden="true">›</span></button>`;
     const ls = S.lessonSetup || (S.lessonSetup = { mid:(S.members[0] || {}).id, k:'dr' });
@@ -4161,6 +4309,7 @@ function renderClub(){
   $('clubBody').innerHTML = h;
 }
 let memSort = 'joined';
+$('clubBody').addEventListener('click', e => { if (e.target.closest('[data-courses]')) { closeClub(); openCourses(); } });
 $('clubBody').addEventListener('click', e => { const ch = e.target.closest('[data-challenge]'); if (ch) { challengeMember(+ch.dataset.challenge); } });
 $('clubBody').addEventListener('click', e => { const ms = e.target.closest('[data-msort]'); if (ms) { memSort = ms.dataset.msort; renderClub(); return; } const gt = e.target.closest('[data-gotab]'); if (gt) { clubTab = gt.dataset.gotab; renderClub(); $('club').querySelector('.card').scrollTop = 0; } });
 $('clubBody').addEventListener('click', e => {
@@ -4352,7 +4501,8 @@ function renderScores(){
   if (scView.mode === 'list') {
     $('scTitle').textContent = 'On the course';
     const gs = S.golfers.filter(g => !g.done);
-    body.innerHTML = tabs + (gs.length ? `<p class="small muted">Tap anyone for their full scorecard. You can also tap golfers right on the map.</p><table><thead><tr><th>Golfer</th><th>Type</th><th>Thru</th><th>To par</th></tr></thead><tbody>` +
+    const chat = `<div class="sortrow"><span class="small muted">💬 Comments on the map:</span>` + [['all','All'],['some','Some'],['big','Big moments'],['off','Off']].map(([k, l]) => `<button class="chip${chatter() === k ? ' on' : ''}" data-chat="${k}">${l}</button>`).join('') + `</div>`;
+    body.innerHTML = tabs + chat + (gs.length ? `<p class="small muted">Tap anyone for their full scorecard. You can also tap golfers right on the map.</p><table><thead><tr><th>Golfer</th><th>Type</th><th>Thru</th><th>To par</th></tr></thead><tbody>` +
       gs.map(g => { const c = cardStats(g); return `<tr data-gid="${g.id}"><td class="withface">${g.isPro ? proFace(24) : golferFace(g, 24)}<u>${esc(golferLabel(g))}</u></td><td>${esc(golferKind(g))}</td><td>${g.leaving ? 'F' : c.thru}</td><td>${c.thru ? toParStr(c.toPar) : '–'}</td></tr>`; }).join('') + '</tbody></table>'
       : '<p class="muted">Nobody is on the course right now. Press ▶ to open for golfers.</p>');
     btns.innerHTML = '<button class="btn" data-sc="close">Back to the course</button>';
@@ -4375,6 +4525,7 @@ function renderScores(){
     `<div class="thoughts">${(g.log || []).slice().reverse().map((t,i) => `<p class="${i ? 'muted' : ''}">${esc(t)}</p>`).join('') || '<p class="muted">Lining up the next shot…</p>'}</div></div>`;
   btns.innerHTML = '<button class="btn" data-sc="follow">Follow on the map</button><button class="btn alt" data-sc="list">Everyone on the course</button><button class="btn alt" data-sc="close">Close</button>';
 }
+$('scBody').addEventListener('click', e => { const c = e.target.closest('[data-chat]'); if (!c) return; store.opts = { ...(store.opts || {}), chatter: c.dataset.chat }; saveStore(); if (c.dataset.chat !== 'all') for (const g of S.golfers) if (g.thought && (c.dataset.chat === 'off' || (c.dataset.chat === 'big' && !g.thought.big))) g.thought = null; toast({ all:'Showing every comment.', some:'Showing some comments; big moments come first.', big:'Only big moments: aces, eagles, birdies, splashes and strong reactions.', off:'Comments are off on the map. They still count in Feedback.' }[c.dataset.chat], 2600); renderScores(); });
 $('scBody').addEventListener('click', e => { const tb = e.target.closest('[data-sct]'); if (tb) { scView = { mode: tb.dataset.sct }; renderScores(); return; } const tr = e.target.closest('[data-gid]'); if (tr) { scView = { mode:'card', id:+tr.dataset.gid }; renderScores(); } });
 $('scBtns').addEventListener('click', e => {
   const b = e.target.closest('[data-sc]'); if (!b) return; const a = b.dataset.sc;
@@ -4813,7 +4964,12 @@ for (const [id, dir] of [['aimL', -1], ['aimR', 1]]) {
 }
 $('clubPrev').addEventListener('click', () => { if (P.meter.phase === 'idle') { P.club = Math.max(0, P.club - 1); updatePlayUI(); } });
 $('clubNext').addEventListener('click', () => { if (P.meter.phase === 'idle') { P.club = Math.min(PUTTER - 1, P.club + 1); updatePlayUI(); } });
-$('swingBtn').addEventListener('click', swingTap);
+$('swingBtn').addEventListener('pointerdown', e => { e.preventDefault(); try { e.target.setPointerCapture(e.pointerId); } catch(_) {} swingDown(); });
+$('swingBtn').addEventListener('pointerup', swingUp);
+$('swingBtn').addEventListener('pointercancel', swingUp);
+$('swingBtn').addEventListener('click', e => { if (e.detail === 0) swingTap(); });
+$('swingBtn').addEventListener('contextmenu', e => e.preventDefault());
+$('smMode').addEventListener('click', e => { e.stopPropagation(); store.opts = { ...(store.opts || {}), easySwing: !swingEasy() }; saveStore(); toast(swingEasy() ? 'Easy swing: hold and let go for power. Your pro handles the accuracy.' : 'Pro swing: hold and let go for power, then tap when the needle hits the middle.', 3000); updatePlayUI(); });
 $('liveScore').addEventListener('click', e => { e.stopPropagation(); showCard(); });
 $('viewBtn').addEventListener('click', () => {
   P.overview = !P.overview;
