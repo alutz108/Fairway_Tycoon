@@ -396,6 +396,17 @@ tr[data-rp],tr[data-mprof]{cursor:pointer}
 .schtag{display:inline-block;font-size:.62rem;font-weight:800;letter-spacing:.03em;border-radius:5px;padding:1px 4px;vertical-align:middle}
 .recbox{display:flex;flex-direction:column;gap:2px}
 .fpschip{position:absolute;left:10px;top:calc(30% + 8px);background:rgba(0,0,0,.6);color:#9effa0;font:600 .7rem ui-monospace,Menlo,monospace;border-radius:6px;padding:2px 6px;pointer-events:none;z-index:5}
+.gprow{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;background:var(--panel);border:1.5px solid var(--line);border-radius:12px;padding:8px 10px;margin:5px 0;font:inherit;color:var(--ink)}
+.gprow.on{border-color:var(--brand);background:var(--chip)}
+.rsum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.rsum div{background:var(--chip);border-radius:10px;padding:8px;display:flex;flex-direction:column}
+.rsum b{font-size:1.02rem}
+td.neg{color:var(--flag)}
+.miles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mile{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px;opacity:.6}
+.mile.done{opacity:1;border-color:var(--brand)}
+.mile .mi1{font-size:1.2rem}
+.mile .mi2{display:flex;flex-direction:column;min-width:0;font-size:.8rem}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}.hud #crewChip{animation:none}.fc-eyes{animation:none}}
 </style>
 </head>
@@ -538,6 +549,10 @@ tr[data-rp],tr[data-mprof]{cursor:pointer}
   <div id="coursesBody"></div>
   <div class="btns"><button class="btn" id="coursesClose">Back to the course</button></div>
 </div></div>
+
+<div id="greenPick" class="overlay hidden"><div class="card"><h2 id="gpTitle"></h2><div id="gpBody"></div><div class="btns"><button class="btn" id="gpDone">Done</button></div></div></div>
+
+<div id="report" class="overlay hidden"><div class="card wide"><h2 id="reportTitle">📊 Monthly report</h2><div id="reportBody"></div><div class="btns"><button class="btn" id="reportClose">Done</button></div></div></div>
 
 <div id="pinsAll" class="overlay hidden"><div class="card">
   <h2>🚩 Pins on every green</h2>
@@ -781,13 +796,13 @@ for (const k of Object.keys(store.saves)) { try { migrateSave(+k, store.saves[k]
 ensureEmpire();
 function saveStore(fromCloud){ if (!fromCloud) store.savedAt = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} if (!fromCloud) cloudQueue(); }
 function saveGame(){
-  store.saves[S.level] = { species:Array.from(TS), grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes, gshape:h.gshape || null, grot:h.grot ?? null, stadium:!!h.stadium })),
+  store.saves[S.level] = { species:Array.from(TS), grid:Array.from(G), elev:Array.from(E), bridges:Array.from(BR), facilities:S.facilities, holes:S.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays, strokes:h.strokes, gshape:h.gshape || null, grot:h.grot ?? null, stadium:!!h.stadium, contour:h.contour || 'flat', island:!!h.island })),
     money:S.money, earned:S.earned, day:S.day, fee:S.fee, recent:S.recent, won:S.won,
-    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, conf:S.conf || null, awards:S.awards || [], awardBoost:S.awardBoost || 0, awardHit:S.awardHit || 0, bevLv:S.bevLv || 1, bridgeSpans:S.bridges || [], shopPrices:S.shopPrices || {}, shopSold:S.shopSold || {}, pinDaily:!!S.pinDaily, house:S.house, fb:S.fb, reviews:S.reviews, cupLast:S.cupLast, parcels:S.parcels || [], news:(S.news || []).slice(0, 40), weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
+    members:S.members, mid:S.mid, dues:S.dues, prestige:S.prestige, eventLast:S.eventLast, history:S.history, clubName:S.clubName, trophy:S.trophy, matchLog:S.matchLog, matchId:S.matchId, records:S.records, typeSat:S.typeSat, pro:S.pro, offers:S.offers, offerId:S.offerId, books:S.books, lastBooks:S.lastBooks, coins:S.coins, lessonsLeft:S.lessonsLeft, staff:S.staff, staffId:S.staffId, cond:S.cond, water:S.water, fert:S.fert, gear:S.gear, houseLv:S.houseLv || 1, daily:S.daily || [], month:S.month || {}, report:S.report || null, conf:S.conf || null, awards:S.awards || [], awardBoost:S.awardBoost || 0, awardHit:S.awardHit || 0, bevLv:S.bevLv || 1, bridgeSpans:S.bridges || [], shopPrices:S.shopPrices || {}, shopSold:S.shopSold || {}, pinDaily:!!S.pinDaily, house:S.house, fb:S.fb, reviews:S.reviews, cupLast:S.cupLast, parcels:S.parcels || [], news:(S.news || []).slice(0, 40), weather:S.weather, forecast:S.forecast, loan:S.loan, stars:S.course.stars, value:propertyValue() };
   saveStore();
 }
 
-function book(cat, amt){ S.books[cat] = (S.books[cat] || 0) + amt; }
+function book(cat, amt){ S.books[cat] = (S.books[cat] || 0) + amt; trackMoney(cat, amt); }
 const isFringe = (x, y) => { const xx = Math.floor(x), yy = Math.floor(y); return xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS && FR[yy*COLS+xx] === 1; };
 const lieAt = (x, y) => { const t = at(x, y); return t === T.ROUGH && isFringe(x, y) ? T.FAIR : t; };
 const tile = (x,y) => (x<0||y<0||x>=COLS||y>=ROWS) ? -1 : G[y*COLS+x];
@@ -869,11 +884,11 @@ let warnedLand = false;
 function notOwned(){ if (!warnedLand) { warnedLand = true; toast('You don’t own that land yet. Buy it with 🏗️ Build → Buy land.'); setTimeout(() => { warnedLand = false; }, 3000); } }
 
 // --- facility upgrades (levels 1-3) ---
-const FAC_EARN = [1, 1.6, 2.3], FAC_UPK = [1, 1.5, 2.2];
+const FAC_EARN = [1, 1.6, 2.3, 3.0, 3.8], FAC_UPK = [1, 1.5, 2.2, 3.0, 3.9], FAC_MAX = 5;
 const facLvOf = f => f.lv || 1;
 const typeLv = t => S.facilities.filter(f => f.type === t).reduce((a, f) => Math.max(a, facLvOf(f)), 0);
 const earnMul = t => FAC_EARN[Math.max(1, typeLv(t)) - 1];
-const upCost = f => { const F = FACS[f.type], lv = facLvOf(f); return lv >= 3 ? 0 : Math.round(F.cost*(lv === 1 ? 1.2 : 2)/50)*50; };
+const upCost = f => { const F = FACS[f.type], lv = facLvOf(f); return lv >= FAC_MAX ? 0 : Math.round(F.cost*[1.2, 2, 3, 4.5][lv - 1]/50)*50; };
 const LV_FX = {
   range:'More bays and targets. More golfers warm up, they pay more, and they play a little better.',
   proshop:'A bigger shop with more stock. More golfers buy, and they spend more.',
@@ -892,11 +907,12 @@ function openFacEd(fi){
   facSel = fi; const lv = facLvOf(f), cost = upCost(f);
   $('facEdTitle').textContent = `${F.icon} ${F.name}, level ${lv}`;
   $('facEdBody').innerHTML = (canTurn(f) ? `<div class="btns" style="margin:0 0 8px"><button class="btn alt sm" data-frot="1">↻ Turn it</button><span class="small muted" style="align-self:center">Golfers use the front door.</span></div>` : '') + `<div class="moods"><div class="spread" style="margin:0"><span>Earnings and effects</span><b>×${FAC_EARN[lv-1]}</b></div><div class="spread" style="margin:0"><span>Upkeep a day</span><b>${fmt(F.upkeep*FAC_UPK[lv-1])}</b></div></div>` +
-    (lv < 3 ? `<h3 class="sec">Level ${lv+1}</h3><p class="small">${LV_FX[f.type] || ''}</p><p class="small muted">Earnings and effects ×${FAC_EARN[lv]}, upkeep ${fmt(F.upkeep*FAC_UPK[lv])} a day.</p><div class="btns"><button class="btn" data-fu="1" ${S.money < cost ? 'disabled' : ''}>Upgrade for ${fmt(cost)}</button></div>`
+    (lv < FAC_MAX ? `<h3 class="sec">Level ${lv+1}${lv + 1 >= 4 ? (lv + 1 === 5 ? ' · Signature' : ' · Premium') : ''}</h3><p class="small">${lv + 1 >= 4 ? (lv + 1 === 5 ? 'The best in the region: golden signage, flower beds and VIP service. The biggest earnings boost.' : 'Premium finishes, flags and lighting. Earnings and effects take another big step up.') : LV_FX[f.type] || ''}</p><p class="small muted">Earnings and effects ×${FAC_EARN[lv]}, upkeep ${fmt(F.upkeep*FAC_UPK[lv])} a day.</p><div class="btns"><button class="btn" data-fu="1" ${S.money < cost ? 'disabled' : ''}>Upgrade for ${fmt(cost)}</button></div>`
       : `<p class="small" style="color:var(--brand);font-weight:700;margin-top:10px">Fully upgraded ✓</p>`) + (f.type === 'proshop' ? shopPricingHtml() : '');
   $('facEd').classList.remove('hidden');
 }
 $('facEdBody').addEventListener('click', e => {
+  if (e.target.closest('[data-hu]')) { upgradeHouse(); return; }
   const fr = e.target.closest('[data-frot]'); if (fr) { const f = S.facilities[facSel]; if (f) { f.rot = ((f.rot || 0) + (turnSteps(f) === 2 ? 2 : 1)) % 4; buildProps(); saveGame(); toast(`${FACS[f.type].icon} Turned.`, 1200); } return; }
   const sp = e.target.closest('[data-sp],[data-spfair]');
   if (sp) { S.shopPrices = S.shopPrices || {}; if (sp.dataset.spfair) S.shopPrices = {}; else { const k = sp.dataset.sp, step = Math.max(1, Math.round(fairShop(k)*.05)); S.shopPrices[k] = Math.max(1, shopPrice(k) + step*(+sp.dataset.d)); } const card = $('facEd').querySelector('.card'), st = card.scrollTop; openFacEd(facSel); card.scrollTop = st; return; }
@@ -960,10 +976,11 @@ function holeInfo(h){
   if (cross) { q -= Math.min(3, cross*1.5); notes.push('Crosses another hole'); }
   const cart = !!cartRoute(h.tee.x+.5, h.tee.y+.5, h.pin.x+.5, h.pin.y+.5);
   if (!cart && S.members.length) notes.push('No cart path access for members');
+  if (h.contour && h.contour !== 'flat') q += .4; if (h.island) q += .8;
   return { yards, par, q: clamp(q,0,10), cov, notes, cart, plays, drop, dog, gs, hz: hz.size, scen, water: wz.size > 0, sand: sz.size > 0 };
 }
 function recompute(){
-  S.dirty = true;
+  S.dirty = true; buildContours();
   NEAR = new Uint8Array(COLS*ROWS);
   FR = new Uint8Array(COLS*ROWS); FO = new Int16Array(COLS*ROWS).fill(-1); S.hasPath = G.includes(T.PATH); routeCache.clear();
   S.facilities.forEach((f, fi) => { const F = FACS[f.type]; for (let dy=0; dy<F.h; dy++) for (let dx=0; dx<F.w; dx++) { const xx = f.x+dx, yy = f.y+dy; if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) FO[yy*COLS+xx] = fi; } });
@@ -1195,7 +1212,7 @@ function rebuildTerrain(){
       const d = Math.hypot(tx+.5-vx, ty+.5-vy); if (d >= R) continue;
       const cx = clamp(tx,0,COLS-1), cy = clamp(ty,0,ROWS-1), t = tile(cx, cy), w = (1 - d/R)**3;
       const ev = t === T.WATER ? 0 : E[cy*COLS + cx]*ELH;
-      wsum += w; hs += w*((TH_H[t] ?? .04) + ev); if (t === T.GREEN || t === T.TEE || t === T.HOUSE) gw += w;
+      wsum += w; hs += w*((TH_H[t] ?? .04) + ev + CONT[cy*COLS + cx]); if (t === T.GREEN || t === T.TEE || t === T.HOUSE) gw += w;
     }
     const inv = 1/(wsum || 1);
     HGT[j*VW+i] = hs*inv + .085*(1 + Math.sin(vx*.5 + LV.seed)*Math.cos(vy*.4 + LV.seed*.7)) * (1 - .8*gw*inv);
@@ -1347,6 +1364,7 @@ function buildProps(){
   for (const z of [-.5,-.05,.4]) add('cyl', TRIM, [1.03,.33,z], [.025,.58,.025]);
   add('box', '#6b4a2f', [.58,.24,-.05], [.012,.42,.22]);
   add('box', '#a35f4a', [-.45,1.02,.25], [.1,.28,.1]); add('box', '#a35f4a', [.3,.98,-.4], [.1,.24,.1]);
+  houseExtras(add, houseLv());
   for (const [x,z,c] of [[1.12,-.6,'#e85d9a'],[1.12,.5,'#f2bd44'],[.3,1.1,'#e85d9a'],[-.7,1.1,'#ffffff']]) { add('box', '#7a5638', [x,.09,z], [.22,.1,.22]); add('sphere', c, [x,.18,z], [.12,.07,.12]); }
   add('cyl', '#f4f4ef', [1.05,.7,.95], [.015,1.4,.015]);
   const fl = new TH.Mesh(new TH.PlaneGeometry(.3,.18), new TH.MeshLambertMaterial({ color:0x1f5c35, side:TH.DoubleSide })); fl.position.set(1.2,1.3,.95); hg.add(fl);
@@ -1515,7 +1533,7 @@ function syncGolfers(){
 
 // --- wildlife: ducks on ponds, alligators in warm-climate water, deer near the trees ---
 const WARM_LV = [2, 3, 5, 6, 10], DEER_LV = [0, 1, 3, 4, 5, 8, 9], SHEEP_LV = [11];
-const onLand = a => a.kind === 'deer' || a.kind === 'sheep';
+const onLand = a => ['deer','sheep','goose','rabbit','fox','heron'].includes(a.kind);
 let animals = [];
 function makeAnimal(kind){
   const g = new TH.Group();
@@ -1525,6 +1543,14 @@ function makeAnimal(kind){
     add('box','#3d4a2c',[0,.01,0],[.13,.05,.42]); add('box','#46552f',[0,.01,.3],[.09,.04,.2]); add('cone','#3d4a2c',[0,0,-.33],[.05,.3,.04],[-Math.PI/2,0,0]);
     for (const x of [-.03,.03]) add('sphere','#c9c25a',[x,.045,.22],[.013,.013,.013]);
     for (const [x,z] of [[-.08,.12],[.08,.12],[-.08,-.12],[.08,-.12]]) add('box','#3d4a2c',[x,-.01,z],[.05,.02,.05]);
+  } else if (kind === 'goose') {
+    add('sphere','#6f6355',[0,.09,0],[.075,.06,.11]); add('sphere','#e9e4d8',[0,.075,-.02],[.06,.035,.08]); add('cyl','#1f1f1f',[0,.17,.09],[.014,.12,.014],[-.25,0,0]); add('sphere','#1f1f1f',[0,.23,.11],[.026,.022,.032]); add('sphere','#f4f1ea',[0,.22,.105],[.013,.012,.02]); add('cone','#2a2a2a',[0,.225,.145],[.009,.028,.009],[Math.PI/2,0,0]); for (const x of [-.02,.02]) add('cyl','#2a2a2a',[x,.02,0],[.006,.05,.006]);
+  } else if (kind === 'rabbit') {
+    const c = pick(['#8a7a66','#a08a70','#6f6050']); add('sphere',c,[0,.05,0],[.045,.04,.06]); add('sphere',c,[0,.08,.05],[.03,.03,.032]); for (const x of [-.012,.012]) add('cyl',c,[x,.125,.045],[.008,.05,.006],[-.2,0,x*8]); add('sphere','#f4f4ef',[0,.055,-.062],[.015,.015,.015]);
+  } else if (kind === 'fox') {
+    add('cyl','#c8642a',[0,.1,0],[.04,.18,.04],[Math.PI/2,0,0]); for (const [x,z] of [[-.025,.06],[.025,.06],[-.025,-.06],[.025,-.06]]) add('cyl','#2a2420',[x,.04,z],[.009,.08,.009]); add('sphere','#c8642a',[0,.13,.11],[.03,.028,.035]); add('cone','#f4f1ea',[0,.12,.15],[.014,.04,.014],[Math.PI/2,0,0]); for (const x of [-.015,.015]) add('cone','#2a2420',[x,.165,.1],[.008,.02,.006]); add('cone','#c8642a',[0,.1,-.16],[.026,.12,.026],[-Math.PI/2.6,0,0]); add('sphere','#f4f1ea',[0,.075,-.22],[.013,.013,.013]);
+  } else if (kind === 'heron') {
+    add('sphere','#9aa3ad',[0,.2,0],[.045,.04,.08]); for (const x of [-.012,.012]) add('cyl','#c9a64a',[x,.09,0],[.004,.18,.004]); add('cyl','#c8ced4',[0,.28,.05],[.01,.12,.01],[-.3,0,0]); add('sphere','#f4f4ef',[0,.34,.07],[.018,.018,.022]); add('cone','#e0b23a',[0,.335,.1],[.006,.05,.006],[Math.PI/2,0,0]); add('box','#2a2a2a',[0,.345,.055],[.004,.004,.03]);
   } else if (kind === 'sheep') {
     const face = Math.random() < .7 ? '#2a2420' : '#f4f1ea';
     add('ico1','#f4f1ea',[0,.17,0],[.1,.08,.14]); add('ico1','#ebe6db',[0,.2,-.02],[.08,.06,.1]);
@@ -1550,33 +1576,36 @@ function clearAnimals(){ for (const a of animals) scene.remove(a.mesh); animals 
 function ensureAnimals(){
   if (!S.active) return;
   let water = 0, trees = 0; for (const t of G) { if (t === T.WATER) water++; else if (t === T.TREES) trees++; }
-  const want = { duck: Math.min(10, Math.floor(water/14)), gator: WARM_LV.includes(S.level) ? Math.min(4, Math.floor(water/40)) : 0, deer: DEER_LV.includes(S.level) && trees > 30 ? Math.min(6, 2 + Math.floor(trees/250)) : 0, sheep: SHEEP_LV.includes(S.level) ? 12 : 0 };
+  const want = { duck: Math.min(10, Math.floor(water/14)), gator: WARM_LV.includes(S.level) ? Math.min(4, Math.floor(water/40)) : 0, deer: DEER_LV.includes(S.level) && trees > 30 ? Math.min(6, 2 + Math.floor(trees/250)) : 0, sheep: SHEEP_LV.includes(S.level) ? 12 : 0,
+    goose: (() => { let f = 0; for (const t of G) if (t === T.FAIR) f++; return f > 40 && !LEVELS[S.level].desert ? 6 : 0; })(), rabbit: trees > 20 ? Math.min(6, 2 + Math.floor(trees/120)) : 0, fox: trees > 60 && !LEVELS[S.level].desert ? 1 : 0, heron: water > 12 ? Math.min(3, 1 + Math.floor(water/60)) : 0 };
   animals = animals.filter(a => { const ok = onLand(a) ? landOk(a.x, a.y) : waterAt(a.x, a.y) || (a.kind === 'gator' && a.bask && landOk(a.x, a.y)); if (!ok) scene.remove(a.mesh); return ok; });
   for (const k of Object.keys(want)) {
     const have = animals.filter(a => a.kind === k);
     while (have.length > want[k]) { const a = have.pop(); scene.remove(a.mesh); animals.splice(animals.indexOf(a), 1); }
-    for (let i = have.length; i < want[k]; i++) { const p = randSpot(k === 'deer' ? (x,y) => landOk(x,y) && nearTrees(x,y) : k === 'sheep' ? (x,y) => landOk(x,y) && at(x,y) !== T.FAIR && at(x,y) !== T.SAND : waterAt); if (!p) break; animals.push({ kind:k, x:p.x, y:p.y, tx:p.x, ty:p.y, t:Math.random()*5, head:Math.random()*6.28, mesh:makeAnimal(k) }); }
+    for (let i = have.length; i < want[k]; i++) { const p = randSpot(k === 'deer' || k === 'fox' ? (x,y) => landOk(x,y) && nearTrees(x,y) : k === 'sheep' ? (x,y) => landOk(x,y) && at(x,y) !== T.FAIR && at(x,y) !== T.SAND : k === 'goose' ? (x,y) => at(x,y) === T.FAIR : k === 'rabbit' ? (x,y) => landOk(x,y) && nearTrees(x,y) && at(x,y) !== T.FAIR : k === 'heron' ? shoreAt : waterAt); if (!p) break; animals.push({ kind:k, x:p.x, y:p.y, tx:p.x, ty:p.y, t:Math.random()*5, head:Math.random()*6.28, mesh:makeAnimal(k) }); }
   }
 }
 function stepAnimals(dt, now){
   for (const a of animals) {
     a.t -= dt; if (a.flee > 0) a.flee -= dt;
     if (onLand(a) && !(a.flee > 0)) {
-      const g = S.golfers.find(g => Math.hypot(g.x - a.x, g.y - a.y) < (a.kind === 'sheep' ? 1.3 : 2.4));
-      if (g) { const fd = a.kind === 'sheep' ? 1.8 : 4, an = Math.atan2(a.y - g.y, a.x - g.x), nx = a.x + Math.cos(an)*fd, ny = a.y + Math.sin(an)*fd; if (landOk(nx, ny)) { a.tx = nx; a.ty = ny; a.flee = 2; } }
+      const g = S.golfers.find(g => Math.hypot(g.x - a.x, g.y - a.y) < ({ sheep:1.3, rabbit:1.8, fox:3.2, heron:2, goose:2.2 }[a.kind] || 2.4));
+      if (g && (a.kind === 'goose' || a.kind === 'heron')) { const sp = randSpot(a.kind === 'goose' ? (x,y) => at(x,y) === T.FAIR && Math.hypot(x - g.x, y - g.y) > 8 : (x,y) => shoreAt(x,y) && Math.hypot(x - g.x, y - g.y) > 6); if (sp) { a.tx = sp.x; a.ty = sp.y; a.flee = 8; a.fly = { d0: Math.max(.5, Math.hypot(sp.x - a.x, sp.y - a.y)) }; } }
+      else if (g) { const fd = a.kind === 'sheep' ? 1.8 : 4, an = Math.atan2(a.y - g.y, a.x - g.x), nx = a.x + Math.cos(an)*fd, ny = a.y + Math.sin(an)*fd; if (landOk(nx, ny)) { a.tx = nx; a.ty = ny; a.flee = 2; } }
     }
-    const d = Math.hypot(a.tx - a.x, a.ty - a.y), sp = a.kind === 'duck' ? .35 : a.kind === 'gator' ? .22 : a.kind === 'sheep' ? (a.flee > 0 ? 1 : .25) : a.flee > 0 ? 2.4 : .55;
+    const d = Math.hypot(a.tx - a.x, a.ty - a.y), sp = a.fly ? 3.2 : a.kind === 'duck' ? .35 : a.kind === 'gator' ? .22 : a.kind === 'sheep' ? (a.flee > 0 ? 1 : .25) : a.kind === 'goose' ? .22 : a.kind === 'rabbit' ? (a.flee > 0 ? 3 : .6) : a.kind === 'fox' ? (a.flee > 0 ? 2 : .8) : a.kind === 'heron' ? .1 : a.flee > 0 ? 2.4 : .55;
     if (d > .05) {
       const st = Math.min(d, sp*dt), nx = a.x + (a.tx - a.x)/d*st, ny = a.y + (a.ty - a.y)/d*st;
-      const ok = onLand(a) ? landOk(nx, ny) : a.kind === 'duck' ? waterAt(nx, ny) : waterAt(nx, ny) || (a.bask && landOk(nx, ny));
+      const ok = a.fly ? true : onLand(a) ? landOk(nx, ny) : a.kind === 'duck' ? waterAt(nx, ny) : waterAt(nx, ny) || (a.bask && landOk(nx, ny));
       if (ok) { a.x = nx; a.y = ny; a.head = Math.atan2(a.tx - a.x, a.ty - a.y); } else { a.tx = a.x; a.ty = a.y; }
-    } else if (a.t <= 0) {
-      const r = a.kind === 'duck' ? 1.5 : a.kind === 'gator' ? 2.5 : a.kind === 'sheep' ? 1.5 : 4;
+    } else if (a.fly) { a.fly = null; a.t = 2; }
+    else if (a.t <= 0) {
+      const r = a.kind === 'duck' ? 1.5 : a.kind === 'gator' ? 2.5 : a.kind === 'sheep' ? 1.5 : a.kind === 'goose' ? 1.2 : a.kind === 'rabbit' ? 1.5 : a.kind === 'heron' ? .5 : 4;
       a.t = a.kind === 'duck' ? 2 + Math.random()*4 : a.kind === 'gator' ? 6 + Math.random()*12 : 3 + Math.random()*7;
       if (a.kind === 'gator' && !a.bask && Math.random() < .3) { for (let i=0; i<20; i++) { const x = a.x + (Math.random()-.5)*3, y = a.y + (Math.random()-.5)*3; if (shoreAt(x, y)) { a.tx = x; a.ty = y; a.bask = true; break; } } }
       else { if (a.bask) a.bask = false; for (let i=0; i<12; i++) { const x = a.x + (Math.random()-.5)*2*r, y = a.y + (Math.random()-.5)*2*r; if (onLand(a) ? landOk(x, y) : waterAt(x, y)) { a.tx = x; a.ty = y; break; } } }
     }
-    const wet = !onLand(a) && waterAt(a.x, a.y), y = wet ? (a.kind === 'duck' ? -.1 + Math.sin(now/480 + a.x*3)*.008 : -.125) : heightAt(a.x, a.y);
+    const dd = Math.hypot(a.tx - a.x, a.ty - a.y), wet = !onLand(a) && waterAt(a.x, a.y), y = wet ? (a.kind === 'duck' ? -.1 + Math.sin(now/480 + a.x*3)*.008 : -.125) : heightAt(a.x, a.y) + (a.fly ? Math.sin(clamp(1 - dd/a.fly.d0, 0, 1)*Math.PI)*1.6 + .05 : 0) + (a.kind === 'rabbit' && dd > .05 ? Math.abs(Math.sin(now/90))*.06 : 0);
     a.mesh.position.set(W2(a.x), y, Z2(a.y)); a.mesh.rotation.y = a.head;
   }
 }
@@ -1724,7 +1753,7 @@ function draw(now){
     ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(p.x-6, p.y-14+b); ctx.lineTo(p.x+6, p.y-14+b); ctx.lineTo(p.x, p.y-5+b); ctx.closePath(); ctx.fill(); ctx.stroke();
   }
-  drawTracer(now); drawFx(now);
+  drawTracer(now); drawSprinklers(now); drawFx(now);
   if (dusk > 0) { ctx.fillStyle = `rgba(255,140,60,${dusk*.08})`; ctx.fillRect(0, 0, SW, SH); }
   if (S.active) drawWeather(now);
 }
@@ -1734,7 +1763,7 @@ function nextInterval(){
   const st = S.course.stars, n = S.holes.length;
   const fair = 12 + st*10 + n*2;
   const pf = clamp(1.45 - .55*S.fee/fair, .1, 1.4);
-  const perDay = n*2.5*(.35 + st/5)*pf*(1 + Math.min(S.prestige, 20)*.04)*WX[wx().k].golf*(isPar3() ? 1.3 : 1)*awardMul();
+  const perDay = n*2.5*(.35 + st/5)*pf*(1 + Math.min(S.prestige, 20)*.04)*WX[wx().k].golf*(isPar3() ? 1.3 : 1)*awardMul()*(houseLv() >= 4 ? 1.15 : 1);
   return DAY / Math.max(.25, perDay) * (.6 + Math.random()*.8);
 }
 function makeGolfer(o){
@@ -1869,7 +1898,7 @@ function lieAdj(lie, g){
   return { mult:1, err:1 };
 }
 function putt(g, px, py, d){
-  const ft = d*75;
+  const ft = d*75/contourK(S.holes[g.hole]);
   const p = Math.min(.99, 1/(1 + Math.pow(ft/8, 1.6)) * (.85 + .2*A(g,'pt')) * (.82 + .18*S.cond.greens/100));
   if (Math.random() < p) return { x:px, y:py, holed:true, putt:true, len:d };
   const leftFt = 1.5 + ft*.12*(.5 + Math.random())/(.7 + A(g,'pt')*.5);
@@ -1951,6 +1980,9 @@ function holeOut(g){
   if (w.mph >= 14 && diff >= 1 && !text && Math.random() < .35) text = pick(LINES.windy);
   if (!text && landmarksNear(h) && Math.random() < .3) { text = pick(LINES.view); g.sat += 1; }
   if (!text && !g.sawDeer && Math.random() < .5 && animals.some(a => a.kind === 'deer' && Math.hypot(a.x - g.x, a.y - g.y) < 5)) { g.sawDeer = true; text = 'Look, deer!'; g.sat += 1.5; }
+  else if (!text && !g.sawCut && h.mowDay === S.day && Math.random() < .3) { g.sawCut = true; text = pick(['Fairways look freshly cut!', 'Love those mowing stripes.', 'The crew has this place looking sharp.']); g.sat += 1; }
+  else if (!text && !g.sawGoose && Math.random() < .3 && animals.some(a => a.kind === 'goose' && Math.hypot(a.x - g.x, a.y - g.y) < 4)) { g.sawGoose = true; text = pick(['Geese on the fairway!', 'Honk! Out of the way, geese.', 'Watch out for the geese!']); }
+  else if (!text && !g.sawBunny && Math.random() < .35 && animals.some(a => (a.kind === 'rabbit' || a.kind === 'fox' || a.kind === 'heron') && Math.hypot(a.x - g.x, a.y - g.y) < 4)) { g.sawBunny = true; const a = animals.find(a => (a.kind === 'rabbit' || a.kind === 'fox' || a.kind === 'heron') && Math.hypot(a.x - g.x, a.y - g.y) < 4); text = a.kind === 'rabbit' ? pick(['Look, a bunny!', 'Aww, a rabbit!']) : a.kind === 'fox' ? pick(['Was that a fox?!', 'A fox by the trees!']) : pick(['A heron by the pond. Beautiful.', 'Look at that heron!']); g.sat += 1; }
   else if (!text && !g.sawSheep && Math.random() < .35 && animals.some(a => a.kind === 'sheep' && Math.hypot(a.x - g.x, a.y - g.y) < 4)) { g.sawSheep = true; text = pick(['Watch out for the sheep!', 'Baa!', 'Sheep on the fairway again.']); g.sat += 1; }
   else if (!text && !g.sawDuck && Math.random() < .15 && animals.some(a => a.kind === 'duck' && Math.hypot(a.x - g.x, a.y - g.y) < 4)) { g.sawDuck = true; text = 'Aww, ducks!'; g.sat += .5; }
   if (h.info.notes.includes('Needs more fairway') && Math.random() < .5) text = 'Where’s the fairway?';
@@ -1981,7 +2013,7 @@ function endDay(){
   saveGame();
 }
 function sim(dt){
-  stepBevs(dt);
+  stepBevs(dt); stepCrew(dt);
   S.clock = (S.clock || 0) + dt;
   S.dayT += dt; if (S.dayT >= DAY) { S.dayT -= DAY; endDay(); if (!S.active) return; }
   if (S.event) eventStep(dt);
@@ -2079,7 +2111,8 @@ fbk(1, 'Great hole design', '', [...LINES.parGreat, 'Love a risk-reward hole.', 
 fbk(1, 'Course in great shape', '', ['Course is in perfect shape!']);
 fbk(1, 'Handy facilities', '', ['Just what I needed.', 'Ahh, a cold drink!', 'Nice spot to rest.', 'Picked up a new glove.']);
 fbk(1, 'Beverage cart', '', ['Bev cart! Perfect timing.', 'Cold drink on the 5th? Yes please.', 'Best sight on the course.', 'Two waters and a hot dog, thanks!', 'This place thinks of everything.', 'Ahh, the drink cart.']);
-fbk(1, 'Wildlife', '', ['Look, deer!', 'Not going in after that one. Gator!', 'Aww, ducks!', 'Watch out for the sheep!', 'Baa!']);
+fbk(1, 'Wildlife', '', ['Look, deer!', 'Not going in after that one. Gator!', 'Aww, ducks!', 'Watch out for the sheep!', 'Baa!', 'Look, a bunny!', 'Aww, a rabbit!', 'Was that a fox?!', 'A fox by the trees!', 'A heron by the pond. Beautiful.', 'Look at that heron!']);
+fbk(1, 'Fresh-cut fairways', '', ['Fairways look freshly cut!', 'Love those mowing stripes.', 'The crew has this place looking sharp.']);
 fbk(1, 'Loved their round', '', [...LINES.goodEnd]);
 function noteFeedback(text){ const f = FBK[text]; if (!f || !S.active) return; S.fb = S.fb || {}; S.fb[f.label] = (S.fb[f.label] || 0) + 1; }
 function leaveReview(g, sat){
@@ -2252,8 +2285,9 @@ function upgradeCards(){
     const F = FACS[f.type]; if (F.kind === 'scenery') return;
     seen[f.type] = (seen[f.type] || 0) + 1;
     const n = S.facilities.filter(x => x.type === f.type).length, lv = facLvOf(f), cost = upCost(f);
-    out.push({ ic:F.icon, nm: F.name + (n > 1 ? ` #${seen[f.type]}` : ''), pr: lv >= 3 ? 'Max level ✓' : `Lv ${lv}→${lv+1} · ${fmt(cost)}`, can: lv < 3 && S.money >= cost, max: lv >= 3, fi });
+    out.push({ ic:F.icon, nm: F.name + (n > 1 ? ` #${seen[f.type]}` : ''), pr: lv >= FAC_MAX ? 'Max level ✓' : `Lv ${lv}→${lv+1} · ${fmt(cost)}`, can: lv < FAC_MAX && S.money >= cost, max: lv >= FAC_MAX, fi });
   });
+  { const lv = houseLv(), nx = HOUSE_UP[lv]; out.push({ ic:'🏠', nm:'Clubhouse', pr: nx ? `${nx.name} · ${fmt(nx.cost)}` : 'Max level ✓', can: !!nx && S.money >= nx.cost, max: !nx, house:true }); }
   if (staffN('bevcart')) { const lv = bevLv(), nx = BEV_UP[lv]; out.push({ ic:'🍹', nm:'Beverage carts', pr: nx ? `Lv ${lv}→${lv+1} · ${fmt(nx.cost)}` : 'Max level ✓', can: !!nx && S.money >= nx.cost, max: !nx, bev:true }); }
   for (const [k, G0] of Object.entries(GEAR)) {
     const lv = gearLv(k), nx = G0.tiers[lv];
@@ -2263,6 +2297,7 @@ function upgradeCards(){
 }
 const upgradesReady = () => upgradeCards().filter(c => c.can).length;
 function useUpgradeCard(c){
+  if (c.house) return openHouseEd();
   if (c.bev) { const lv = bevLv(), nx = BEV_UP[lv]; if (!nx) return toast('🍹 Beverage carts are fully upgraded.'); if (!confirm(`🍹 ${nx.name} for ${fmt(nx.cost)}?\n\n${nx.txt}`)) return; if (S.money < nx.cost) return toast(`That costs ${fmt(nx.cost)}.`); S.money -= nx.cost; book('build', -nx.cost); S.bevLv = lv + 1; for (const b of bevs) scene.remove(b.mesh); bevs = []; toast(`🍹 ${nx.name}! ${nx.txt}`, 3600); buildTools(); updateHUD(); return; }
   if (c.fi != null) { const f = S.facilities[c.fi], ctr = facCenter(f); view.tx = W2(ctr.x); view.tz = Z2(ctr.y); clampCam(); openFacEd(c.fi); return; }
   const G0 = GEAR[c.gear], lv = gearLv(c.gear), nx = G0.tiers[lv]; if (!nx) return toast(`${G0.icon} ${G0.name}: fully upgraded.`);
@@ -2618,7 +2653,9 @@ function facModel(f){
         if (L3) { add('box','#dfe7ee',[-.22,.2,0],[.3,.4,.5]); add('pyr','#2e6b3e',[0,.66,0],[.62,.24,.52]); add('cyl','#2a2a2a',[.33,.35,0],[.01,.2,.01]); add('box','#fff7c2',[.33,.47,0],[.05,.05,.05]); }
         break;
     }
-    g.scale.setScalar(1 + .04*(lv - 1));
+    if (lv >= 4) for (const sx of [-1, 1]) { add('cyl', '#d8d8d2', [sx*.55, .45, .55], [.012, .9, .012]); add('box', lv >= 5 ? '#f2bd44' : '#1f5c35', [sx*.55 + .08, .82, .55], [.16, .1, .008]); add('sphere', '#fff7c2', [sx*.55, .92, .55], [.025, .025, .025]); }
+    if (lv >= 5) { add('box', '#f2bd44', [0, .95, .3], [.42, .12, .03]); for (const sx of [-1, 1]) { add('box', '#7a5638', [sx*.3, .05, .7], [.2, .08, .12]); add('sphere', '#e85d9a', [sx*.3, .12, .7], [.1, .05, .06]); } }
+    g.scale.setScalar(1 + .03*(lv - 1));
   }
   if (f.rot && canTurn(f)) g.rotation.y = f.rot*Math.PI/2;
   const c = facCenter(f); g.position.set(W2(c.x), heightAt(c.x, c.y), Z2(c.y)); return g;
@@ -2705,9 +2742,9 @@ function doglegTap(x, y){
   updateHint();
 }
 let hist = [], future = [], curAct = null;
-function snap(){ return { g:G.slice(), e:E.slice(), br:BR.slice(), fac:S.facilities.map(f => ({ ...f })), holes:S.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes, gshape:h.gshape, grot:h.grot, stadium:h.stadium })), spans:(S.bridges || []).map(b => ({ ...b })) }; }
+function snap(){ return { g:G.slice(), e:E.slice(), br:BR.slice(), fac:S.facilities.map(f => ({ ...f })), holes:S.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes, gshape:h.gshape, grot:h.grot, stadium:h.stadium, contour:h.contour, island:h.island })), spans:(S.bridges || []).map(b => ({ ...b })) }; }
 function restore(sn){
-  G.set(sn.g); E.set(sn.e); BR.set(sn.br); S.facilities = sn.fac.map(f => ({ ...f })); S.holes = sn.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes, gshape:h.gshape, grot:h.grot, stadium:h.stadium })); S.bridges = (sn.spans || []).map(b => ({ ...b }));
+  G.set(sn.g); E.set(sn.e); BR.set(sn.br); S.facilities = sn.fac.map(f => ({ ...f })); S.holes = sn.holes.map(h => ({ tee:{ ...h.tee }, pin:{ ...h.pin }, bend:h.bend ? { ...h.bend } : null, plays:h.plays, strokes:h.strokes, gshape:h.gshape, grot:h.grot, stadium:h.stadium, contour:h.contour, island:h.island })); S.bridges = (sn.spans || []).map(b => ({ ...b }));
   for (const g of S.golfers) if (!g.leaving && g.hole >= S.holes.length) goHome(g);
   S.pendingTee = null; terrainDirty = true; recompute(); saveGame(); updateHint(); updateHUD();
 }
@@ -2753,10 +2790,11 @@ function holeTap(x, y){
   if (S.money < cost) return toast(`This hole costs ${fmt(cost)}. You have ${fmt(S.money)}.`);
   checkpoint(); S.money -= cost; book('build', -cost); spend(cost);
   setTile(tee.x, tee.y, T.TEE); for (const [gx,gy] of greens) setTile(gx, gy, T.GREEN);
-  const h = { tee, pin:{ x, y }, plays:0, strokes:0 }; S.holes.push(h);
+  const h = { tee, pin:{ x, y }, plays:0, strokes:0, contour:'flat' }; S.holes.push(h);
   S.pendingTee = null; terrainDirty = true; recompute();
-  toast(`Hole ${S.holes.length}: par ${h.info.par}, ${h.info.yards} yards. Cost ${fmt(cost)}.`);
-  updateHint(); checkGoals();
+  const m0 = S.money; reshapeGreen(h, 'oval', false, true); const gc = m0 - S.money;
+  toast(`Hole ${S.holes.length}: par ${h.info.par}, ${h.info.yards} yards. Cost ${fmt(cost + gc)} with a full-size green.`);
+  updateHint(); checkGoals(); openGreenPick(S.holes.length - 1);
 }
 
 // ---------- play mode ----------
@@ -2944,7 +2982,7 @@ function landP(){
 }
 // On the green, putting is automatic: by distance, 1, 2 or 3 putts.
 function autoPutt(){
-  const p = pinOf(), ft = Math.round(Math.hypot(p.x - P.bx, p.y - P.by)*75), n = ft <= 6 ? 1 : ft <= 35 ? 2 : 3;
+  const p = pinOf(), ft = Math.round(Math.hypot(p.x - P.bx, p.y - P.by)*75), k = contourK(S.holes[P.hole]), n = ft <= 6*k ? 1 : ft <= 35*k ? 2 : 3;
   P.strokes += n; P.bx = p.x; P.by = p.y; P.puttNote = `${n === 1 ? 'One putt' : n === 2 ? 'Two putts' : 'Three putts'} from ${ft} ft. `;
   holeOutP();
 }
@@ -3045,7 +3083,7 @@ function taste(g, h, diff){
   else if (g.type === 'bomber') { if (i.par === 5) { d += 3; say = 'Driver, baby!'; } else if (i.par === 3) d -= 1; }
   return { d, say };
 }
-function fairDues(){ return Math.round((30 + S.course.stars*25 + S.holes.length*3)/5)*5; }
+function fairDues(){ return Math.round((30 + S.course.stars*25 + S.holes.length*3)*(houseLv() >= 2 ? 1.1 : 1)/5)*5; }
 function memberCap(){ return Math.min(200, Math.max(10, S.holes.length*11)); }
 const hcp = s => Math.max(0, Math.round((1-s)*30));
 const mood = s => s >= 70 ? '😀 Happy' : s >= 45 ? '🙂 Okay' : '😠 Unhappy';
@@ -3084,12 +3122,17 @@ function planMembers(){
 }
 function clubDay(){
   const msgs = [];
+  logDay();
+  if (houseLv() >= 2) for (const m of S.members) m.sat = Math.min(100, m.sat + .3);
+  if (houseLv() >= 3 && S.day % 7 === 0 && S.holes.length) { const amt = Math.round((1500 + S.course.stars*800)*(1 + Math.min(S.prestige, 20)*.02)/50)*50; S.money += amt; book('banquet', amt); msgs.push(`💒 ${pick(['A wedding','A corporate outing','A charity banquet','A retirement party'])} at the Banquet Hall +${fmt(amt)}.`); }
+  if (houseLv() >= 4 && S.dayGolfers) { const rooms = Math.round(S.dayGolfers*.12), amt = rooms*Math.round(90 + S.course.stars*25); if (amt) { S.money += amt; book('banquet', amt); msgs.push(`🏨 ${rooms} room${rooms === 1 ? '' : 's'} booked at the Lodge +${fmt(amt)}.`); } }
   if (S.day % 7 === 0 && S.members.length) { const amt = S.members.length*S.dues; S.money += amt; book('dues', amt); msgs.push(`Weekly dues +${fmt(amt)}.`); }
   if (S.day % 7 === 0) {
     const aw = awayMembers().length; if (aw) { const amt = aw*Math.round(S.dues*.4); S.money += amt; book('dues', amt); msgs.push(`Reciprocal fees from ${aw} member${aw === 1 ? '' : 's'} of your other courses +${fmt(amt)}.`); }
     for (const m of S.members) if (m.sat > 78 && Math.random() < .04) { const opts = store.empire.owned.filter(lv => lv !== S.level && store.saves[lv] && (store.saves[lv].holes || []).length >= 6 && !(m.also || []).includes(lv)); if (opts.length) { const lv = pick(opts); (m.also = m.also || []).push(lv); msgs.push(`${m.name} also joined ${courseName(lv)}.`); } }
   }
-  if (S.day % 28 === 0) { const a = monthlyAwards(); if (a) msgs.push(a); }
+  if (S.day % 28 === 0) { const a = monthlyAwards(); if (a) msgs.push(a); makeReport(); msgs.push('📊 Your monthly report is ready.'); }
+  checkMiles();
   { const c = maybeConfOffer(); if (c) msgs.push(c); }
   if (S.day % 7 === 0) { S.lastBooks = S.books; S.books = {}; S.shopSold = {}; }
   S.lessonsLeft = LESSONS_PER_DAY;
@@ -3517,7 +3560,7 @@ function eventMath(field, income, prestige){
 }
 
 // ---------- reshape a hole's green ----------
-function reshapeGreen(h, shape, turn){
+function reshapeGreen(h, shape, turn, quiet){
   const old = greenTilesOf(h); if (!old.length && tile(h.pin.x, h.pin.y) !== T.GREEN) old.push([h.pin.x, h.pin.y]);
   if (turn) h.grot = ((h.grot ?? 0) + 1) % 8; else h.grot = ((Math.round(Math.atan2(h.pin.y - h.tee.y, h.pin.x - h.tee.x)/(Math.PI/4)) % 8) + 8) % 8;
   h.gshape = shape;
@@ -3531,7 +3574,7 @@ function reshapeGreen(h, shape, turn){
   for (const k of want) { const [x, y] = k.split(',').map(Number); setTile(x, y, T.GREEN); TS[y*COLS + x] = 0; }
   S.money -= cost; if (cost) { book('build', -cost); spend(cost); }
   terrainDirty = true; recompute(); crewCheckAfterPaint();
-  toast(`${GSHAPES[shape].icon} Hole ${S.holes.indexOf(h) + 1} now has a ${GSHAPES[shape].name.toLowerCase()} green${cost ? ` (${fmt(cost)})` : ''}. The old green outside the new shape became fairway.`, 3200);
+  if (!quiet) toast(`${GSHAPES[shape].icon} Hole ${S.holes.indexOf(h) + 1} now has a ${GSHAPES[shape].name.toLowerCase()} green${cost ? ` (${fmt(cost)})` : ''}. The old green outside the new shape became fairway.`, 3200);
 }
 
 // ---------- carts drive along your paths ----------
@@ -4413,6 +4456,226 @@ function confHistoryHtml(){
     C.history.map(h => `<tr><td>${h.season}</td><td>${schoolTag(h.team)} ${esc(h.team)} <span class="muted small">${h.teamScore}</span></td><td>${esc(h.ind)} ${schoolTag(h.indSchool)} <span class="muted small">${h.indScore}</span></td></tr>`).join('') + `</tbody></table>`;
 }
 
+// ---------- green design: shape, contour, island ----------
+const CONTOURS = { flat:{ name:'Flat', icon:'➖', k:1, blurb:'Plain and fair.' }, slope:{ name:'Back-to-front slope', icon:'↘️', k:.85, blurb:'Tilts toward the fairway. Putts from above the hole are slick.' },
+  tier:{ name:'Two-tier', icon:'🪜', k:.75, blurb:'A step in the middle. Land on the wrong tier and it’s a tough two-putt.' }, crown:{ name:'Crowned', icon:'🐢', k:.8, blurb:'Domed in the middle, so balls roll off the edges.' }, bowl:{ name:'Punchbowl', icon:'🥣', k:1.15, blurb:'Edges funnel the ball toward the middle. Friendly, and fun to watch.' } };
+let CONT = new Float32Array(COLS*ROWS);
+function buildContours(){
+  CONT = new Float32Array(COLS*ROWS);
+  for (const h of S.holes) {
+    const c = h.contour; if (!c || c === 'flat') continue;
+    const tiles = greenTilesOf(h); if (tiles.length < 3) continue;
+    const cx = tiles.reduce((a, t) => a + t[0], 0)/tiles.length + .5, cy = tiles.reduce((a, t) => a + t[1], 0)/tiles.length + .5;
+    const dx = h.pin.x - h.tee.x, dy = h.pin.y - h.tee.y, L = Math.hypot(dx, dy) || 1, ux = dx/L, uy = dy/L;
+    const rad = Math.max(1.5, Math.max(...tiles.map(t => Math.hypot(t[0] + .5 - cx, t[1] + .5 - cy))));
+    for (const [x, y] of tiles) {
+      const px = x + .5 - cx, py = y + .5 - cy, along = clamp((px*ux + py*uy)/rad, -1, 1), r = clamp(Math.hypot(px, py)/rad, 0, 1);
+      CONT[y*COLS + x] = c === 'slope' ? .11*along : c === 'tier' ? (along > .05 ? .13 : 0) : c === 'crown' ? .12*(1 - r*r) : c === 'bowl' ? .12*r*r : 0;
+    }
+  }
+}
+const contourK = h => (h && CONTOURS[h.contour] ? CONTOURS[h.contour].k : 1);
+function makeIsland(h){
+  const tiles = greenTilesOf(h); if (!tiles.length) return toast('Give the hole a green first.');
+  const isG = new Set(tiles.map(t => t + '')), ring = new Map();
+  for (const [x, y] of tiles) for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) { const k = (x + dx) + ',' + (y + dy); if (!isG.has(k)) ring.set(k, [x + dx, y + dy]); }
+  const ang = Math.atan2(h.tee.y - h.pin.y, h.tee.x - h.pin.x), walk = new Set();
+  for (let d = 1; d <= 3.6; d += .5) walk.add(Math.round(h.pin.x + Math.cos(ang)*d) + ',' + Math.round(h.pin.y + Math.sin(ang)*d));
+  const water = [...ring.entries()].filter(([k, [x, y]]) => !walk.has(k) && ownedAt(x, y) && ![T.HOUSE, T.TEE, T.GREEN, T.WATER].includes(tile(x, y)) && FO[y*COLS + x] < 0);
+  const cost = water.length*TOOLS.water.cost; if (S.money < cost) return toast(`Turning this into an island green costs ${fmt(cost)}.`);
+  checkpoint();
+  for (const [, [x, y]] of water) { setTile(x, y, T.WATER); TS[y*COLS + x] = 0; }
+  for (const k of walk) { const [x, y] = k.split(',').map(Number); if (!isG.has(k) && ownedAt(x, y) && ![T.HOUSE, T.TEE].includes(tile(x, y))) { setTile(x, y, T.PATH); BR[y*COLS + x] = 0; } }
+  h.island = true; S.money -= cost; book('build', -cost); spend(cost); terrainDirty = true; recompute();
+  toast(`🏝️ Hole ${S.holes.indexOf(h) + 1} is now an island green (${fmt(cost)}). A little walkway leads in from the tee side.`, 3800);
+}
+let gpHole = -1;
+function openGreenPick(i){
+  gpHole = i; const h = S.holes[i]; if (!h) return;
+  $('gpTitle').textContent = `⛳ Hole ${i + 1}: design the green`;
+  $('gpBody').innerHTML = `<p class="small muted">It already has a full-size oval green. Pick a shape and how it breaks. You can change this anytime in ✏️ Edit hole.</p>` +
+    `<h3 class="sec">Shape</h3><div class="chips">${Object.entries(GSHAPES).map(([k, G0]) => `<button class="chip shapechip${(h.gshape || 'oval') === k ? ' on' : ''}" data-gps="${k}">${shapeSVG(k).replace('width="36" height="36"', 'width="22" height="22"')} ${G0.name}</button>`).join('')}</div>` +
+    `<h3 class="sec">Contour</h3>` + Object.entries(CONTOURS).map(([k, C]) => `<button class="gprow${(h.contour || 'flat') === k ? ' on' : ''}" data-gpc="${k}"><b>${C.icon} ${C.name}</b><span class="small muted">${C.blurb}</span></button>`).join('') +
+    `<h3 class="sec">Island green</h3>${h.island ? '<p class="small">🏝️ This is an island green.</p>' : `<button class="btn alt" data-gpi="1">🏝️ Surround it with water</button><p class="small muted">Golfers love the drama and fear the splash. It costs $60 per water tile.</p>`}`;
+  $('greenPick').classList.remove('hidden');
+}
+$('gpBody').addEventListener('click', e => {
+  const h = S.holes[gpHole]; if (!h) return;
+  const sb = e.target.closest('[data-gps]'), cb = e.target.closest('[data-gpc]'), ib = e.target.closest('[data-gpi]');
+  if (sb) { reshapeGreen(h, sb.dataset.gps, false); }
+  else if (cb) { h.contour = cb.dataset.gpc; recompute(); terrainDirty = true; toast(`${CONTOURS[h.contour].icon} ${CONTOURS[h.contour].name} green.`, 1500); }
+  else if (ib) makeIsland(h);
+  else return;
+  openGreenPick(gpHole);
+});
+$('gpDone').addEventListener('click', () => { $('greenPick').classList.add('hidden'); saveGame(); });
+
+// ---------- grounds crew you can see ----------
+let crew = [];
+function crewMesh(role){
+  const g = new TH.Group(), add = (geo, c, p, s, r) => { const m = new TH.Mesh(GEO[geo], mat(c)); m.position.set(...p); m.scale.set(...s); if (r) m.rotation.set(...r); m.castShadow = true; g.add(m); return m; };
+  const VEST = '#ff8a3d', SK = pick(SKIN);
+  if (role === 'mower') {
+    add('box', '#2e7d4f', [0, .1, 0], [.26, .1, .4]); add('box', '#2e7d4f', [0, .16, .12], [.22, .08, .14]); add('box', '#f2bd44', [0, .19, -.06], [.14, .04, .12]);
+    add('cyl', '#9aa3ad', [0, .05, .26], [.04, .3, .04], [0, 0, Math.PI/2]); for (const [x, z, r] of [[-.13, -.12, .06], [.13, -.12, .06], [-.11, .13, .04], [.11, .13, .04]]) add('cyl', '#2a2a2a', [x, r, z], [r, .03, r], [0, 0, Math.PI/2]);
+    add('cyl', VEST, [0, .28, -.06], [.05, .12, .045]); add('sphere', SK, [0, .38, -.06], [.045, .048, .045]); add('hemi', '#f2bd44', [0, .395, -.06], [.05, .035, .05]);
+  } else {
+    for (const x of [-.03, .03]) add('cyl', '#3d4a5c', [x, .08, 0], [.02, .16, .02]);
+    add('cyl', VEST, [0, .24, 0], [.055, .16, .045]); add('sphere', SK, [0, .37, 0], [.048, .052, .048]); add('hemi', '#2e7d4f', [0, .385, 0], [.052, .036, .052]);
+    add('box', '#e2483d', [0, .05, .17], [.14, .07, .1]); add('cyl', '#9aa3ad', [0, .16, .1], [.008, .2, .008], [.9, 0, 0]);
+  }
+  g.scale.setScalar(1.3); scene.add(g); return g;
+}
+function crewPlan(c){
+  const holes = S.holes; if (!holes.length) return;
+  c.hi = (c.hi + 1) % holes.length; const h = holes[c.hi], r = routeOf(h), a = r[0], b = r[r.length - 1];
+  const ang = Math.atan2(b.y - a.y, b.x - a.x), nx = -Math.sin(ang), ny = Math.cos(ang), pts = [];
+  if (c.role === 'mower') {
+    [-1.5, -.5, .5, 1.5].forEach((o, i) => { const s = i % 2 ? .85 : .15, e2 = i % 2 ? .15 : .85; for (const f of [s, e2]) pts.push({ x: lerp(a.x, b.x, f) + nx*o, y: lerp(a.y, b.y, f) + ny*o }); });
+  } else {
+    const p = { x:h.pin.x + .5, y:h.pin.y + .5 }; [-1.2, -.4, .4, 1.2].forEach((o, i) => { const s = i % 2 ? 1.6 : -1.6; pts.push({ x:p.x + Math.cos(ang)*s + nx*o, y:p.y + Math.sin(ang)*s + ny*o }, { x:p.x - Math.cos(ang)*s + nx*o, y:p.y - Math.sin(ang)*s + ny*o }); });
+    for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) { const t = tile(h.pin.x + dx, h.pin.y + dy); if ([T.SAND, T.POT, T.GBUNK].includes(t)) { pts.push({ x:h.pin.x + dx + .5, y:h.pin.y + dy + .5, rake:true }); dy = 9; break; } }
+  }
+  c.pts = pts.filter(p => { const t = at(p.x, p.y); return t >= 0 && t !== T.WATER && t !== T.ROCK && t !== T.HOUSE && t !== T.TREES; }); c.hole = h;
+}
+function stepCrew(dt){
+  const nM = S.holes.length && !S.event ? Math.min(4, staffN('grounds')) : 0, nG = S.holes.length && !S.event ? Math.min(3, staffN('greens')) : 0;
+  for (const [role, n] of [['mower', nM], ['green', nG]]) {
+    const mine = crew.filter(c => c.role === role);
+    while (mine.length < n) { const c = { role, x:DOOR.x, y:DOOR.y, hi: Math.floor(Math.random()*9) + mine.length*3, pts:[], wait:0, head:0, mesh:crewMesh(role) }; crew.push(c); mine.push(c); }
+    while (mine.length > n) { const c = mine.pop(); scene.remove(c.mesh); crew.splice(crew.indexOf(c), 1); }
+  }
+  for (const c of crew) {
+    if (c.wait > 0) { c.wait -= dt; continue; }
+    if (!c.pts.length) { if (c.hole) { if (c.role === 'mower') c.hole.mowDay = S.day; else c.hole.greenDay = S.day; } crewPlan(c); if (!c.pts.length) { c.wait = 3; continue; } }
+    // give way to golfers
+    if (S.golfers.some(g => !g.leaving && Math.hypot(g.x - c.x, g.y - c.y) < (c.role === 'mower' ? 3 : 2.2) && g.state !== 'flight')) { c.wait = 1.5; continue; }
+    const p = c.pts[0], d = Math.hypot(p.x - c.x, p.y - c.y), sp = (c.role === 'mower' ? 1.5 : .7)*dt;
+    if (d > .02) c.head = Math.atan2(p.x - c.x, p.y - c.y);
+    if (d <= sp) { c.x = p.x; c.y = p.y; c.pts.shift(); if (p.rake) c.wait = 4; } else { c.x += (p.x - c.x)/d*sp; c.y += (p.y - c.y)/d*sp; }
+  }
+}
+function syncCrew(){ for (const c of crew) { c.mesh.position.set(W2(c.x), heightAt(c.x, c.y), Z2(c.y)); c.mesh.rotation.y = c.head; } }
+function clearCrew(){ for (const c of crew) scene.remove(c.mesh); crew = []; }
+// sprinklers at dawn (drawn on the 2D layer)
+function drawSprinklers(now){
+  if (S.mode !== 'build' || S.dayT > DAY*.06 || !S.holes.length) return;
+  const k = 1 - S.dayT/(DAY*.06), sc = clamp(cam.z/cam.fit, .6, 2.5);
+  for (const h of S.holes) { const r = routeOf(h), a = r[0], b = r[r.length - 1];
+    for (const f of [.35, .65, 1]) { const x = lerp(a.x, b.x, f), y = lerp(a.y, b.y, f), p = proj(x, y, heightAt(x, y) + .05), spin = now/300 + x;
+      ctx.fillStyle = `rgba(200,230,255,${.55*k})`;
+      for (let i=0; i<7; i++) { const t = (i/7 + now/900) % 1, aa = spin + i*.15, dd = t*22*sc; ctx.beginPath(); ctx.arc(p.x + Math.cos(aa)*dd, p.y - Math.sin(t*Math.PI)*9*sc + Math.sin(aa)*dd*.4, 1.6*sc, 0, 6.283); ctx.fill(); } } }
+}
+
+// ---------- birds flying over ----------
+let birds = [], birdT = 20;
+function stepBirds(dt, now){
+  birdT -= dt;
+  if (!birds.length && birdT <= 0) {
+    birdT = 50 + Math.random()*70; const n = 5 + Math.floor(Math.random()*5), a = Math.random()*Math.PI*2, cx = COLS/2 + Math.cos(a)*(COLS*.9), cy = ROWS/2 + Math.sin(a)*(ROWS*.9), dir = a + Math.PI + (Math.random() - .5)*.6, h = 5 + Math.random()*4;
+    for (let i=0; i<n; i++) { const g = new TH.Group(), wl = new TH.Mesh(GEO.box, mat('#2a2a2a')), wr = new TH.Mesh(GEO.box, mat('#2a2a2a')); wl.scale.set(.22, .015, .06); wr.scale.set(.22, .015, .06); wl.position.x = -.11; wr.position.x = .11; g.add(wl); g.add(wr); scene.add(g);
+      const row = Math.ceil(i/2), side = i % 2 ? 1 : -1; birds.push({ g, wl, wr, x: cx - Math.cos(dir)*row*.6 + Math.cos(dir + Math.PI/2)*row*.5*side, y: cy - Math.sin(dir)*row*.6 + Math.sin(dir + Math.PI/2)*row*.5*side, h: h + Math.random()*.4, dir, ph: Math.random()*6 }); }
+  }
+  for (const b of birds) { b.x += Math.cos(b.dir)*3.2*dt; b.y += Math.sin(b.dir)*3.2*dt; const f = Math.sin(now/110 + b.ph)*.5;
+    b.g.position.set(W2(b.x), b.h, Z2(b.y)); b.g.rotation.y = -b.dir + Math.PI/2; b.wl.rotation.z = f; b.wr.rotation.z = -f; }
+  if (birds.length && birds.every(b => b.x < -12 || b.x > COLS + 12 || b.y < -12 || b.y > ROWS + 12)) { for (const b of birds) scene.remove(b.g); birds = []; }
+}
+
+// ---------- clubhouse upgrades ----------
+const HOUSE_UP = [null,
+  { name:'Locker Room', cost:15000, txt:'Lockers, showers and a members’ lounge. Members are happier every day and fair dues rise 10%.' },
+  { name:'Banquet Hall', cost:40000, txt:'Weddings, corporate outings and banquets. Brings in extra money every week, more with a higher rating and prestige.' },
+  { name:'Lodge', cost:90000, txt:'Rooms for overnight golf trips. 15% more golfers, and the ones who stay pay for a room.' }];
+const houseLv = () => S.houseLv || 1;
+function openHouseEd(){
+  facSel = -2; const lv = houseLv(), nx = HOUSE_UP[lv];
+  $('facEdTitle').textContent = `🏠 Clubhouse, level ${lv}`;
+  $('facEdBody').innerHTML = `<p class="small muted">Your clubhouse grows as you upgrade it.</p>` + HOUSE_UP.slice(1, lv).map((u, i) => `<p class="small">✓ <b>${u.name}</b>: ${u.txt}</p>`).join('') +
+    (nx ? `<h3 class="sec">Next: ${nx.name}</h3><p class="small">${nx.txt}</p><div class="btns"><button class="btn" data-hu="1" ${S.money < nx.cost ? 'disabled' : ''}>Build it for ${fmt(nx.cost)}</button></div>` : `<p class="small" style="color:var(--brand);font-weight:700">Fully upgraded ✓</p>`);
+  $('facEd').classList.remove('hidden');
+}
+function upgradeHouse(){
+  const lv = houseLv(), nx = HOUSE_UP[lv]; if (!nx) return; if (S.money < nx.cost) return toast(`That costs ${fmt(nx.cost)}.`);
+  S.money -= nx.cost; book('build', -nx.cost); S.houseLv = lv + 1; buildProps(); saveGame(); updateHUD(); toast(`🏠 ${nx.name} open! ${nx.txt}`, 4000); openHouseEd(); buildTools();
+}
+function houseExtras(add, lv){
+  const WALL = '#f3ead6', ROOF = '#8e3a30', WIN = '#9fd3f0';
+  if (lv >= 2) { add('box', WALL, [-.95, .3, -.45], [.55, .5, .7]); add('pyr', ROOF, [-.95, .7, -.45], [.45, .3, .56]); for (const z of [-.6, -.3]) add('box', WIN, [-.95, .35, z], [.56, .14, .1]); }
+  if (lv >= 3) { add('box', '#ffffff', [-.75, .26, 1.25], [1.0, .44, .6]); add('pyr', '#f4f4ef', [-.75, .62, 1.25], [.86, .28, .52]); for (let i=0; i<8; i++) add('sphere', '#ffd76a', [-1.2 + i*.13, .5, 1.58], [.02, .02, .02]); }
+  if (lv >= 4) { add('box', WALL, [.7, .55, -1.45], [1.3, 1.0, .5]); add('pyr', ROOF, [.7, 1.2, -1.45], [1.1, .4, .42]); for (const x of [.25, .55, .85, 1.15]) for (const y of [.35, .75]) add('box', WIN, [x, y, -1.19], [.14, .14, .01]); }
+}
+
+// ---------- monthly report ----------
+const REPORT_CATS = [['fees','Green fees'],['dues','Member dues'],['food','Food & drink'],['shop','Pro shop'],['range','Range fees'],['carts','Cart rentals'],['events','Events'],['banquet','Banquet & lodge'],['prize','Pro winnings'],['lessons','Lesson fees'],['build','Building'],['upkeep','Upkeep'],['staff','Staff'],['land','Land']];
+function trackMoney(cat, amt){ if (!S.active) return; S.month = S.month || {}; S.month[cat] = (S.month[cat] || 0) + amt; if (amt > 0) S.dayInc = (S.dayInc || 0) + amt; else S.dayExp = (S.dayExp || 0) - amt; }
+function logDay(){ S.daily = S.daily || []; S.daily.push({ d:S.day, inc:Math.round(S.dayInc || 0), exp:Math.round(S.dayExp || 0), g:S.dayGolfers || 0, st:+S.course.stars.toFixed(2) }); if (S.daily.length > 56) S.daily.shift(); S.dayInc = 0; S.dayExp = 0; }
+function makeReport(){
+  const days = (S.daily || []).slice(-28), inc = days.reduce((a, d) => a + d.inc, 0), exp = days.reduce((a, d) => a + d.exp, 0);
+  const thoughts = Object.entries(S.fb || {}).map(([l, v]) => [l, v, (Object.values(FBK).find(f => f.label === l) || {}).sent]).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  S.report = { from: days.length ? days[0].d : S.day, to: S.day, inc, exp, golfers: days.reduce((a, d) => a + d.g, 0), books: { ...(S.month || {}) }, days, thoughts, happy: Math.round(avgSat()), stars: S.course.stars, awards: (S.awards || []).filter(a => a.day > S.day - 28).map(a => a.icon + ' ' + a.name), miles: Object.values(store.miles || {}).filter(m => m.lv === S.level && m.day > S.day - 28).map(m => m.name) };
+  S.month = {}; S.reportNew = true;
+}
+function reportHtml(R, live){
+  if (!R) return '<p class="muted">Your first monthly report arrives on day 28.</p>';
+  const profit = R.inc - R.exp, max = Math.max(1, ...R.days.map(d => Math.abs(d.inc - d.exp)));
+  const bars = R.days.map((d, i) => { const v = d.inc - d.exp, h = Math.max(1, Math.abs(v)/max*44); return `<rect x="${i*10 + 1}" y="${v >= 0 ? 50 - h : 50}" width="8" height="${h}" rx="1.5" fill="${v >= 0 ? '#4fbf5a' : '#e2483d'}"><title>Day ${d.d}: ${fmt(v)}</title></rect>`; }).join('');
+  const rows = REPORT_CATS.filter(([k]) => R.books[k]).sort((a, b) => R.books[b[0]] - R.books[a[0]]).map(([k, l]) => `<tr><td>${l}</td><td class="${R.books[k] < 0 ? 'neg' : ''}">${fmt(R.books[k])}</td></tr>`).join('');
+  return `<p class="small muted">${live ? 'This month so far' : `Days ${R.from}–${R.to}`} · ${R.golfers.toLocaleString('en-US')} golfers · happiness ${R.happy}/100 · ★ ${R.stars.toFixed(1)}</p>` +
+    `<div class="rsum"><div><span class="small muted">Income</span><b>${fmt(R.inc)}</b></div><div><span class="small muted">Spending</span><b>${fmt(R.exp)}</b></div><div><span class="small muted">Profit</span><b style="color:${profit >= 0 ? 'var(--brand)' : 'var(--flag)'}">${profit >= 0 ? '+' : ''}${fmt(profit)}</b></div></div>` +
+    (R.days.length ? `<h3 class="sec">Daily profit</h3><svg viewBox="0 0 ${R.days.length*10} 100" width="100%" height="110" preserveAspectRatio="none" role="img" aria-label="Daily profit chart"><line x1="0" y1="50" x2="${R.days.length*10}" y2="50" stroke="currentColor" stroke-opacity=".25"/>${bars}</svg>` : '') +
+    (rows ? `<h3 class="sec">Where the money went</h3><table><tbody>${rows}</tbody></table>` : '') +
+    (R.thoughts.length ? `<h3 class="sec">💭 What golfers are saying</h3>` + R.thoughts.map(([l, v, sent]) => `<div class="spread small"><span>${sent > 0 ? '👍' : sent < 0 ? '👎' : '💬'} ${esc(l)}</span><span class="muted">${Math.round(v)}×</span></div>`).join('') : '') +
+    (R.awards.length ? `<h3 class="sec">🏅 Awards</h3><p class="small">${R.awards.map(esc).join(' · ')}</p>` : '') +
+    (R.miles && R.miles.length ? `<h3 class="sec">🎖️ Milestones</h3><p class="small">${R.miles.map(esc).join(' · ')}</p>` : '');
+}
+function openReport(live){
+  const R = live ? (() => { const save = { m:S.month }; const days = (S.daily || []).filter(d => d.d > S.day - ((S.day - 1) % 28) - 1); const r = { from: days.length ? days[0].d : S.day, to:S.day, inc: days.reduce((a, d) => a + d.inc, 0), exp: days.reduce((a, d) => a + d.exp, 0), golfers: days.reduce((a, d) => a + d.g, 0), books:{ ...(S.month || {}) }, days, thoughts: Object.entries(S.fb || {}).map(([l, v]) => [l, v, (Object.values(FBK).find(f => f.label === l) || {}).sent]).sort((a, b) => b[1] - a[1]).slice(0, 6), happy: Math.round(avgSat()), stars:S.course.stars, awards:[], miles:[] }; return r; })() : S.report;
+  $('reportTitle').textContent = live ? '📊 This month so far' : '📊 Monthly report';
+  $('reportBody').innerHTML = reportHtml(R, live) + (S.report && live ? '<div class="btns"><button class="btn alt sm" data-rlast="1">See last month’s report</button></div>' : '');
+  $('report').classList.remove('hidden'); S.reportNew = false;
+}
+$('reportClose').addEventListener('click', () => $('report').classList.add('hidden'));
+$('reportBody').addEventListener('click', e => { if (e.target.closest('[data-rlast]')) openReport(false); });
+
+// ---------- milestones ----------
+const MILES = [
+  ['hole1', '⛳', 'First hole', 'Build your first hole', 2, () => S.holes.length >= 1],
+  ['hole9', '9️⃣', 'Front nine', 'Build 9 holes on one course', 4, () => S.holes.length >= 9],
+  ['hole18', '🏁', 'Full eighteen', 'Build 18 holes on one course', 8, () => S.holes.length >= 18],
+  ['star3', '⭐', 'Three stars', 'Reach a 3★ rating', 3, () => S.course.stars >= 3],
+  ['star4', '🌟', 'Four stars', 'Reach a 4★ rating', 6, () => S.course.stars >= 4],
+  ['star45', '💫', 'World class', 'Reach a 4.5★ rating', 10, () => S.course.stars >= 4.5],
+  ['mem25', '👥', 'Busy clubhouse', '25 members at one course', 3, () => S.members.length >= 25],
+  ['mem100', '🏘️', 'Thriving club', '100 members at one course', 6, () => S.members.length >= 100],
+  ['mem200', '🏙️', 'Full house', '200 members at one course', 10, () => S.members.length >= 200],
+  ['event1', '🏆', 'Host with the most', 'Host your first event', 3, () => S.history.length >= 1],
+  ['national', '🎓', 'National stage', 'Host the National Collegiate Championship', 8, () => S.history.some(r => /National/.test(r.name))],
+  ['ace', '🎯', 'Hole in one!', 'Anyone makes a hole in one on your course', 4, () => S.records && S.records.aces && S.records.aces.length > 0],
+  ['record', '📉', 'Under par', 'Someone sets a course record under par (9+ holes)', 5, () => Object.entries((S.records && S.records.rounds) || {}).some(([n, r]) => +n >= 9 && r.toPar < 0)],
+  ['earn100k', '💵', 'Six figures', 'Earn $100,000 in green fees on one course', 4, () => S.earned >= 100000],
+  ['earn1m', '💰', 'Millionaire', 'Earn $1,000,000 in green fees on one course', 10, () => S.earned >= 1000000],
+  ['own3', '🗺️', 'Golf group', 'Own 3 courses', 5, () => store.empire.owned.length >= 3],
+  ['own6', '🌍', 'Golf empire', 'Own 6 courses', 8, () => store.empire.owned.length >= 6],
+  ['ownall', '👑', 'Everything', 'Own every course', 15, () => store.empire.owned.length >= LEVELS.length],
+  ['stadium', '🏟️', 'Stadium hole', 'Build a stadium hole', 4, () => S.holes.some(h => h.stadium) && S.facilities.some(f => f.type === 'grandstand')],
+  ['award', '🏅', 'Award winner', 'Win a course award', 4, () => (S.awards || []).some(a => a.good)],
+  ['beatmem', '⚔️', 'Club pro pride', 'Beat a member in a match', 3, () => S.members.some(m => m.vsPro && m.vsPro.l > 0)],
+  ['lv5', '✨', 'Signature facility', 'Upgrade a facility to level 5', 6, () => S.facilities.some(f => (f.lv || 1) >= 5)],
+  ['lodge', '🏨', 'Destination', 'Open the clubhouse Lodge', 8, () => houseLv() >= 4],
+  ['island', '🏝️', 'Island green', 'Build an island green', 3, () => S.holes.some(h => h.island)]
+];
+function checkMiles(){
+  if (!S.active) return; store.miles = store.miles || {}; const got = [];
+  for (const [id, icon, name, , coins, test] of MILES) { if (store.miles[id]) continue; let ok = false; try { ok = test(); } catch(e) {} if (!ok) continue;
+    store.miles[id] = { day:S.day, lv:S.level, name: icon + ' ' + name }; S.coins += coins; S.prestige += .2; got.push(`${icon} ${name} (+${coins} 🪙)`); }
+  if (got.length) { toast(`🎖️ Milestone${got.length > 1 ? 's' : ''}: ${got.join(', ')}`, 4200); logNews && logNews(`🎖️ Milestone: ${got.join(', ')}`); saveStore(); }
+}
+function milesHtml(){
+  const M = store.miles || {}, n = MILES.filter(m => M[m[0]]).length;
+  return `<h3 class="sec">🎖️ Milestones (${n} of ${MILES.length})</h3><div class="miles">` + MILES.map(([id, icon, name, desc, coins]) => { const m = M[id];
+    return `<div class="mile${m ? ' done' : ''}"><span class="mi1">${m ? icon : '🔒'}</span><span class="mi2"><b>${name}</b><span class="small muted">${m ? `Day ${m.day} · ${esc(LEVELS[m.lv] ? (m.lv === S.level ? (S.clubName || LEVELS[m.lv].name) : LEVELS[m.lv].name) : '')}` : `${desc} · +${coins} 🪙`}</span></span></div>`; }).join('') + `</div>`;
+}
+
 // ---------- clubhouse location ----------
 const houseAt = () => S.house || { x:CHX, y:CHY };
 function setDoor(){ const h = houseAt(); DOOR.x = h.x + 2.4; DOOR.y = h.y + 1; }
@@ -4628,7 +4891,7 @@ function renderClub(){
   $('clubTitle').textContent = S.clubName || 'The clubhouse';
   let h = '';
   if (clubTab === 'club') {
-    h += `<button class="btn alt" data-courses="1" style="width:100%;margin:0 0 10px">🗺️ Switch courses or buy a new one (${store.empire.owned.length} owned)</button>`;
+    h += `<div class="btns" style="margin:0 0 10px"><button class="btn alt" data-courses="1">🗺️ Courses (${store.empire.owned.length})</button><button class="btn alt" data-report="1">📊 Report${S.reportNew ? ' 🔴' : ''}</button></div>`;
     h += attentionHtml();
     h += `<button class="mcard" data-act="profile" data-mid="pro"><span class="mavf">${proFace(44)}${S.pro.country ? `<span class="fflag">${flagTxt(S.pro.country)}</span>` : ''}</span><span class="mi"><b>${esc(S.pro.name)}</b><span class="small muted">Your club pro: ${S.pro.starts} start${S.pro.starts === 1 ? '' : 's'}, ${S.pro.wins} win${S.pro.wins === 1 ? '' : 's'}, ${fmt(S.pro.earnings)} won</span></span><span class="chev" aria-hidden="true">›</span></button>`;
     const ls = S.lessonSetup || (S.lessonSetup = { mid:(S.members[0] || {}).id, k:'dr' });
@@ -4641,7 +4904,7 @@ function renderClub(){
       h += `<div class="chips">${ATTRS.map(([k,l]) => `<button class="chip${ls.k === k ? ' on' : ''}" data-act="lk" data-k="${k}">${l}</button>`).join('')}</div>`;
       h += `<div class="btns"><button class="btn" data-act="giveLesson" ${S.lessonsLeft > 0 ? '' : 'disabled'}>${S.lessonsLeft > 0 ? 'Give lesson' : 'No lessons left today'}</button></div>`;
     }
-    const CATS = [['loanIn','Loans received'],['fees','Green fees'],['dues','Member dues'],['food','Food & drink'],['shop','Pro shop'],['range','Range fees'],['carts','Cart rentals'],['events','Events'],['prize','Pro winnings'],['build','Building'],['upkeep','Upkeep'],['lessons','Lesson fees'],['salaries','Staff salaries'],['water','Water'],['fert','Fertilizer'],['power','Electricity'],['repairs','Repairs'],['loan','Loan payments'],['transfer','Sent to other courses'],['land','Land purchases']];
+    const CATS = [['loanIn','Loans received'],['fees','Green fees'],['dues','Member dues'],['food','Food & drink'],['shop','Pro shop'],['range','Range fees'],['carts','Cart rentals'],['events','Events'],['banquet','Banquet & lodge'],['prize','Pro winnings'],['build','Building'],['upkeep','Upkeep'],['lessons','Lesson fees'],['salaries','Staff salaries'],['water','Water'],['fert','Fertilizer'],['power','Electricity'],['repairs','Repairs'],['loan','Loan payments'],['transfer','Sent to other courses'],['land','Land purchases']];
     const tw = S.books, lw = S.lastBooks || {}, sum = o => Object.values(o).reduce((a,b) => a+b, 0);
     const rows = CATS.filter(([k]) => tw[k] || lw[k]).map(([k,l]) => `<tr><td>${l}</td><td class="${(tw[k] || 0) < 0 ? 'neg' : ''}">${tw[k] ? fmt(tw[k]) : '–'}</td><td class="${(lw[k] || 0) < 0 ? 'neg' : ''}">${lw[k] ? fmt(lw[k]) : '–'}</td></tr>`).join('');
     h += `<h3 class="sec">Finances</h3>` + (rows ? `<table><thead><tr><th>Money</th><th>This week</th><th>Last week</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td><b>Net</b></td><td><b>${fmt(sum(tw))}</b></td><td><b>${fmt(sum(lw))}</b></td></tr></tfoot></table>` : '') +
@@ -4737,6 +5000,7 @@ function renderClub(){
   } else if (clubTab === 'rank') {
     h += rankingsHtml();
   } else {
+    h += milesHtml();
     h += recordBook();
     h += awardsHtml();
     h += confHistoryHtml();
@@ -4756,7 +5020,7 @@ $('pcardBody').addEventListener('click', e => {
   if (sv) { const p = ensureRoster().find(x => x.id === sv.dataset.rpsave), v = $('rpName').value.trim().slice(0, 24); if (p && v) { p.name = v; saveStore(); toast('Name saved.'); openRosterCard(p.id); if (!$('club').classList.contains('hidden')) renderClub(); } }
   if (dl) { const p = ensureRoster().find(x => x.id === dl.dataset.rpdel); if (p && confirm(`Remove ${p.name} from the tour? They won’t play in your events anymore.`)) { p.gone = true; saveStore(); $('pcard').classList.add('hidden'); toast(`${p.name} has left the tour.`); renderClub(); } }
 });
-$('clubBody').addEventListener('click', e => { if (e.target.closest('[data-courses]')) { closeClub(); openCourses(); } });
+$('clubBody').addEventListener('click', e => { if (e.target.closest('[data-courses]')) { closeClub(); openCourses(); } if (e.target.closest('[data-report]')) { openReport(!S.reportNew); renderClub(); } });
 $('clubBody').addEventListener('click', e => { const ch = e.target.closest('[data-challenge]'); if (ch) { challengeMember(+ch.dataset.challenge); } });
 $('clubBody').addEventListener('click', e => { const ms = e.target.closest('[data-msort]'); if (ms) { memSort = ms.dataset.msort; renderClub(); return; } const gt = e.target.closest('[data-gotab]'); if (gt) { clubTab = gt.dataset.gotab; renderClub(); $('club').querySelector('.card').scrollTop = 0; } });
 $('clubBody').addEventListener('click', e => {
@@ -5042,7 +5306,8 @@ function endPtr(e, cancel){
   if (!pend) return;
   if (S.landMode && pend.start && !pend.active && (pend.moved || 0) < 8) { const lt = tileAtScreen(pend.start); landTap(lt.x, lt.y); pend = null; return; }
   if (pend.start && !pend.active && (pend.moved || 0) < 8) { const g = golferAt(pend.start); if (g) { pend = null; openScores(g.id); return; }
-    if (S.tool === 'move' && S.mode === 'build') { const tt = tileAtScreen(pend.start), fi = tt.x >= 0 && tt.y >= 0 && tt.x < COLS && tt.y < ROWS ? FO[tt.y*COLS + tt.x] : -1; if (fi >= 0 && S.facilities[fi] && (FACS[S.facilities[fi].type].kind !== 'scenery' || canTurn(S.facilities[fi]))) { pend = null; openFacEd(fi); return; } } }
+    if (S.tool === 'move' && S.mode === 'build') { const tt = tileAtScreen(pend.start), fi = tt.x >= 0 && tt.y >= 0 && tt.x < COLS && tt.y < ROWS ? FO[tt.y*COLS + tt.x] : -1; if (fi >= 0 && S.facilities[fi] && (FACS[S.facilities[fi].type].kind !== 'scenery' || canTurn(S.facilities[fi]))) { pend = null; openFacEd(fi); return; }
+      const hs = houseAt(); if (tt.x >= hs.x && tt.x < hs.x + 2 && tt.y >= hs.y && tt.y < hs.y + 2) { pend = null; openHouseEd(); return; } } }
   if (pend.kind === 'tap') { if (S.tool === 'bridge') bridgeTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].gshape) stampGreen(pend.t.x, pend.t.y, TOOLS[S.tool].gshape); else if (S.tool === 'house') houseTap(pend.t.x, pend.t.y); else if (S.tool === 'upgrade') facTapUpgrade(pend.t.x, pend.t.y); else if (S.tool === 'edit') { const fi = FO[pend.t.y*COLS + pend.t.x]; if (fi >= 0 && S.facilities[fi] && !S.editMove) openFacEd(fi); else editTap(pend.t.x, pend.t.y); } else if (S.tool === 'dogleg') doglegTap(pend.t.x, pend.t.y); else if (TOOLS[S.tool].fac) facTap(pend.t.x, pend.t.y); else holeTap(pend.t.x, pend.t.y); }
   else if (pend.kind === 'paint' && !pend.active) { checkpoint(); paintAt(pend.t.x, pend.t.y); }
   pend = null;
@@ -5125,6 +5390,7 @@ function openHoleEd(){
     </div>
     <h3 class="sec">Green shape</h3><div class="chips">${Object.entries(GSHAPES).map(([k, G0]) => `<button class="chip shapechip${h.gshape === k ? ' on' : ''}" data-gs="${k}">${shapeSVG(k).replace('width="36" height="36"', 'width="22" height="22"')} ${G0.name}</button>`).join('')}${h.gshape ? '<button class="chip" data-ed="grot">↻ Turn it</button>' : ''}</div>
     <p class="small muted">Reshapes this hole’s green around the pin. New green tiles cost $60; old green outside the shape becomes fairway.</p>
+    <h3 class="sec">Contour</h3><div class="chips">${Object.entries(CONTOURS).map(([k, C]) => `<button class="chip${(h.contour || 'flat') === k ? ' on' : ''}" data-ed="ct-${k}">${C.icon} ${C.name}</button>`).join('')}</div>${h.island ? '<p class="small">🏝️ Island green</p>' : '<div class="btns"><button class="btn alt sm" data-ed="island">🏝️ Make it an island green</button></div>'}
     <p class="small muted">Moving a tee or pin costs $100. Moving the pin off the green adds one green tile there.</p>`;
   $('holeEd').classList.remove('hidden');
 }
@@ -5162,6 +5428,8 @@ $('holeEdBody').addEventListener('click', e => {
   if (S.event) return toast('The course is locked while an event is on');
   if (a === 'pfront' || a === 'pmiddle' || a === 'pback' || a === 'prandom') { if (setPin(h, a.slice(1))) { recompute(); toast(`Hole ${i+1}: pin moved to the ${a === 'prandom' ? 'new spot' : a.slice(1)} of the green. Now ${h.info.yards} yards.`); } else toast('Paint a bigger green first, then you can move the pin around on it.'); openHoleEd(); return; }
   if (b.dataset.gs) { reshapeGreen(h, b.dataset.gs, false); openHoleEd(); return; }
+  if (a && a.startsWith('ct-')) { h.contour = a.slice(3); recompute(); terrainDirty = true; toast(`${CONTOURS[h.contour].icon} ${CONTOURS[h.contour].name} green.`, 1500); openHoleEd(); return; }
+  if (a === 'island') { makeIsland(h); openHoleEd(); return; }
   if (a === 'stadOn') { for (const h2 of S.holes) h2.stadium = false; h.stadium = true; toast(`🏟️ Hole ${i + 1} is now your stadium hole.`); openHoleEd(); return; }
   if (a === 'stadOff') { h.stadium = false; openHoleEd(); return; }
   if (a === 'stadBuild') { buildStadium(h); openHoleEd(); return; }
@@ -5385,18 +5653,18 @@ function showLevels(){
 function startLevel(i, cont){
   const L = LEVELS[i]; S.level = i; const sv = cont && store.saves[i];
   if (sv) {
-    TS = sv.species && sv.species.length === COLS*ROWS ? Uint8Array.from(sv.species) : new Uint8Array(COLS*ROWS); G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); const spansOld = Array.isArray(sv.bridges) && sv.bridges.length && typeof sv.bridges[0] === 'object'; BR = sv.bridges && !spansOld && sv.bridges.length === COLS*ROWS ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0, gshape:h.gshape || null, grot:h.grot ?? null, stadium:!!h.stadium }));
+    TS = sv.species && sv.species.length === COLS*ROWS ? Uint8Array.from(sv.species) : new Uint8Array(COLS*ROWS); G = Uint8Array.from(sv.grid); E = sv.elev ? Int8Array.from(sv.elev) : new Int8Array(COLS*ROWS); const spansOld = Array.isArray(sv.bridges) && sv.bridges.length && typeof sv.bridges[0] === 'object'; BR = sv.bridges && !spansOld && sv.bridges.length === COLS*ROWS ? Uint8Array.from(sv.bridges) : new Uint8Array(COLS*ROWS); S.facilities = (sv.facilities || []).filter(f => FACS[f.type]); S.holes = sv.holes.map(h => ({ tee:h.tee, pin:h.pin, bend:h.bend || null, plays:h.plays||0, strokes:h.strokes||0, gshape:h.gshape || null, grot:h.grot ?? null, stadium:!!h.stadium, contour:h.contour || 'flat', island:!!h.island }));
     S.money = sv.money; S.earned = sv.earned; S.day = sv.day; S.fee = sv.fee; S.recent = sv.recent || []; S.won = !!sv.won;
     S.clubName = sv.clubName || L.name + ' Golf Club'; S.trophy = sv.trophy || 'Founders Cup';
-    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.conf = sv.conf || null; S.awards = sv.awards || []; S.awardBoost = sv.awardBoost || 0; S.awardHit = sv.awardHit || 0; S.bevLv = sv.bevLv || 1; S.bridges = Array.isArray(sv.bridgeSpans) ? sv.bridgeSpans : (Array.isArray(sv.bridges) && sv.bridges.length && typeof sv.bridges[0] === 'object') ? sv.bridges : []; for (const b of S.bridges) for (const [bx, by] of bridgeTiles(b)) if (G[by*COLS + bx] === T.WATER) BR[by*COLS + bx] = 1; S.shopPrices = sv.shopPrices || {}; S.shopSold = sv.shopSold || {}; S.pinDaily = !!sv.pinDaily; S.house = sv.house || { x:CHX, y:CHY }; S.fb = sv.fb || {}; S.reviews = sv.reviews || []; S.cupLast = sv.cupLast || {}; S.parcels = sv.parcels || []; S.news = sv.news || []; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
+    S.members = (sv.members || []).map(fixMember); S.mid = sv.mid || 0; S.matchLog = sv.matchLog || []; S.records = sv.records || { rounds:{}, holes:[], aces:[] }; S.matchId = sv.matchId || 0; S.typeSat = sv.typeSat || {}; S.pro = fixPro(sv.pro); S.offers = sv.offers || []; S.offerId = sv.offerId || 0; S.books = sv.books || {}; S.lastBooks = sv.lastBooks || {}; S.coins = sv.coins || 0; S.staffId = sv.staffId || 0; S.cond = sv.cond || { turf:85, greens:85, bunkers:85, equip:100 }; S.water = sv.water || 'normal'; S.fert = !!sv.fert; S.loan = sv.loan || null; S.gear = sv.gear || {}; S.houseLv = sv.houseLv || 1; S.daily = sv.daily || []; S.month = sv.month || {}; S.report = sv.report || null; S.conf = sv.conf || null; S.awards = sv.awards || []; S.awardBoost = sv.awardBoost || 0; S.awardHit = sv.awardHit || 0; S.bevLv = sv.bevLv || 1; S.bridges = Array.isArray(sv.bridgeSpans) ? sv.bridgeSpans : (Array.isArray(sv.bridges) && sv.bridges.length && typeof sv.bridges[0] === 'object') ? sv.bridges : []; for (const b of S.bridges) for (const [bx, by] of bridgeTiles(b)) if (G[by*COLS + bx] === T.WATER) BR[by*COLS + bx] = 1; S.shopPrices = sv.shopPrices || {}; S.shopSold = sv.shopSold || {}; S.pinDaily = !!sv.pinDaily; S.house = sv.house || { x:CHX, y:CHY }; S.fb = sv.fb || {}; S.reviews = sv.reviews || []; S.cupLast = sv.cupLast || {}; S.parcels = sv.parcels || []; S.news = sv.news || []; S.weather = sv.weather || null; S.forecast = sv.forecast || null; S.staff = sv.staff || []; if (!sv.staff) { hireStaff('grounds'); hireStaff('greens'); } S.lessonsLeft = sv.lessonsLeft ?? LESSONS_PER_DAY; S.lessonSetup = null; if (!sv.offers) S.offers.push(makeOffer('amateur')); S.dues = sv.dues || 50; S.prestige = sv.prestige || 0; S.eventLast = sv.eventLast || {}; S.history = sv.history || [];
   } else {
     TS = new Uint8Array(COLS*ROWS); G = genMap(L); E = genElev(L, G); BR = new Uint8Array(COLS*ROWS); S.facilities = []; S.holes = []; S.money = L.cash; S.earned = 0; S.day = 1; S.fee = L.fee; S.recent = []; S.won = false;
     S.clubName = L.name + ' Golf Club'; S.trophy = 'Founders Cup';
-    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.conf = null; S.awards = []; S.awardBoost = 0; S.awardHit = 0; S.bevLv = 1; S.bridges = []; S.shopPrices = {}; S.shopSold = {}; S.pinDaily = false; S.house = { x:CHX, y:CHY }; S.fb = {}; S.reviews = []; S.cupLast = {}; S.parcels = []; S.news = []; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
+    S.members = []; S.mid = 0; S.matchLog = []; S.matchId = 0; S.records = { rounds:{}, holes:[], aces:[] }; S.typeSat = {}; S.pro = fixPro(); S.offers = []; S.offerId = 0; S.books = {}; S.lastBooks = {}; S.coins = 0; S.lessonsLeft = LESSONS_PER_DAY; S.lessonSetup = null; S.offers.push(makeOffer('amateur')); S.staff = []; S.staffId = 0; S.cond = { turf:85, greens:85, bunkers:85, equip:100 }; S.water = 'normal'; S.fert = false; hireStaff('grounds'); hireStaff('greens'); S.loan = null; S.gear = {}; S.houseLv = 1; S.daily = []; S.month = {}; S.report = null; S.conf = null; S.awards = []; S.awardBoost = 0; S.awardHit = 0; S.bevLv = 1; S.bridges = []; S.shopPrices = {}; S.shopSold = {}; S.pinDaily = false; S.house = { x:CHX, y:CHY }; S.fb = {}; S.reviews = []; S.cupLast = {}; S.parcels = []; S.news = []; S.weather = { k:'sunny', mph:4, dir:1, temp:72 }; S.forecast = null; S.dues = 50; S.prestige = 0; S.eventLast = {}; S.history = [];
     delete store.saves[i]; saveStore();
   }
   S.mode = 'build'; P.fl = null; P.drag = null; hist = []; future = []; curAct = null; S.event = null; S.setup = null; S.matches = []; S.matchSetup = null; S.follow = null; $('prof').classList.add('hidden'); scView = null; $('sc').classList.add('hidden'); $('round').classList.add('hidden'); $('club').classList.add('hidden'); $('evDone').classList.add('hidden');
-  clearAnimals(); for (const b of rangeBalls) b.on = false; for (const b of bevs) scene.remove(b.mesh); bevs = []; S.cup = null; S.cupSetup = null; facSel = -1; S.landMode = false; S.landSel = null; $('landBar').classList.add('hidden'); $('stage').classList.remove('landing');
+  clearAnimals(); for (const b of rangeBalls) b.on = false; for (const b of bevs) scene.remove(b.mesh); bevs = []; clearCrew(); for (const b of birds) scene.remove(b.g); birds = []; birdT = 15; S.cup = null; S.cupSetup = null; facSel = -1; S.landMode = false; S.landSel = null; $('landBar').classList.add('hidden'); $('stage').classList.remove('landing');
   S.golfers = []; S.dayT = 0; S.spawnT = 2; S.speed = 0; S.pendingTee = null; S.tool = 'move'; S.tray = null; S.dayFees = 0; S.dayGolfers = 0;
   S.active = true; setDoor(); computeOwn(); syncTourOffer(); S.editMove = null; editSel = -1; recompute(); buildTools(); cam.ready = false; layout(); terrainDirty = true; updateSpeed(); updateHUD(); updateHint();
   planMembers();
@@ -5714,6 +5982,7 @@ function frame(now){
     if (!g || S.mode !== 'build') S.follow = null;
     else { view.tx += (W2(g.x) - view.tx)*.12; view.tz += (Z2(g.y) - view.tz)*.12; clampCam(); }
   }
+  if (S.active) { syncCrew(); stepBirds(dtRaw, now); }
   if (S.active && S.mode === 'play') { updateCrowd(dt); }
   else if (S.active) { syncBevs(); updateRopes(); updateCrowd(dt); stepBoards(dt); stepAnimals(Math.min(dt, .05)*Math.max(1, S.speed), now); stepRangeBalls(Math.min(dt, .05)*Math.max(1, S.speed)); }
   if (S.speed > 0 || S.mode === 'play' || S.follow || !S.active || now - lastInteract < 1500 || (++idleN % 4) === 0) draw(now);
