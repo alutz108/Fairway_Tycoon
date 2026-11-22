@@ -5464,20 +5464,48 @@ function cloudErr(e){
     c.includes('invalid-email') ? 'That email address doesn’t look right.' : c.includes('network') ? 'No connection. Check your internet and try again.' :
     c.includes('permission-denied') ? 'Firebase refused the save. Check the Firestore rules from the setup steps.' : c.includes('too-many-requests') ? 'Too many tries. Wait a minute and try again.' : (e && e.message) || 'Something went wrong.';
 }
+// Cloud copies are gzip-compressed (built into the browser) so a big empire still fits in one cloud file.
+const CLOUD_MAX = 950000, canZip = typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined';
+async function zipText(str){
+  const cs = new CompressionStream('gzip'), w = cs.writable.getWriter(); w.write(new TextEncoder().encode(str)); w.close();
+  const buf = new Uint8Array(await new Response(cs.readable).arrayBuffer()); let bin = '';
+  for (let i=0; i<buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+async function unzipText(b64){
+  const bin = atob(b64), buf = new Uint8Array(bin.length); for (let i=0; i<bin.length; i++) buf[i] = bin.charCodeAt(i);
+  const ds = new DecompressionStream('gzip'), w = ds.writable.getWriter(); w.write(buf); w.close();
+  return await new Response(ds.readable).text();
+}
+function docJson(doc){
+  if (doc.z) { if (!canZip) return Promise.reject(new Error('This device is too old to open your compressed cloud save. Update iOS (16.4 or newer) or your browser.')); return unzipText(doc.z); }
+  return Promise.resolve(doc.data);
+}
+function cloudMeterHtml(){
+  if (cloud.used == null) return `<p class="small muted">☁️ Cloud space: shown after the next save.</p>`;
+  const pct = Math.round(cloud.used*100), col = pct >= 85 ? '#e2483d' : pct >= 70 ? '#e8b93a' : '#4fbf5a';
+  return `<div class="rrow" style="margin:8px 0"><div class="spread" style="margin:0"><span class="small">☁️ Cloud space used</span><b class="small">${pct}% · ${Math.round(cloud.size/1024)} KB of ${Math.round(CLOUD_MAX/1024)} KB</b></div><div class="rbar"><i style="width:${Math.min(100, pct)}%;background:${col}"></i></div>` +
+    `<p class="small muted" style="margin:4px 0 0">${cloud.zipped ? `Compressed from ${Math.round(cloud.raw/1024)} KB.` : 'Not compressed on this device.'}${pct >= 70 ? ' <b>Getting full.</b> Ask Claude to split your cloud save into one file per course.' : ''}</p></div>`;
+}
 function cloudUpload(){
   if (!cloud.user || !cloud.db) return Promise.resolve();
   if (!navigator.onLine) { cloud.pending = true; cloud.status = 'Offline. Your latest progress will upload when you’re back online.'; renderCloud(); return Promise.resolve(); }
   cloud.pending = false;
-  const data = JSON.stringify(store);
-  if (data.length > 950000) { cloud.status = 'Your saves are too big for one cloud file.'; renderCloud(); return Promise.resolve(); }
-  return cloudDoc().set({ data, savedAt: store.savedAt || Date.now(), device: deviceName(), courses: courseCount(store) })
+  const json = JSON.stringify(store);
+  return (canZip ? zipText(json).then(z => ({ z, enc:'gzip' })) : Promise.resolve({ data: json, enc:'json' })).then(payload => {
+    const size = (payload.z || payload.data).length; cloud.size = size; cloud.raw = json.length; cloud.used = size/CLOUD_MAX; cloud.zipped = !!payload.z;
+    if (size > CLOUD_MAX) { cloud.status = 'Your saves are too big for one cloud file. Ask Claude to split your cloud save into one file per course.'; renderCloud(); return; }
+    return cloudDoc().set({ ...payload, savedAt: store.savedAt || Date.now(), device: deviceName(), courses: courseCount(store) });
+  })
     .then(() => { cloud.status = `Saved to the cloud ${when(Date.now())}.`; cloud.err = ''; renderCloud(); if (S.active && Date.now() - savedShown > 12000) showSaved('☁️ Saved ✓', 1500); })
     .catch(e => { cloud.err = cloudErr(e); renderCloud(); });
 }
 function cloudQueue(){ if (!cloud || !cloud.user || !cloud.auto) return; clearTimeout(cloud.timer); cloud.timer = setTimeout(cloudUpload, 6000); }
 function cloudFetch(){ return cloudDoc().get().then(d => d.exists ? d.data() : null); }
 function applyCloud(doc){
-  const data = JSON.parse(doc.data);
+  return docJson(doc).then(json => applyCloudData(doc, JSON.parse(json))).catch(e => { cloud.err = e.message || cloudErr(e); renderCloud(); });
+}
+function applyCloudData(doc, data){
   store = { ...data, unlocked: data.unlocked || 0, saves: data.saves || {}, savedAt: doc.savedAt || Date.now() };
   for (const k of Object.keys(store.saves)) { try { migrateSave(+k, store.saves[k]); } catch(e) {} }
   ensureEmpire(); saveStore(true); cloud.choice = null; cloud.status = `Loaded your cloud save from ${doc.device || 'another device'}.`;
@@ -5510,7 +5538,7 @@ function renderCloud(){
   if (signinOpen()) renderSignin();
   const body = $('cloudBody'); if (!body || $('cloud').classList.contains('hidden')) return;
   let h = '';
-  const msg = (cloud.err ? `<p class="small" style="color:var(--flag)">${esc(cloud.err)}</p>` : '') + (cloud.status ? `<p class="small muted">${esc(cloud.status)}</p>` : '');
+  const msg = (cloud.err ? `<p class="small" style="color:var(--flag)">${esc(cloud.err)}</p>` : '') + (cloud.status ? `<p class="small muted">${esc(cloud.status)}</p>` : '') + (cloud.user ? cloudMeterHtml() : '');
   if (!cloudConfig()) {
     h += `<p class="small">Sign in to keep the same courses on your iPhone and your computer. This needs a free Firebase project (a one-time setup). Paste the <b>firebaseConfig</b> block from your Firebase project settings here.</p>`;
     h += `<textarea id="fbCfg" class="namebox" rows="6" spellcheck="false" placeholder="apiKey: &quot;…&quot;, authDomain: &quot;…&quot;, projectId: &quot;…&quot;, …"></textarea>${msg}`;
