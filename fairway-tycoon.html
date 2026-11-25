@@ -1837,9 +1837,12 @@ function stepGolfer(g, dt){
     if (g.passenger && g.passenger.inCart !== g) g.passenger = null;
     let riding = !drv && !!((g.mid || g.rented) && !g.ep && cartsAvail());
     if (riding) { const rk = Math.round(tx*4) + ',' + Math.round(ty*4);
-      if (g.rKey !== rk) { g.rKey = rk; g.walkRest = false; const r = hasCart(g.x, g.y) && hasCart(tx, ty) ? cartRoute(g.x, g.y, tx, ty) : null, last = r && r.length ? r[r.length - 1] : [g.x, g.y], pk = cartPark(last[0], last[1], tx, ty);
+      if (g.rKey !== rk) { g.rKey = rk; g.walkRest = false; g.legT = 0; const r = hasCart(g.x, g.y) && hasCart(tx, ty) ? cartRoute(g.x, g.y, tx, ty) : null, last = r && r.length ? r[r.length - 1] : [g.x, g.y], pk = cartPark(last[0], last[1], tx, ty);
         g.route = r ? r.slice().concat(pk ? [pk] : []) : pk ? [pk] : null; }
-      if (!g.route || g.walkRest || NO_CART.has(at(g.x, g.y))) riding = false; }
+      // once out of the cart for the last stretch, stay on foot until the ball (no hopping in and out at a green's edge)
+      g.legT = (g.legT || 0) + dt;
+      if (NO_CART.has(at(g.x, g.y)) || Math.hypot(tx - g.x, ty - g.y) < 2 || g.legT > 40) g.walkRest = true;
+      if (!g.route || g.walkRest) riding = false; }
     else { g.rKey = null; g.route = null; }
     g.cart = riding;
     if (riding && g.route.length) {   // drive along the path, then the last bit to the ball
@@ -4107,6 +4110,54 @@ function updateRopes(){
   ropeLines.count = lines.length; ropeStakes.castShadow = true; scene.add(ropeStakes); scene.add(ropeLines);
 }
 
+// ---------- driving routes for beverage carts and the grounds crew (around trees, water, rocks, buildings) ----------
+function drivable(x, y, walker){
+  if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return false;
+  const i = y*COLS + x, t = G[i];
+  if (t === T.WATER) return BR[i] === 1;
+  if (FO[i] >= 0 || t === T.TREES || t === T.ROCK || t === T.HOUSE) return false;
+  if (!walker && (t === T.GREEN || t === T.SAND || t === T.POT || t === T.GBUNK)) return false;
+  return true;
+}
+function nearestDrivable(x, y, walker){
+  const fx = Math.floor(x), fy = Math.floor(y);
+  for (let r=0; r<=8; r++) for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; if (drivable(fx + dx, fy + dy, walker)) return [fx + dx, fy + dy]; }
+  return null;
+}
+function clearLine(x0, y0, x1, y1, walker){
+  const d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.ceil(d/.3));
+  for (let k=1; k<n; k++) { const x = lerp(x0, x1, k/n), y = lerp(y0, y1, k/n); if (!drivable(Math.floor(x), Math.floor(y), walker)) return false; }
+  return true;
+}
+// Cheapest route on the tile grid (cart paths cost less), then straightened where the way is clear.
+function drivePath(x0, y0, x1, y1, walker){
+  const a = nearestDrivable(x0, y0, walker), b = nearestDrivable(x1, y1, walker); if (!a || !b) return null;
+  const end = drivable(Math.floor(x1), Math.floor(y1), walker) ? [x1, y1] : [b[0] + .5, b[1] + .5];
+  if (clearLine(x0, y0, end[0], end[1], walker)) return [end];
+  const N = COLS*ROWS, dist = new Float32Array(N).fill(1e9), prev = new Int32Array(N).fill(-1), s = a[1]*COLS + a[0], goal = b[1]*COLS + b[0];
+  const heap = [s]; dist[s] = 0;
+  const push = i => { heap.push(i); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (dist[heap[p]] <= dist[heap[k]]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2*k + 1, r = l + 1; let m = k; if (l < heap.length && dist[heap[l]] < dist[heap[m]]) m = l; if (r < heap.length && dist[heap[r]] < dist[heap[m]]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  let found = false, guard = 0;
+  while (heap.length && guard++ < 20000) {
+    const i = pop(); if (i === goal) { found = true; break; }
+    const x = i % COLS, y = (i - x)/COLS;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+      const nx = x + dx, ny = y + dy; if (!drivable(nx, ny, walker)) continue;
+      if (dx && dy && (!drivable(x + dx, y, walker) || !drivable(x, y + dy, walker))) continue;
+      const n = ny*COLS + nx, c = (dx && dy ? 1.414 : 1)*(G[n] === T.PATH || BR[n] ? .55 : 1), nd = dist[i] + c;
+      if (nd < dist[n]) { dist[n] = nd; prev[n] = i; push(n); }
+    }
+  }
+  if (!found) return null;
+  const tiles = []; for (let i = goal; i !== -1; i = prev[i]) tiles.push([(i % COLS) + .5, Math.floor(i/COLS) + .5]); tiles.reverse();
+  // straighten: skip ahead while the straight line stays clear
+  const out = []; let cx = x0, cy = y0, k = 0;
+  while (k < tiles.length) { let j = tiles.length - 1; while (j > k && !clearLine(cx, cy, tiles[j][0], tiles[j][1], walker)) j--; out.push(tiles[j]); [cx, cy] = tiles[j]; k = j + 1; }
+  if (clearLine(cx, cy, end[0], end[1], walker)) out.push(end);
+  return out;
+}
+
 // ---------- beverage carts ----------
 let bevs = [];
 const BEV_LINES = ['Bev cart! Perfect timing.', 'Cold drink on the 5th? Yes please.', 'Best sight on the course.', 'Two waters and a hot dog, thanks!', 'This place thinks of everything.', 'Ahh, the drink cart.'];
@@ -4133,27 +4184,29 @@ function bevTarget(c){
     const g = want[0], h = S.holes[g.hole]; if (!h) return null;
     const ang = Math.atan2(h.pin.y - h.tee.y, h.pin.x - h.tee.x), side = (g.id % 2 ? 1 : -1);
     let tx = g.x - Math.sin(ang)*1.4*side, ty = g.y + Math.cos(ang)*1.4*side, t = at(tx, ty);
-    if (t < 0 || t === T.WATER || t === T.GREEN || t === T.HOUSE) { tx = g.x; ty = g.y; }
+    if (!drivable(Math.floor(tx), Math.floor(ty), false)) { const d = nearestDrivable(tx, ty, false); if (!d) return null; tx = d[0] + .5; ty = d[1] + .5; }
     return { x:tx, y:ty, g };
   }
-  return { x:DOOR.x, y:DOOR.y, g:null };
+  const park = nearestDrivable(DOOR.x, DOOR.y, false) || [Math.floor(DOOR.x), Math.floor(DOOR.y)];
+  return { x:park[0] + .5, y:park[1] + .5, g:null };
 }
 function stepBevs(dt){
   const n = S.event || !S.holes.length ? 0 : staffN('bevcart');
-  while (bevs.length < n) bevs.push({ x:DOOR.x, y:DOOR.y, route:null, tx:null, ty:null, pause:0, head:0, mesh:makeBevMesh() });
+  const home = nearestDrivable(DOOR.x, DOOR.y, false) || [DOOR.x - .5, DOOR.y - .5];
+  while (bevs.length < n) bevs.push({ x:home[0] + .5, y:home[1] + .5, route:null, tx:null, ty:null, pause:0, head:0, mesh:makeBevMesh() });
   while (bevs.length > n) { const b = bevs.pop(); scene.remove(b.mesh); }
   for (const c of bevs) {
     if (c.pause > 0) { c.pause -= dt; continue; }
     if (c.tx == null || (c.for && (c.for.leaving || c.for.done || c.for.hole !== c.forHole))) {
       const t = bevTarget(c); if (!t) continue;
       c.tx = t.x; c.ty = t.y; c.for = t.g; c.forHole = t.g ? t.g.hole : null;
-      const r = cartRoute(c.x, c.y, c.tx, c.ty); c.route = r ? r.slice() : null;
+      const r = drivePath(c.x, c.y, c.tx, c.ty, false); if (!r) { c.tx = null; c.for = null; c.pause = 2; continue; } c.route = r;
     }
     const sp = 3.4*dt*(S.weather && S.weather.k === 'rain' ? .8 : 1)*(bevLv() >= 3 ? 1.25 : 1);
     let wx = c.tx, wy = c.ty; if (c.route && c.route.length) [wx, wy] = c.route[0];
     const d = Math.hypot(wx - c.x, wy - c.y);
     if (d > .02) c.head = Math.atan2(wx - c.x, wy - c.y);
-    if (d <= sp) { c.x = wx; c.y = wy; if (c.route && c.route.length) c.route.shift(); else { c.tx = null; c.pause = c.for ? 0 : 3; } }
+    if (d <= sp) { c.x = wx; c.y = wy; if (c.route && c.route.length) { c.route.shift(); if (!c.route.length) { c.tx = null; c.pause = c.for ? 0 : 3; } } else { c.tx = null; c.pause = c.for ? 0 : 3; } }
     else { c.x += (wx - c.x)/d*sp; c.y += (wy - c.y)/d*sp; }
     // sell to anyone close by
     for (const g of S.golfers) {
@@ -4536,23 +4589,31 @@ function crewPlan(c){
     const p = { x:h.pin.x + .5, y:h.pin.y + .5 }; [-1.2, -.4, .4, 1.2].forEach((o, i) => { const s = i % 2 ? 1.6 : -1.6; pts.push({ x:p.x + Math.cos(ang)*s + nx*o, y:p.y + Math.sin(ang)*s + ny*o }, { x:p.x - Math.cos(ang)*s + nx*o, y:p.y - Math.sin(ang)*s + ny*o }); });
     for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) { const t = tile(h.pin.x + dx, h.pin.y + dy); if ([T.SAND, T.POT, T.GBUNK].includes(t)) { pts.push({ x:h.pin.x + dx + .5, y:h.pin.y + dy + .5, rake:true }); dy = 9; break; } }
   }
-  c.pts = pts.filter(p => { const t = at(p.x, p.y); return t >= 0 && t !== T.WATER && t !== T.ROCK && t !== T.HOUSE && t !== T.TREES; }); c.hole = h;
+  const walker = c.role !== 'mower';
+  c.pts = pts.filter(p => p.rake || drivable(Math.floor(p.x), Math.floor(p.y), walker) || (walker && at(p.x, p.y) === T.GREEN)); c.hole = h; c.leg = null; c.waited = 0;
 }
 function stepCrew(dt){
   const nM = S.holes.length && !S.event ? Math.min(4, staffN('grounds')) : 0, nG = S.holes.length && !S.event ? Math.min(3, staffN('greens')) : 0;
   for (const [role, n] of [['mower', nM], ['green', nG]]) {
     const mine = crew.filter(c => c.role === role);
-    while (mine.length < n) { const c = { role, x:DOOR.x, y:DOOR.y, hi: Math.floor(Math.random()*9) + mine.length*3, pts:[], wait:0, head:0, mesh:crewMesh(role) }; crew.push(c); mine.push(c); }
+    const home = nearestDrivable(DOOR.x, DOOR.y, role !== 'mower') || [DOOR.x - .5, DOOR.y - .5];
+    while (mine.length < n) { const c = { role, x:home[0] + .5, y:home[1] + .5, hi: Math.floor(Math.random()*9) + mine.length*3, pts:[], wait:0, head:0, mesh:crewMesh(role) }; crew.push(c); mine.push(c); }
     while (mine.length > n) { const c = mine.pop(); scene.remove(c.mesh); crew.splice(crew.indexOf(c), 1); }
   }
   for (const c of crew) {
     if (c.wait > 0) { c.wait -= dt; continue; }
     if (!c.pts.length) { if (c.hole) { if (c.role === 'mower') c.hole.mowDay = S.day; else c.hole.greenDay = S.day; } crewPlan(c); if (!c.pts.length) { c.wait = 3; continue; } }
     // give way to golfers
-    if (S.golfers.some(g => !g.leaving && Math.hypot(g.x - c.x, g.y - c.y) < (c.role === 'mower' ? 3 : 2.2) && g.state !== 'flight')) { c.wait = 1.5; continue; }
-    const p = c.pts[0], d = Math.hypot(p.x - c.x, p.y - c.y), sp = (c.role === 'mower' ? 1.5 : .7)*dt;
-    if (d > .02) c.head = Math.atan2(p.x - c.x, p.y - c.y);
-    if (d <= sp) { c.x = p.x; c.y = p.y; c.pts.shift(); if (p.rake) c.wait = 4; } else { c.x += (p.x - c.x)/d*sp; c.y += (p.y - c.y)/d*sp; }
+    if (S.golfers.some(g => !g.leaving && Math.hypot(g.x - c.x, g.y - c.y) < (c.role === 'mower' ? 3 : 2.2) && g.state !== 'flight')) {
+      c.waited = (c.waited || 0) + 1.5; if (c.waited < 10) { c.wait = 1.5; continue; }
+      c.pts.shift(); c.leg = null; c.waited = 0; continue;   // waited long enough: move on to the next lane
+    }
+    const p = c.pts[0], walker = c.role !== 'mower';
+    if (!c.leg) { c.leg = drivePath(c.x, c.y, p.x, p.y, walker || at(p.x, p.y) === T.GREEN); if (!c.leg) { c.pts.shift(); continue; } }
+    const w = c.leg[0] || [p.x, p.y], d = Math.hypot(w[0] - c.x, w[1] - c.y), sp = (c.role === 'mower' ? 1.5 : .7)*dt;
+    if (d > .02) c.head = Math.atan2(w[0] - c.x, w[1] - c.y);
+    if (d <= sp) { c.x = w[0]; c.y = w[1]; c.leg.shift(); if (!c.leg.length) { c.leg = null; c.pts.shift(); c.waited = 0; if (p.rake) c.wait = 4; } }
+    else { c.x += (w[0] - c.x)/d*sp; c.y += (w[1] - c.y)/d*sp; }
   }
 }
 function syncCrew(){ for (const c of crew) { c.mesh.position.set(W2(c.x), heightAt(c.x, c.y), Z2(c.y)); c.mesh.rotation.y = c.head; } }
